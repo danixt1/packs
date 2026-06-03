@@ -1,6 +1,7 @@
 # StoryEngine — AI Coding Agent Instructions
 
-A declarative textual game engine built with SvelteKit. Authors describe worlds in JSON-like declarative data, and the engine simulates them.
+A declarative textual game engine built with SvelteKit. Use static adapter with hash routing.
+Prefer any than unknow to resolve typing issues.
 
 ## Quick Start
 
@@ -21,7 +22,7 @@ src/
       getters.d.ts          # Declare forms to get variables from game in a valid JSON format.
     engine/
         index.ts            # Core engine: state, conditions, effects, actions, events
-        getters.ts          # resolve the getter object or return the value if not is a getter.
+        getters.ts          # resolve the getter object or return the value if not is a getter(is strong related to getters.d.ts).
         autonomy.ts         # Rule-based NPC autonomy system
         types.ts          # Runtime type definitions (mutable state shapes)
         engine.spec.ts      # Engine unit tests
@@ -39,9 +40,19 @@ src/
 
 The engine uses a getter-based resolution system for conditions, effects, and text templates:
 - `self-variable`, `self-metadata` — actor's variables/fields
+- `temp-variable` — temporary values during action execution
+
+the getter engines also have scopes.
+
+**target**: the target object declared in `targets`
+**runtime**: variables and metada only avaliable in specific state.
+
+format os scoped variables: `SCOPE`:`OBJECT`-`WHERE`
+
+some examples:
+
 - `target:character-variable`, `target:place-variable`, `target:item-variable` — target entity data
 - `runtime:event-variable`, `runtime:action-metadata` — runtime context
-- `temp-variable` — temporary values during action execution
 
 ### Core Engine Functions
 
