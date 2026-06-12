@@ -1,21 +1,28 @@
 <script lang="ts">
+    import { goto } from "$app/navigation";
+
 	interface Props {
 		worldName: string;
-		menuItems: string[];
-		showTopMenu?: boolean;
-		onnoteMenuAction?: (item: string) => void;
 	}
 
+    function onNoteMenuAction(item: string) {
+		showTopMenu = false;
+		const ops:any = {
+            'Create':()=>{goto('#/create')},
+            'Main Menu':()=>{goto('')}
+        }
+        if(item in ops){
+            ops[item]()
+        }
+	}
 	let {
-		worldName,
-		menuItems,
-		showTopMenu = $bindable(false),
-		onnoteMenuAction
+		worldName
 	}: Props = $props();
 
+    let showTopMenu = $state(false);
+    const menuItems = ['Main Menu', 'Save', 'Load', 'AI', 'Create'];
 	function handleMenuAction(item: string) {
-		showTopMenu = false;
-		onnoteMenuAction?.(item);
+		onNoteMenuAction(item);
 	}
 </script>
 
@@ -54,7 +61,6 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		gap: 1rem;
 		padding: 1rem;
 		border-radius: 8px;
 	}
@@ -147,6 +153,11 @@
 
 		.menu-actions button {
 			width: 100%;
+		}
+        .top-bar {
+			padding: 0.65rem;
+            padding-bottom: 0.1rem;
+			gap: 0.65rem;
 		}
 	}
 </style>

@@ -156,7 +156,7 @@
 		display: grid;
 		grid-template-rows: auto minmax(0, 1fr);
 		gap: 0.75rem;
-		padding: 1rem;
+		padding: 1rem 0rem 1rem 0rem;
 		min-height: 0;
 		max-height: 32vh;
 		overflow: hidden;
@@ -214,9 +214,7 @@
 		.bottom-bar {
 			grid-template-rows: auto auto minmax(0, 1fr);
 			max-height: 38vh;
-		}
-		.bottom-bar {
-			padding: 0.75rem;
+			padding: 0.5rem 0rem 0.7rem 0rem;
 		}
 	}
 </style>

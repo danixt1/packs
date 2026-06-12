@@ -24,5 +24,14 @@
 		flex: 1;
 		min-height: 0;
 		overflow: hidden;
+        padding: 1rem;
+		gap: 0.6rem;
+	}
+	@media (max-width: 780px) {
+		.game-shell {
+			padding: 0.65rem;
+            padding-bottom: 0.1rem;
+			gap: 0.65rem;
+		}
 	}
 </style>

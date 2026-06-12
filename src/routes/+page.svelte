@@ -4,18 +4,11 @@
 	import { world } from '$lib/data/world';
 	import { createGameEngine, type Engine, type GameView } from '$lib/engine';
 
-	const menuItems = ['Main Menu', 'Save', 'Load', 'AI', 'Create'];
-
 	const engine = createGameEngine(world);
 
 	let showMobileActions = $state(false);
-	let showTopMenu = $state(false);
 	let view = $state(engine.getView());
 
-	function noteMenuAction(item: string) {
-		showTopMenu = false;
-		console.info(`${item} is visible as a prototype command, but it is not connected yet.`);
-	}
 	function callEngine(func: (engine: Engine) => void | GameView) {
 		let ret = func(engine);
 		if (ret) {
@@ -34,9 +27,6 @@
 <div class="page-layout">
 	<TopBar
 		worldName={world.name}
-		{menuItems}
-		bind:showTopMenu
-		onnoteMenuAction={noteMenuAction}
 	/>
 
 	<MainGame {callEngine} bind:view bind:showMobileActions />
@@ -61,8 +51,6 @@
 		height: 100vh;
 		height: 100dvh;
 		overflow: hidden;
-		padding: 1rem;
-		gap: 0.6rem;
 		box-sizing: border-box;
 	}
 
@@ -89,12 +77,5 @@
 
 	:global(*::-webkit-scrollbar-thumb:hover) {
 		background: linear-gradient(180deg, #f0c987, #a87a3a);
-	}
-
-	@media (max-width: 780px) {
-		.page-layout {
-			padding: 0.65rem;
-			gap: 0.65rem;
-		}
 	}
 </style>
