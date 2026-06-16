@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ActionOption, Engine } from "$lib/engine";
+    import type { ActionOption } from "$lib/engine";
 
     const {action,executeAction}:{action:ActionOption,executeAction:(action:ActionOption)=>void} = $props();
 

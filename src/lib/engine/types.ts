@@ -11,23 +11,23 @@ export type RuntimeVariable = {
 	max?: number;
 	description?: string;
 };
-
-export type VarDisplayView = {
+export interface BaseDisplay{
+	icon:string | null;
+	iconFallback:string | null
+	/** Value to show in frontend */
+	value:string | number | boolean|null
+}
+export interface VarDisplayView extends BaseDisplay{
 	title:string | null
 	altText:string | null
 	priority:number
-	icon:string | null 
-	iconFallback:string | null
-	/** Value to show in frontend */
-	value:string | number | boolean
 	min?:number
 	max?:number
 };
 
-export type DisplayAttribute = {
-	title:string
-	icon:string | null
-	alText:string | null
+export interface DisplayAttribute extends  BaseDisplay{
+	title:string | null
+	altText:string | null
 }
 
 export type RuntimePlace = {
@@ -49,7 +49,8 @@ export type RuntimeCharacter = {
 	placeId: string;
 	autonomy?: any;
 	displayAttributes:DisplayAttribute[],
-	displayVariables:VarDisplayView[]
+	displayInfoCard:VarDisplayView[]
+	displayBar:VarDisplayView[]
 	autonomyMemory: RuntimeVariable[];
 	autonomyState: {
 		currentGoal?: string;

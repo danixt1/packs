@@ -2,6 +2,22 @@ import type { World } from "$lib/types/data/declarative";
 
 export const world: World = {
     name:'Adventure World',
+    displays:[
+        {
+            type:"char-var-display",
+            varName:"health",
+            showIn:'statusBar',
+            title:"Health",
+            priority:10
+        },
+        {
+            type:"char-var-display",
+            varName:"energy",
+            showIn:"statusBar",
+            title:"Energy",
+            priority:10
+        }
+    ],
     places:[
         {
             id:'camp',
@@ -135,7 +151,7 @@ export const world: World = {
             name:'Merlin',
             labels:['npc','mage','rural','healer','friendly'],
             vars:[
-                {name:'health', type:'number', value:50},
+                {name:'health', type:'number', value:50,max:50},
                 {name:'energy', type:'number', value:10,min:0, max:10},
                 {name:'canAttack', type:'boolean', value:false},
                 {name:'isHostile', type:'boolean', value:false},

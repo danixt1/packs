@@ -13,11 +13,6 @@
 		{ id: 'items', label: 'Items' },
 		{ id: 'places', label: 'Places' }
 	];
-	function getNumberVariable(entity: { vars: { name: string; type: string; value: string | number | boolean; max?: number }[] }, name: string) {
-		const variable = entity.vars.find((item) => item.name === name && item.type === 'number');
-
-		return variable?.type === 'number' && typeof variable.value === 'number' ? variable as { name: string; type: 'number'; value: number; max?: number } : null;
-	}
     let activeTab = $state<PanelTab>('characters');
 </script>
 
@@ -48,24 +43,29 @@
 	<div class="bottom-content">
 		{#if activeTab === 'characters'}
 			{#each view.visibleCharacters as character}
-				{@const health = getNumberVariable(character, 'health')}
-				<article class:player-card={character.id === view.playerId} class="info-card">
-					<div>
-						<h3>{character.name}</h3>
-					</div>
-
-					{#if health}
-						<div class="health-block">
-							<span>Health</span>
-							<strong>{health.value}{health.max ? ` / ${health.max}` : ''}</strong>
-							<div class="health-track" aria-hidden="true">
-								<div
-									class="health-fill"
-									style={`width: ${Math.min(100, Math.max(0, health.value))}%`}
-								></div>
+			{@const displays = character.displayBar}
+			<article class:player-card={character.id === view.playerId} class="info-card">
+				<div>
+					<h3>{character.name}</h3>
+				</div>
+				{#if displays.length > 0}
+				<div class="char-displays">
+					{#each displays as display}
+						{#if typeof display.value === 'number'}
+							<div class="number-block">
+								<span>{display.title}</span>
+								<strong>{display.value}{display.max ? ` / ${display.max}` : ''}</strong>
+								<div class="number-track" aria-hidden="true">
+									<div
+										class="number-fill"
+										style={`width: ${Math.min(100, Math.max(0,display.max ? 100 /display.max * display.value:display.value ))}%`}
+									></div>
+								</div>
 							</div>
-						</div>
-					{/if}
+						{/if}
+					{/each}
+				</div>
+				{/if}
 				</article>
 			{/each}
 		{:else if activeTab === 'items'}
@@ -98,8 +98,7 @@
 </footer>
 
 <style>
-	h3,
-	p {
+	h3,p {
 		margin-top: 0;
 	}
 	h3 {
@@ -179,33 +178,38 @@
 		background: rgba(215, 177, 115, 0.12);
 	}
 
-	.health-block {
+	.number-block {
 		display: grid;
 		gap: 0.35rem;
+		flex-grow: 1;
 	}
-
-	.health-block span,
+	.char-displays{
+		gap: 4px;
+		display: flex;
+	}
+	.number-block span,
 	.info-card > span {
 		color: #c9c0b4;
 		font-size: 0.82rem;
 	}
 
-	.health-block strong {
+	.number-block strong {
 		color: #f8d89d;
 	}
 
-	.health-track {
+	.number-track {
 		height: 0.45rem;
 		overflow: hidden;
 		border-radius: 999px;
 		background: rgba(255, 255, 255, 0.12);
 	}
 
-	.health-fill {
+	.number-fill {
 		height: 100%;
 		border-radius: inherit;
 		background: linear-gradient(90deg, #5cc985, #d7b173);
 	}
+
 	@media (max-width: 780px) {
 		.mobile-actions-button {
 			display: block;

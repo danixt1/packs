@@ -14,17 +14,44 @@ import type {
 	RunningAction,
 	VarDisplayView,
 	WorldIndexes,
-	RuntimeCharacter
+	RuntimeCharacter,
+	BaseDisplay
 } from './types';
 import { runAutonomy } from './autonomy';
 import { resolveGetter } from './getters';
-import type { Character, World } from '$lib/types/data/declarative';
+import type { BaseVariableDisplay, Character, PlaceToShowInUI, VariableDeclarator, World } from '$lib/types/data/declarative';
 
 const clone = <T>(value: T): T => structuredClone(value);
 const isGetter = (value: unknown): value is { type: 'getter'; in: string; variable: string; fallback?: string | number | boolean } =>
 	typeof value === 'object' && value !== null && (value as { type?: string }).type === 'getter';
 
 const optionSeparator = '|';
+
+function getCharacterRuntime(character:Character,placeByCharacter:Map<string,string>):RuntimeCharacter{
+	const displayAttributes:DisplayAttribute[] = [];
+	const displayInfoCard:VarDisplayView[] = [];
+	const displayBar:VarDisplayView[] = [];
+
+	return {
+			id: character.id,
+			name: character.name,
+			labels: [...(character.labels ?? [])],
+			vars: clone(character.vars ?? []),
+			displayAttributes,
+			displayBar,
+			displayInfoCard,
+			controlledByPlayer: Boolean(character.controlledByPlayer),
+			playableStatus: character.playableStatus,
+			placeId: placeByCharacter.get(character.id) ?? '',
+			autonomy: clone(character.autonomy ?? null),
+			autonomyMemory: clone(character.autonomy?.memory ?? []),
+			autonomyState: {
+				lastDecisionTime: 0,
+				cycle: 0,
+				cooldowns: {}
+			}
+		}
+}
 
 export function createRuntimeState(world: World): RuntimeState {
 	const placeByCharacter = new Map<string, string>();
@@ -43,24 +70,7 @@ export function createRuntimeState(world: World): RuntimeState {
 			vars: clone(place.vars ?? []),
 			charactersId: [...(place.charactersId ?? [])]
 		})),
-		characters: (world.characters ?? []).map((character: Character) => ({
-			id: character.id,
-			name: character.name,
-			labels: [...(character.labels ?? [])],
-			vars: clone(character.vars ?? []),
-			displayAttributes:[],
-			displayVariables:[],
-			controlledByPlayer: Boolean(character.controlledByPlayer),
-			playableStatus: character.playableStatus,
-			placeId: placeByCharacter.get(character.id) ?? '',
-			autonomy: clone(character.autonomy ?? null),
-			autonomyMemory: clone(character.autonomy?.memory ?? []),
-			autonomyState: {
-				lastDecisionTime: 0,
-				cycle: 0,
-				cooldowns: {}
-			}
-		})),
+		characters: (world.characters ?? []).map((e)=>getCharacterRuntime(e,placeByCharacter)),
 		items: (world.items ?? []).map((item: any) => ({
 			id: item.id,
 			name: item.name,
@@ -708,35 +718,61 @@ function playerId(state: RuntimeState) {
 
 export function updateCharacterDisplay(world:World,state:RuntimeState,chars:RuntimeCharacter[]){
 	const defValues = new Map(world.displays?.map(e =>[e.varName,e]) || []);
-	
-	return chars.map(char => {
-		const displayVariables: VarDisplayView[] = [];
-		const displayAttributes: DisplayAttribute[] = [];
-		
-		for (const def of world.displays ?? []) {
-			const context: ResolveContext = { self: char };
-			const resolved = resolveGetter(state, { type: 'getter', in: 'self:character-variable', variable: def.varName }, context);
-			
-			if (resolved.ok && resolved.value !== undefined) {
-				displayVariables.push({
-					title: def.title ?? null,
-					altText: def.altText ?? null,
-					priority: def.priority ?? 0,
-					icon: def.icon 
-						? def.isValueIconPath 
-							? String(resolved.value) 
-							: def.icon 
-						: null,
-					iconFallback: def.icon && def.isValueIconPath ? def.icon : null,
-					value: resolved.value
-				});
-			}
+	function buildBaseDisplay(b:BaseVariableDisplay,v:any):BaseDisplay{
+		return {
+			icon: b.isValueIconPath ? v : b.icon,
+			iconFallback: b.icon || null,
+			value: b.isValueIconPath ? null : v
 		}
+	}
+	function createVarDisplayView(b:BaseVariableDisplay,v:any,declarator:VariableDeclarator):VarDisplayView{
+		return {
+			...buildBaseDisplay(b,v),
+			altText:b.altText || null,
+			priority:b.priority || 10,
+			title:b.title || null,
+			min:declarator.type == 'number' ? declarator.min || undefined : undefined,
+			max:declarator.type == 'number' ? declarator.max || undefined : undefined
+		}
+	}
+	return chars.map(char => {
+		const displayInfoCard: VarDisplayView[] = [];
+		const displayAttributes: DisplayAttribute[] = [];
+		const displayBar:VarDisplayView[] = [];
 		
+		const vars = world.characters.find((c)=>c.id == char.id)?.vars || [];
+		const displayIn:Record<PlaceToShowInUI,(b:BaseVariableDisplay,d:any,va:VariableDeclarator)=>void> = {
+			attribute(e,v){
+				displayAttributes.push({
+					...buildBaseDisplay(e,v),
+					altText: e.altText || null,
+					title:e.title || null
+				})
+			},
+			statusBar(b,v,va){
+				displayBar.push(createVarDisplayView(b,v,va))
+			},
+			statusCard(b,v,va){
+				displayInfoCard.push(createVarDisplayView(b,v,va))
+			}
+		};
+		for(const v of vars){
+			const display = v.display || defValues.get(v.name);
+			if(!display){
+				continue;
+			}
+			const context: ResolveContext = { self: char };
+			const resolvedValue = resolveGetter(state,{type:'getter',in:'self-variable',variable:v.name},context);
+			if(!resolvedValue.ok || resolvedValue.value === undefined){
+				continue;
+			}
+			displayIn[display.showIn](display,resolvedValue.value,v);
+		}
 		return {
 			...char,
-			displayVariables,
-			displayAttributes
+			displayInfoCard,
+			displayAttributes,
+			displayBar
 		};
 	});
 }
@@ -745,6 +781,7 @@ export function getGameView(world: any, state: RuntimeState): GameView {
 	const id = playerId(state);
 	const player = state.characters.find((character) => character.id === id) ?? state.characters[0];
 	const currentPlace = state.places.find((place) => place.id === player.placeId) ?? state.places[0];
+	
 	return {
 		time: state.time,
 		playerId: id,

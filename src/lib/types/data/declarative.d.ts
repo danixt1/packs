@@ -1,5 +1,5 @@
 import * as Getters from './getters';
-
+export type PlaceToShowInUI = 'statusCard'|'statusBar'|'attribute';
 interface BaseVariableDisplay{
     /**
      * case no title is passed and `showIn` is equal attribute only show what is inside the variable
@@ -19,7 +19,7 @@ interface BaseVariableDisplay{
      * - `statusBar`: shown in the status bar, can by used for important variables that the player needs to keep an eye on, like health, mana, etc.
      * - `attribute`: shown near character name as something he is or a effect ex: Arthur (with:poison)
      */
-    showIn:'statusCard'|'statusBar'|'attribute';
+    showIn:PlaceToShowInUI
 
 }
 interface VariableDeclaratorBase{
