@@ -1,8 +1,31 @@
 import * as Getters from './getters';
 
+interface BaseVariableDisplay{
+    /**
+     * case no title is passed and `showIn` is equal attribute only show what is inside the variable
+     */
+    title?: string;
+    altText?:string;
+    icon?:string;
+    /**
+     * Use the value in variable as the icon path.
+     * Case the value results in a invalid path and `icon` is defined the property turns in a fallback.
+     */
+    isValueIconPath?:boolean;
+    priority?: number;
+    /**
+     * How this variable is shown in the UI.
+     * - `statusCard`: shown in the character status card.
+     * - `statusBar`: shown in the status bar, can by used for important variables that the player needs to keep an eye on, like health, mana, etc.
+     * - `attribute`: shown near character name as something he is or a effect ex: Arthur (with:poison)
+     */
+    showIn:'statusCard'|'statusBar'|'attribute';
+
+}
 interface VariableDeclaratorBase{
     name:string;
     description?: string;
+    display?:BaseVariableDisplay
 }
 interface VariableNumber extends VariableDeclaratorBase{
     type:'number';
@@ -37,7 +60,7 @@ interface Place{
     charactersId: string[];
 }
 
-interface Character{
+export interface Character{
     id: string;
     name: string;
     /**
@@ -414,7 +437,7 @@ interface DialogueTree{
     id: string;
     name: string;
     /**
-     * Purpose used by effects like start-dialogue to resolve a matching tree.
+     * Purpose used by `effects` like start-dialogue to resolve a matching tree.
      */
     intent: string;
     /**
@@ -482,10 +505,16 @@ interface TextTemplate{
     priority?:number;
     match: TextTemplateMatch;
 }
+interface DisplayVariable extends BaseVariableDisplay{
+    type:'char-var-display',
+    varName:string
+}
+export type Display =DisplayVariable
 
 export interface World{
     name:string;
     places: Place[];
+    displays?:DisplayVariable[]
     characters: Character[];
     items: Item[];
     /**

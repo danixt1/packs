@@ -12,6 +12,24 @@ export type RuntimeVariable = {
 	description?: string;
 };
 
+export type VarDisplayView = {
+	title:string | null
+	altText:string | null
+	priority:number
+	icon:string | null 
+	iconFallback:string | null
+	/** Value to show in frontend */
+	value:string | number | boolean
+	min?:number
+	max?:number
+};
+
+export type DisplayAttribute = {
+	title:string
+	icon:string | null
+	alText:string | null
+}
+
 export type RuntimePlace = {
 	id: string;
 	name: string;
@@ -30,6 +48,8 @@ export type RuntimeCharacter = {
 	playableStatus?: string;
 	placeId: string;
 	autonomy?: any;
+	displayAttributes:DisplayAttribute[],
+	displayVariables:VarDisplayView[]
 	autonomyMemory: RuntimeVariable[];
 	autonomyState: {
 		currentGoal?: string;
@@ -102,7 +122,6 @@ export type RuntimeEvent = {
 	actionInstanceId?: string;
 	consumed?: boolean;
 };
-
 export type ActiveDialogue = {
 	id: string;
 	dialogueId: string;

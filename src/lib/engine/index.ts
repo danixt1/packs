@@ -2,6 +2,7 @@ import type {
 	ActionOption,
 	ActiveDialogue,
 	DialogueView,
+	DisplayAttribute,
 	Engine,
 	GameCommand,
 	GameView,
@@ -11,10 +12,13 @@ import type {
 	RuntimeState,
 	RuntimeTarget,
 	RunningAction,
-	WorldIndexes
+	VarDisplayView,
+	WorldIndexes,
+	RuntimeCharacter
 } from './types';
 import { runAutonomy } from './autonomy';
 import { resolveGetter } from './getters';
+import type { Character, World } from '$lib/types/data/declarative';
 
 const clone = <T>(value: T): T => structuredClone(value);
 const isGetter = (value: unknown): value is { type: 'getter'; in: string; variable: string; fallback?: string | number | boolean } =>
@@ -22,7 +26,7 @@ const isGetter = (value: unknown): value is { type: 'getter'; in: string; variab
 
 const optionSeparator = '|';
 
-export function createRuntimeState(world: any): RuntimeState {
+export function createRuntimeState(world: World): RuntimeState {
 	const placeByCharacter = new Map<string, string>();
 	for (const place of world.places ?? []) {
 		for (const characterId of place.charactersId ?? []) placeByCharacter.set(characterId, place.id);
@@ -39,11 +43,13 @@ export function createRuntimeState(world: any): RuntimeState {
 			vars: clone(place.vars ?? []),
 			charactersId: [...(place.charactersId ?? [])]
 		})),
-		characters: (world.characters ?? []).map((character: any) => ({
+		characters: (world.characters ?? []).map((character: Character) => ({
 			id: character.id,
 			name: character.name,
 			labels: [...(character.labels ?? [])],
 			vars: clone(character.vars ?? []),
+			displayAttributes:[],
+			displayVariables:[],
 			controlledByPlayer: Boolean(character.controlledByPlayer),
 			playableStatus: character.playableStatus,
 			placeId: placeByCharacter.get(character.id) ?? '',
@@ -700,6 +706,41 @@ function playerId(state: RuntimeState) {
 	return state.characters.find((character) => character.controlledByPlayer)?.id ?? state.characters[0]?.id;
 }
 
+export function updateCharacterDisplay(world:World,state:RuntimeState,chars:RuntimeCharacter[]){
+	const defValues = new Map(world.displays?.map(e =>[e.varName,e]) || []);
+	
+	return chars.map(char => {
+		const displayVariables: VarDisplayView[] = [];
+		const displayAttributes: DisplayAttribute[] = [];
+		
+		for (const def of world.displays ?? []) {
+			const context: ResolveContext = { self: char };
+			const resolved = resolveGetter(state, { type: 'getter', in: 'self:character-variable', variable: def.varName }, context);
+			
+			if (resolved.ok && resolved.value !== undefined) {
+				displayVariables.push({
+					title: def.title ?? null,
+					altText: def.altText ?? null,
+					priority: def.priority ?? 0,
+					icon: def.icon 
+						? def.isValueIconPath 
+							? String(resolved.value) 
+							: def.icon 
+						: null,
+					iconFallback: def.icon && def.isValueIconPath ? def.icon : null,
+					value: resolved.value
+				});
+			}
+		}
+		
+		return {
+			...char,
+			displayVariables,
+			displayAttributes
+		};
+	});
+}
+
 export function getGameView(world: any, state: RuntimeState): GameView {
 	const id = playerId(state);
 	const player = state.characters.find((character) => character.id === id) ?? state.characters[0];
@@ -708,7 +749,7 @@ export function getGameView(world: any, state: RuntimeState): GameView {
 		time: state.time,
 		playerId: id,
 		currentPlace,
-		visibleCharacters: state.characters.filter((character) => character.placeId === currentPlace.id),
+		visibleCharacters: updateCharacterDisplay(world,state,state.characters.filter((character) => character.placeId === currentPlace.id)),
 		items: state.items.filter((item) => item.location.type === 'place' && item.location.id === currentPlace.id),
 		availableActions: buildActionOptions(world, state, id, 'player'),
 		activeDialogue: getDialogueView(world, state),
