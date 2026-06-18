@@ -757,7 +757,7 @@ export function updateCharacterDisplay(world:World,state:RuntimeState,chars:Runt
 			}
 		};
 		for(const v of vars){
-			const display = v.display || defValues.get(v.name);
+			const display = v.display === undefined ? defValues.get(v.name) : v.display;
 			if(!display){
 				continue;
 			}

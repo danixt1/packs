@@ -1,5 +1,6 @@
 import * as Getters from './getters';
 export type PlaceToShowInUI = 'statusCard'|'statusBar'|'attribute';
+
 interface BaseVariableDisplay{
     /**
      * case no title is passed and `showIn` is equal attribute only show what is inside the variable
@@ -25,7 +26,10 @@ interface BaseVariableDisplay{
 interface VariableDeclaratorBase{
     name:string;
     description?: string;
-    display?:BaseVariableDisplay
+    /**
+     * Set null to cancel the default display
+     */
+    display?:BaseVariableDisplay|null
 }
 interface VariableNumber extends VariableDeclaratorBase{
     type:'number';
