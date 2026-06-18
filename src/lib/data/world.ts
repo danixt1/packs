@@ -2,6 +2,8 @@ import type { World } from "$lib/types/data/declarative";
 
 export const world: World = {
     name:'Adventure World',
+    description:"The main adventure world",
+    version:[1,0,0],
     displays:[
         {
             type:"char-var-display",

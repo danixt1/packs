@@ -517,6 +517,14 @@ export type Display =DisplayVariable
 
 export interface World{
     name:string;
+    description:string;
+    /**
+     * separated in 3 numbers.
+     * pos 1: update if the world have breaking/incompatible updates comparated the last version.
+     * pos 2: if the game have a new content who DON'T break the game and generate problems with the save.
+     * pos 3: small additions(new texts, typo fix, small adjusts)
+     */
+    version:number[];
     places: Place[];
     displays?:DisplayVariable[]
     characters: Character[];

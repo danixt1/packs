@@ -2,10 +2,13 @@ import { describe, expect, it, vi } from 'vitest';
 import { buildActionOptions, createRuntimeState, evaluateAutonomyDecision, evaluateConditions } from '$lib/engine';
 import { runAutonomy } from '$lib/engine/autonomy';
 import type { ActionOption, RuntimeState } from '$lib/engine';
+import type { World } from '$lib/types/data/declarative';
 
-function autonomyTestWorld() {
+function autonomyTestWorld():World {
 	return {
 		name: 'Autonomy Test World',
+		description:'',
+		version:[1,0,0],
 		places: [
 			{
 				id: 'camp',

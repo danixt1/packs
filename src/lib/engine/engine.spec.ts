@@ -51,6 +51,8 @@ function engineTestWorld(actionOverrides: Record<string, any> = {}):World {
 
 	return {
 		name: 'Engine Test World',
+		description:'',
+		version:[],
 		places: [
 			{
 				id: 'camp',
@@ -345,9 +347,11 @@ function addRunningAction(worldUnderTest: any, state: ReturnType<typeof createRu
 	return option;
 }
 
-function textTemplateOrderWorld() {
+function textTemplateOrderWorld():World {
 	return {
 		name: 'Text Template Order World',
+		description:'',
+		version:[1,0,0],
 		places: [
 			{
 				id: 'camp',
