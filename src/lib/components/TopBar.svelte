@@ -67,7 +67,7 @@
 
 	.eyebrow {
 		margin: 0 0 0.25rem;
-		color: #d7b173;
+		color: var(--color-accent);
 		font-size: 0.72rem;
 		font-weight: 800;
 		letter-spacing: 0;
@@ -102,10 +102,10 @@
 	.menu-actions button,
 	.menu-toggle {
 		min-height: 2.5rem;
-		border: 1px solid rgba(236, 211, 167, 0.2);
+		border: 1px solid var(--border-subtle);
 		border-radius: 6px;
-		background: rgba(255, 255, 255, 0.06);
-		color: #f7ead6;
+		background: var(--bg-card);
+		color: var(--color-accent-light);
 		padding: 0.55rem 0.8rem;
 		cursor: pointer;
 		transition:
@@ -117,7 +117,7 @@
 	.menu-actions button:hover,
 	.menu-toggle:hover {
 		border-color: rgba(215, 177, 115, 0.76);
-		background: rgba(215, 177, 115, 0.16);
+		background: var(--bg-card-hover);
 		transform: translateY(-1px);
 	}
 
@@ -140,9 +140,9 @@
 			z-index: 10;
 			display: none;
 			width: min(100%, 20rem);
-			border: 1px solid rgba(236, 211, 167, 0.2);
+			border: 1px solid var(--border-subtle);
 			border-radius: 8px;
-			background: rgba(18, 20, 25, 0.98);
+			background: var(--bg-overlay);
 			box-shadow: 0 1rem 2rem rgba(0, 0, 0, 0.36);
 			padding: 0.5rem;
 		}

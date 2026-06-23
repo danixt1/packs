@@ -72,14 +72,14 @@
 <style>
 	.actions-panel,
 	.dialog-panel {
-		border: 1px solid rgba(236, 211, 167, 0.18);
-		background: rgba(18, 20, 25, 0.82);
+		border: 1px solid var(--border-default);
+		background: var(--bg-panel);
 		box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.24);
 		backdrop-filter: blur(16px);
 	}
 	.eyebrow {
 		margin: 0 0 0.25rem;
-		color: #d7b173;
+		color: var(--color-accent);
 		font-size: 0.72rem;
 		font-weight: 800;
 		letter-spacing: 0;
@@ -130,13 +130,13 @@
 	}
 
 	.scene-context {
-		border-bottom: 1px solid rgba(236, 211, 167, 0.14);
+		border-bottom: 1px solid var(--border-subtle);
 		padding-bottom: 1rem;
 	}
 
 	.scene-context p:last-child {
 		margin-bottom: 0;
-		color: #c9c0b4;
+		color: var(--color-accent-dim);
 		line-height: 1.55;
 	}
 
@@ -150,15 +150,15 @@
 
 	.dialog-entry {
 		max-width: 58rem;
-		border-left: 3px solid #d7b173;
-		background: rgba(7, 9, 12, 0.42);
+		border-left: 3px solid var(--color-accent);
+		background: var(--bg-dialog);
 		padding: 0.85rem 1rem;
 	}
 
 	.dialog-entry strong {
 		display: block;
 		margin-bottom: 0.35rem;
-		color: #f8d89d;
+		color: var(--color-text-bright);
 	}
 
 	.dialog-entry p {
@@ -175,10 +175,10 @@
 
 	.dialogue-choices button {
 		min-height: 2.35rem;
-		border: 1px solid rgba(215, 177, 115, 0.42);
+		border: 1px solid var(--border-strong);
 		border-radius: 6px;
 		background: rgba(215, 177, 115, 0.14);
-		color: #f7ead6;
+		color: var(--color-accent-light);
 		padding: 0.5rem 0.75rem;
 		cursor: pointer;
 	}

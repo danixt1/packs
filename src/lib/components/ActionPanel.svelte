@@ -18,10 +18,10 @@ aria-label="action">
 		display: grid;
 		gap: 0.35rem;
 		width: 100%;
-		border: 1px solid rgba(236, 211, 167, 0.16);
+		border: 1px solid var(--border-subtle);
 		border-radius: 8px;
 		background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
-		color: #f7ead6;
+		color: var(--color-accent-light);
 		padding: 0.9rem;
 		text-align: left;
 		cursor: pointer;
@@ -36,12 +36,12 @@ aria-label="action">
 	}
 
 	.action-card small {
-		color: #c9c0b4;
+		color: var(--color-accent-dim);
 		line-height: 1.45;
 	}
 
 	.action-card strong {
-		color: #d7b173;
+		color: var(--color-accent);
 		font-size: 0.78rem;
 	}
 </style>
