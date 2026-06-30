@@ -1,13 +1,34 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
+    import { type NotifyData, notificationsCallbacks } from '$lib/notify';
+    import Notification from '$lib/components/Notification.svelte';
 
 	let { children } = $props();
+	let notifications = $state<NotifyData[]>([]);
+
+	function addNewNotification(data: NotifyData) {
+		notifications = [...notifications, data];
+	}
+
+	function removeNotification(index: number) {
+		notifications = notifications.filter((_, i) => i !== index);
+	}
+
+	notificationsCallbacks(addNewNotification);
 </script>
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
 </svelte:head>
-
+<div class="popup-messages">
+    {#each notifications as notification, idx (notification)}
+        <Notification
+            data={notification}
+            onClose={() => removeNotification(idx)}
+            index={idx}
+        />
+    {/each}
+</div>
 {@render children()}
 
 <style>
