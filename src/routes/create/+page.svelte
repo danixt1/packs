@@ -1,8 +1,7 @@
 <script lang="ts">
     import TopBar from "$lib/components/TopBar.svelte";
-    import type { World } from "$lib/types/data/declarative";
-    import {world as worlData} from "$lib/data/world";
-    let selectedWorld:World|null = $state(null);
+    import { goto } from "$app/navigation";
+    let avaliableWorlds = $state(getAvaliableWorlds());
 
     interface InfoWolrd{
         name:string
@@ -10,20 +9,27 @@
         createdAt?:number
         lastEdit?:number
         version:number[]
-        load:()=>void,
-        del:()=>void
+        del:(()=>void) | null
     }
-    
+
+    function handleDelete(e:Event, delFn:(()=>void)|null){
+        e.stopPropagation();
+        delFn?.();
+        avaliableWorlds = getAvaliableWorlds();
+    }
+    function gotoWorld(name:string){
+        if(name == 'Main World'){
+            name = 'main';
+        }
+        goto('#/create/'+name);
+    }
     function getAvaliableWorlds(){
         let worlds:InfoWolrd[] = [
             {
-                name:'Adventure World',
+                name:'Main World',
                 description:'The main adventure world',
                 version:[1,0,0],
-                load() {
-                    selectedWorld = worlData;
-                },
-                del(){}
+                del:null
             }
         ]
         if(typeof window != undefined){
@@ -48,23 +54,20 @@
             if(!Array.isArray(resolved)){
                 return;
             }
-            for(const w of resolved){
-                if(typeof w.name === 'string'){
+            setWorlds(resolved);
+            function setWorlds(worldsToLoad:InfoWolrd[]){
+                for(const w of worldsToLoad){
+                    if(typeof w.name != 'string'){
+                        continue;
+                    }
                     worlds.push({
                         name:w.name,
                         description:w.description || "None",
                         version:w.version,
-                        load() {
-                            let data = localStorage.getItem('world-'+w.name);
-                            if(!data){
-                                //TODO: show message to user as "not found world"
-                                console.error(`world-${w.name} not found in localStorage`);
-                                return;
-                            }
-                            let jsonData = JSON.parse(data);
-                            selectedWorld = jsonData;
-                        },
                         del(){
+                            let idx = worldsToLoad.findIndex((e)=>e.name === w.name);
+                            worldsToLoad.splice(idx,1);
+                            localStorage.setItem(key,JSON.stringify(worldsToLoad));
                             localStorage.removeItem('world-'+w.name);
                         }
                     })
@@ -77,26 +80,31 @@
 <div class="page-layout">
     <TopBar worldName="Create" />
     <main>
-        {#if selectedWorld == null}
             <div class="worlds">
                 <div class="worlds-list">
                     <div>
                         <h1>Avaliable worlds</h1>
                     </div>
-                    {#each getAvaliableWorlds() as world}
-                        <button class="world-item" onclick={()=>{world.load()}}>
+                    {#each avaliableWorlds as world}
+                        <button class="world-item" onclick={()=>{gotoWorld(world.name)}} onkeydown={(e)=>{if(e.key==="Enter")gotoWorld(world.name)}}>
                             <div class="world-title">
                                 <h2>{world.name}</h2>
                             </div>
                             {world.description}
-    
+                            {#if world.del}
+                                <div role="button" tabindex="0" title="delete" class="world-delete-btn" onclick={(e)=>handleDelete(e, world.del)} onkeydown={(e)=>{if(e.key==="Enter")handleDelete(e, world.del)}}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                                    </svg>
+                                </div>
+                            {/if}
                         </button>
                     {/each}
                 </div>
                 <button type="button" class="world-new-btn">Create New World</button>
             </div>
-        {/if}
-
+        
     </main>
 </div>
 <style>
@@ -184,6 +192,7 @@
 		font-family: inherit;
 		font-size: 1rem;
 		transition: all 0.2s ease;
+		position: relative;
 	}
 
 	.world-item:hover {
@@ -204,6 +213,26 @@
 		font-size: 1.125rem;
 		font-weight: 600;
 		color: #d7b173;
+	}
+
+	.world-delete-btn {
+		position: absolute;
+		top: 0.75rem;
+		right: 0.75rem;
+		background: transparent;
+		border: none;
+		cursor: pointer;
+		color: rgba(215, 177, 115, 0.6);
+		padding: 0.25rem;
+		border-radius: 4px;
+		transition: all 0.2s ease;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.world-delete-btn:hover {
+		color: #e74c3c;
 	}
     @media (max-width:780px){
         .world-item{
