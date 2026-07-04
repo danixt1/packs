@@ -1,5 +1,4 @@
 <script lang="ts">
-    import TopBar from "$lib/components/TopBar.svelte";
     import { goto } from "$app/navigation";
     let avaliableWorlds = $state(getAvaliableWorlds());
 
@@ -77,36 +76,33 @@
     }
 </script>
 
-<div class="page-layout">
-    <TopBar worldName="Create" />
-    <main>
-            <div class="worlds">
-                <div class="worlds-list">
-                    <div>
-                        <h1>Avaliable worlds</h1>
-                    </div>
-                    {#each avaliableWorlds as world}
-                        <button class="world-item" onclick={()=>{gotoWorld(world.name)}} onkeydown={(e)=>{if(e.key==="Enter")gotoWorld(world.name)}}>
-                            <div class="world-title">
-                                <h2>{world.name}</h2>
-                            </div>
-                            {world.description}
-                            {#if world.del}
-                                <div role="button" tabindex="0" title="delete" class="world-delete-btn" onclick={(e)=>handleDelete(e, world.del)} onkeydown={(e)=>{if(e.key==="Enter")handleDelete(e, world.del)}}>
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
-                                        <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
-                                        <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
-                                    </svg>
-                                </div>
-                            {/if}
-                        </button>
-                    {/each}
+<main>
+        <div class="worlds">
+            <div class="worlds-list">
+                <div>
+                    <h1>Avaliable worlds</h1>
                 </div>
-                <button type="button" class="world-new-btn">Create New World</button>
+                {#each avaliableWorlds as world}
+                    <button class="world-item" onclick={()=>{gotoWorld(world.name)}} onkeydown={(e)=>{if(e.key==="Enter")gotoWorld(world.name)}}>
+                        <div class="world-title">
+                            <h2>{world.name}</h2>
+                        </div>
+                        {world.description}
+                        {#if world.del}
+                            <div role="button" tabindex="0" title="delete" class="world-delete-btn" onclick={(e)=>handleDelete(e, world.del)} onkeydown={(e)=>{if(e.key==="Enter")handleDelete(e, world.del)}}>
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                                    <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5m3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0z"/>
+                                    <path d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4zM2.5 3h11V2h-11z"/>
+                                </svg>
+                            </div>
+                        {/if}
+                    </button>
+                {/each}
             </div>
-        
-    </main>
-</div>
+            <button type="button" class="world-new-btn">Create New World</button>
+        </div>
+    
+</main>
 <style>
 	.world-new-btn {
 		color: var(--color-accent-light);
@@ -148,14 +144,6 @@
 	.world-new-btn:active {
 		transform: translateY(0);
 		box-shadow: 0 4px 12px rgba(215, 177, 115, 0.15);
-	}
-	.page-layout {
-		display: flex;
-		flex-direction: column;
-		height: 100vh;
-		height: 100dvh;
-		overflow: hidden;
-		box-sizing: border-box;
 	}
 
 	main {
