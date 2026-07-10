@@ -1,6 +1,7 @@
 import { error } from '@sveltejs/kit';
 import type { PageLoad } from './$types';
 import { world } from '$lib/data/world';
+import type { World } from '$lib/types/data/declarative';
 
 export const load: PageLoad = async ({ params }) => {
     let slug = params.worldName;
@@ -16,6 +17,6 @@ export const load: PageLoad = async ({ params }) => {
         }
     }
     return {
-        world: JSON.parse(worldToLoad)
+        world: JSON.parse(worldToLoad) as World,
     }
 }
