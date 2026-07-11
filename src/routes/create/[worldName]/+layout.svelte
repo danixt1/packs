@@ -76,7 +76,7 @@
         flex-direction:column;
         width:150px;
         border-right: 1px solid var(--border-subtle);
-        margin-right: 5px;
+        padding-right: 5px;
         padding: 8px 0;
         gap: 2px;
     }
@@ -118,6 +118,36 @@
         background:rgba(0,0,0,0.5);
         z-index:999;
     }
+    main{
+        flex:1;
+        width:100%;
+        min-height:0;
+    }
+    
+    .item-button{
+        display:flex;
+        flex-direction:row;
+        align-items:center;
+        justify-content:flex-start;
+        padding:10px 16px;
+        border:none;
+        border-left: 3px solid transparent;
+        background-color: transparent;
+        color: var(--color-accent-light);
+        font-size:14px;
+        cursor:pointer;
+        transition: all 0.2s ease;
+        margin: 0 4px;
+        border-radius: 4px 0 0 4px;
+    }
+    .item-button:hover{
+        background-color:var(--bg-card-hover);
+        border-left-color:var(--color-accent);
+        color:var(--color-text-bright);
+    }
+    .item-button:active{
+        background-color:var(--bg-card);
+    }
     @media (max-width: 640px) {
         .mobile-menu-toggle-collapsed{
             display:flex;
@@ -145,32 +175,7 @@
             transform:translateX(0);
         }
         main{
-            width:100%;
             padding-top:52px;
         }
-    }
-    .item-button{
-        display:flex;
-        flex-direction:row;
-        align-items:center;
-        justify-content:flex-start;
-        padding:10px 16px;
-        border:none;
-        border-left: 3px solid transparent;
-        background-color: transparent;
-        color:var(--color-text);
-        font-size:14px;
-        cursor:pointer;
-        transition: all 0.2s ease;
-        margin: 0 4px;
-        border-radius: 4px 0 0 4px;
-    }
-    .item-button:hover{
-        background-color:var(--bg-card-hover);
-        border-left-color:var(--color-accent);
-        color:var(--color-text-bright);
-    }
-    .item-button:active{
-        background-color:var(--bg-card);
     }
 </style>
