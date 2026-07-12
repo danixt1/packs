@@ -20,7 +20,7 @@
         if(name == 'Main World'){
             name = 'main';
         }
-        goto('#/create/'+name);
+        goto('#/editor/'+name);
     }
     function getAvaliableWorlds(){
         let worlds:InfoWolrd[] = [

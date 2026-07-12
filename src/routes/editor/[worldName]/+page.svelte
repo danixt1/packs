@@ -24,7 +24,7 @@
     </div>
     <div class="options">
         <button type="button" onclick={()=>{}}>Save</button>
-        <button type="button" onclick={()=>{goto('#/create')}}>Back to Worlds</button>
+        <button type="button" onclick={()=>{goto('#/editor')}}>Back to Worlds</button>
     </div>
 </div>
 <style>

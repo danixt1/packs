@@ -8,7 +8,7 @@
     function onNoteMenuAction(item: string) {
 		showTopMenu = false;
 		const ops:any = {
-            'Create':()=>{goto('#/create')},
+            'Editor':()=>{goto('#/editor')},
             'Main Menu':()=>{goto('')}
         }
         if(item in ops){
@@ -20,7 +20,7 @@
 	}: Props = $props();
 
     let showTopMenu = $state(false);
-    const menuItems = ['Main Menu', 'Save', 'Load', 'AI', 'Create'];
+    const menuItems = ['Main Menu', 'Save', 'Load', 'AI', 'Editor'];
 	function handleMenuAction(item: string) {
 		onNoteMenuAction(item);
 	}
