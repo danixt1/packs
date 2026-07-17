@@ -1,10 +1,11 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
+    import {page} from '$app/state';
     let { children } = $props();
     let menus:{display:string,name:string}[] = [
         {
-            display:'Settings',
-            name:'settings'
+            display:'World',
+            name:''
         },
         {
             display:'Items',
@@ -54,7 +55,7 @@
     {/if}
     <nav class="items-bar" class:open={mobileMenuOpen}>
         {#each menus as menu}
-            <button onclick={() => { goto(window.location.hash + '/' + menu.name); mobileMenuOpen = false; }} class="item-button">
+            <button onclick={() => { goto("#/editor/"+page.params.worldName+"/"+menu.name); mobileMenuOpen = false; }} class="item-button">
                 {menu.display}
             </button>
         {/each}
