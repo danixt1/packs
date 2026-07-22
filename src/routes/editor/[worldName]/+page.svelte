@@ -1,5 +1,6 @@
 <script lang='ts'>
     import { goto } from "$app/navigation";
+    import Input from "$lib/components/Input.svelte";
     import type { World } from "$lib/types/data/declarative";
     import type { PageProps } from './$types';
     let { data }: PageProps = $props();
@@ -11,8 +12,7 @@
     <div class="panels">
         <div class="base-info">
             <div>
-                <span class="title">&gt;</span>
-                <input type="text" name="worldName" id="worldName" class="i input-title title" value={selectedWorld.name} />
+                <Input type="text-title" name="worldName" bind:value={selectedWorld.name}/>
             </div>
             <div>
                 <div class="label-description">
@@ -76,16 +76,5 @@
     }
     .i:hover{
         background:var(--bg-card-hover);
-    }
-    .title{
-        font-size:1.5rem;
-        font-weight:bold;
-        padding:4px 8px;
-        background:transparent;
-        border:none;
-    }
-    .input-title{
-        border-bottom:1px solid var(--border-subtle);
-        color: var(--color-accent-light);
     }
 </style>
