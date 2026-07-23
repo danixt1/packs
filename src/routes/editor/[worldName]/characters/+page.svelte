@@ -188,7 +188,7 @@
         border:1px solid var(--border-subtle);
         padding:0.35rem 0.7rem;
         color:var(--color-text);
-        background:var(--bg-card);
+        background:var(--bg-button);
         font:inherit;
     }
     .label-chip,.new-label-button{

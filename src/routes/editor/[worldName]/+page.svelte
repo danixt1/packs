@@ -33,7 +33,7 @@
     }
     .options button{
         border-radius: 6px;
-        background:var(--bg-card);
+        background:var(--bg-button);
         border:1px solid var(--border-subtle);
         color: var(--color-accent-light);
         padding:0.5rem 1rem;
@@ -71,7 +71,7 @@
     }
     .i{
         color:var(--color-text);
-        background:var(--bg-card);
+        background:var(--bg-button);
         border:1px solid var(--border-subtle);
     }
     .i:hover{

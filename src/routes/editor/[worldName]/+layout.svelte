@@ -90,7 +90,7 @@
         height:44px;
         border:none;
         border-radius:8px;
-        background:var(--bg-card);
+        background:var(--bg-button);
         color:var(--color-text);
         font-size:20px;
         cursor:pointer;
@@ -106,7 +106,7 @@
         height:44px;
         border:none;
         border-radius:8px;
-        background:var(--bg-card);
+        background:var(--bg-button);
         color:var(--color-text);
         font-size:20px;
         cursor:pointer;
@@ -147,7 +147,7 @@
         color:var(--color-text-bright);
     }
     .item-button:active{
-        background-color:var(--bg-card);
+        background-color:var(--bg-button);
     }
     @media (max-width: 640px) {
         .mobile-menu-toggle-collapsed{

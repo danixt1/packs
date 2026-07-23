@@ -104,7 +104,7 @@
 		min-height: 2.5rem;
 		border: 1px solid var(--border-subtle);
 		border-radius: 6px;
-		background: var(--bg-card);
+		background: var(--bg-button);
 		color: var(--color-accent-light);
 		padding: 0.55rem 0.8rem;
 		cursor: pointer;

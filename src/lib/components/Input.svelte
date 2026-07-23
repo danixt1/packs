@@ -34,7 +34,7 @@
 <style>
     .i{
         color:var(--color-text);
-        background:var(--bg-card);
+        background:var(--bg-button);
         border:1px solid var(--border-subtle);
     }
     .i:hover{

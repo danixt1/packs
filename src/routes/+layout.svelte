@@ -52,7 +52,7 @@
 		/* Backgrounds */
 		--bg-panel: rgba(18, 20, 25, 0.82);
 		--bg-panel-solid: #12141a;
-		--bg-card: rgba(255, 255, 255, 0.08);
+		--bg-button: rgba(255, 255, 255, 0.08);
 		--bg-card-hover: rgba(215, 177, 115, 0.16);
 		--bg-dialog: rgba(7, 9, 12, 0.42);
 		--bg-overlay: rgba(18, 20, 25, 0.98);
