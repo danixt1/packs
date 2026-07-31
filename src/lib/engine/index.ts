@@ -262,14 +262,15 @@ export function collectTargets(world: any, state: RuntimeState, action: any, act
 }
 
 function renderTemplateText(state: RuntimeState, template: string, context: ResolveContext) {
-	return template.replace(/\$([^$]+)\$/g, (_, path: string) => {
+	return template.replace(/([^\\]|^)(\$([^$]+)[^\\]\$)/g, (_,_a, path: string) => {
+		path = path.substring(1,path.length - 1);
 		const lastColon = path.lastIndexOf(':');
 		const variable = path.slice(lastColon + 1);
 		const source = path.slice(0, lastColon);
 		const normalizedGetter = { type: 'getter', in: source, variable };
 		const resolved = resolveGetter(state, normalizedGetter, context);
-		return resolved.ok ? String(resolved.value) : '';
-	});
+		return resolved.ok ? _a + String(resolved.value) : _a;
+	}).replaceAll('\\$','$');
 }
 
 export function buildActionOptions(world: any, state: RuntimeState, actorId: string, audience: 'player' | 'autonomous' = 'player') {
