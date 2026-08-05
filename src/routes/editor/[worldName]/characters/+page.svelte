@@ -1,7 +1,11 @@
 <script lang="ts">
     import CreateLabelPopup, { type NewLabel } from "$lib/components/CreateLabelPopup.svelte";
     import Input from "$lib/components/Input.svelte";
+    import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { page } from '$app/state';
 
+    let editor = getCurrentWorldEditor(page.params.worldName);
+    //editor
     //TODO: add the data when the editor backend is ready.
     let tempData =$state({
         labelsDetails:[
@@ -95,7 +99,7 @@
                 </div>
                 <section class="character-labels" aria-labelledby={'labels-' + character.id}>
                     <div class="labels-heading">
-                        <h3 id={'labels-' + character.id}>Labels</h3>
+                        <h3 id={'labels-' + character.id} class="property-heading">Labels</h3>
                         <button type="button" class="new-label-button" onclick={() => openCreateLabel(character.id)}>New label</button>
                     </div>
                     <div class="label-chips" aria-label={'Labels for ' + character.name}>
@@ -124,11 +128,16 @@
                         {/each}
                     </div>
                 </section>
-                <ul>
+                <div class="character-properties">
+                    <div>
+                        <h3 class="property-heading">Variables</h3>
+                    </div>
                     {#each character.vars as variable}
-                        <li>{variable.name}: {variable.value}</li>
+                        <div>
+                            <Input type={variable.type as any} name={variable.id} label={variable.name + ':'} bind:value={variable.value}/>
+                        </div>
                     {/each}
-                </ul>
+                </div>
             </div>
         {/each}
     </div>
@@ -169,7 +178,7 @@
         justify-content:space-between;
         gap:0.75rem;
     }
-    .labels-heading h3{
+    .property-heading{
         margin:0;
         color:var(--color-accent-light);
         font-size:1rem;
