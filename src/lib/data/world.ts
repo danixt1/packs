@@ -767,5 +767,12 @@ export const world: World = {
             categories:['third-person','combat']
         }
     ],
-    vars:[]
+    vars:[],
+    editor:{
+        labelsDescription:{
+            "npc":{title:"NPC", description:"Non-player character, usually controlled by the game."},
+            "autonomous":{title:"Autonomous", description:"Character is autonomous and can act on its own."},
+            "hostile":{title:"Hostile", description:"Character is hostile and will attack the player."},
+        }
+    }
 }

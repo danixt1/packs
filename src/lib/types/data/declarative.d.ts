@@ -525,6 +525,7 @@ export interface World{
      * pos 3: small additions(new texts, typo fix, small adjusts)
      */
     version:number[];
+    editor?: Editor;
     places: Place[];
     displays?:DisplayVariable[]
     characters: Character[];
