@@ -90,7 +90,6 @@
 	:global(body) {
 		margin: 0;
 		min-width: 320px;
-		overflow: hidden;
 		background:
 			radial-gradient(circle at top left, rgba(156, 106, 47, 0.24), transparent 32rem),
 			linear-gradient(135deg, #111318 0%, #1d1b1f 48%, #101723 100%);
@@ -101,8 +100,6 @@
 	.page-layout {
 		display: flex;
 		flex-direction: column;
-		height: 100vh;
-		height: 100dvh;
 		overflow: hidden;
 		box-sizing: border-box;
 	}
