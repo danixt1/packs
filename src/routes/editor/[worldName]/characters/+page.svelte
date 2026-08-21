@@ -1,9 +1,12 @@
 <script lang="ts">
-    import CreateLabelPopup, { type NewLabel } from "$lib/components/CreateLabelPopup.svelte";
-    import Input from "$lib/components/Input.svelte";
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
-
+    import ObjectTable from "$lib/components/ObjectTable.svelte";
+    import FormPopup from "$lib/components/FormPopup.svelte";
+    import InputText from "$lib/components/inputs/InputText.svelte";
+    import InputCard from "$lib/components/inputs/InputCard.svelte";
+    import { showError } from "$lib/notify";
+    import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     let editor = getCurrentWorldEditor(page.params.worldName);
     //editor
     //TODO: add the data when the editor backend is ready.
@@ -11,6 +14,7 @@
         labelsDetails:[
             {
                 name:'npc',
+                title:'NPC' as string | undefined,
                 description:'is a Non-player character',
                 usedBy:[
                     {
@@ -18,7 +22,6 @@
                         mappingId:'dial.small-talk-npc',
                         id:'small-talk-npc',
                         name:'NPC Small Talk',
-                        priority:'low' // pre-process priority in backend to determine UI order and colors.
                     }
                 ]
             }
@@ -45,212 +48,186 @@
                     }
                 ]
                 //TODO: autonomy
+            },
+            {
+                id:'char2',
+                name:'Character 2',
+                labels:[],
+                vars:[
+                    {
+                        id:'desc',
+                        name:'Description',
+                        type:'string',
+                        value:'The second character in the world'
+                    },
+                    {
+                        id:'health',
+                        name:'Health',
+                        type:'number',
+                        min:0,
+                        max:100,
+                        value:80
+                    }
+                ]
             }
         ]
     })
+    let charsList = $derived(tempData.characters.map((character) => ({
+            Id: character.id,
+            Name: character.name,
+            Labels: character.labels.join(', '),
+            Variables: character.vars.map((v) => `${v.name}`).join(', ')
+    })));
+    let openObjectEditor = $state(false);
+    let keepEditorOpen = $state(false);
 
-    let labelPopupOpen = $state(false);
-    let characterIdForNewLabel = $state<string | null>(null);
+    let formTitle = $state('');
+        
+    let formCharacter = $state<Record<string, any>>({});
+    let formLabel = $state<Record<string, any>>({});
+    let showLabelForm = $state(false);
+    let currentCharId:string|null = $state(null);
 
-    function hasLabel(character: typeof tempData.characters[number], labelName: string) {
-        return character.labels.includes(labelName);
-    }
-
-    function toggleLabel(character: typeof tempData.characters[number], labelName: string) {
-        if (hasLabel(character, labelName)) {
-            character.labels = character.labels.filter((label) => label !== labelName);
-            return;
+    function formSubmit(){
+        if(showLabelForm){
+            createLabel(formLabel);
+            showLabelForm = false;
+            setTimeout(()=>{keepEditorOpen = false});
+            return
         }
-        character.labels = [...character.labels, labelName];
+        if(currentCharId === null){
+            if(tempData.characters.some((e)=>e.id == formCharacter.id)){
+                showError('The Passed ID already existed')
+                setTimeout(()=>{openObjectEditor = true})
+                return
+            }
+            createCharacter(formCharacter);
+            return
+        }
+        const index = tempData.characters.findIndex((e)=>e.id == currentCharId);
+        if(index <  0){
+            showError('Failed Editing character, Original ID not found');
+            return
+        }
+        tempData.characters[index] = formCharacter as any;
+        currentCharId = null;
     }
 
-    function deleteLabel(labelName: string) {
-        tempData.labelsDetails = tempData.labelsDetails.filter((label) => label.name !== labelName);
-        for (const character of tempData.characters) {
-            character.labels = character.labels.filter((label) => label !== labelName);
+    function createLabel(label: any) {
+        tempData.labelsDetails.push({ name: label.name, description: label.description, usedBy: [], title: label.title });
+    }
+    function buildBaseCharacterFormData() {
+        formCharacter = {
+            id: '',
+            name: '',
+            labels: [],
+            vars: []
+        };
+    }
+    function buildBaseLabelFormData(){
+        formLabel = {
+            name:'',
+            title:'',
+            description:''
         }
     }
-
-    function openCreateLabel(characterId: string) {
-        characterIdForNewLabel = characterId;
-        labelPopupOpen = true;
-    }
-
-    function createLabel(label: NewLabel) {
-        tempData.labelsDetails.push({ name: label.name, description: label.description, usedBy: [] });
-        const character = tempData.characters.find((candidate) => candidate.id === characterIdForNewLabel);
-        if (character && !hasLabel(character, label.name)) {
-            character.labels = [...character.labels, label.name];
-        }
-        characterIdForNewLabel = null;
+    function createCharacter(character: Record<string,any>) {
+        const newCharacter = {
+            id: character.id,
+            name: character.name,
+            labels: character.labels,
+            vars: []
+        };
+        tempData.characters.push(newCharacter);
     }
 
 </script>
 <div class="world-characters">
-    <h2>Characters</h2>
-    <div class="characters-list">
-        {#each tempData.characters as character}
-            <div class="character-card">
-                <div>
-                    <Input type='text-title' name="charName" bind:value={character.name}/>
-                </div>
-                <div class="character-properties">
-                    <Input type='text' name="charId" label="ID:" bind:value={character.id}/>
-                </div>
-                <section class="character-labels" aria-labelledby={'labels-' + character.id}>
-                    <div class="labels-heading">
-                        <h3 id={'labels-' + character.id} class="property-heading">Labels</h3>
-                        <button type="button" class="new-label-button" onclick={() => openCreateLabel(character.id)}>New label</button>
-                    </div>
-                    <div class="label-chips" aria-label={'Labels for ' + character.name}>
-                        {#each tempData.labelsDetails as label}
-                            <div class="label-option">
-                                <button
-                                    type="button"
-                                    class:selected={hasLabel(character, label.name)}
-                                    class="label-chip"
-                                    aria-pressed={hasLabel(character, label.name)}
-                                    title={label.description || label.name}
-                                    onclick={() => toggleLabel(character, label.name)}
-                                >
-                                    {label.name}
-                                </button>
-                                <button
-                                    type="button"
-                                    class="delete-label-button"
-                                    aria-label={'Delete label ' + label.name}
-                                    title={'Delete label ' + label.name}
-                                    onclick={() => deleteLabel(label.name)}
-                                >
-                                    &times;
-                                </button>
-                            </div>
-                        {/each}
-                    </div>
-                </section>
-                <div class="character-properties">
-                    <div>
-                        <h3 class="property-heading">Variables</h3>
-                    </div>
-                    {#each character.vars as variable}
-                        <div>
-                            <Input type={variable.type as any} name={variable.id} label={variable.name + ':'} bind:value={variable.value}/>
-                        </div>
-                    {/each}
-                </div>
-            </div>
-        {/each}
+    <div>
+        <h2>Characters</h2>
+    </div>
+    <ObjectTable
+        bind:items={charsList}
+        headers={['Id','Name', 'Labels', 'Variables']}
+        ref = {tempData.characters}
+        onEdit={(character) => {
+            formTitle = 'Editing Character'
+            
+            formCharacter = $state.snapshot(character);
+            
+            currentCharId = character.id as string;
+            openObjectEditor = true;
+        }}
+        onDelete={(character) => {
+            tempData.characters = tempData.characters.filter((c) => c.id !== character.id);
+        }}/>
+    <div class="btn-create">
+        <button onclick={()=>{
+            formTitle = 'Create Character';
+            buildBaseCharacterFormData();
+            openObjectEditor = true}}>Add Character</button>
     </div>
 </div>
-<CreateLabelPopup
-    bind:open={labelPopupOpen}
-    existingLabelNames={tempData.labelsDetails.map((label) => label.name)}
-    onCreate={createLabel}
-/>
+<FormPopup
+    bind:open={openObjectEditor}
+    title={formTitle}
+    onClose={() => { openObjectEditor = false; }}
+    onSubmit={formSubmit}
+    keepOpen={keepEditorOpen}>
+
+    {#if showLabelForm}
+        <InputText id="labelName"  label="Name(id)" bind:value={formLabel.name} wrapDiv required/>
+        <InputText id="labelTitle" label="Title" bind:value={formLabel.title} wrapDiv />
+        <InputText id="labelDesc" label="Description" bind:value={formLabel.description} wrapDiv/>
+    {:else}
+        <InputText id="charId" label="ID" bind:value={formCharacter.id} wrapDiv required />
+        <InputText id="charName" label="Name" bind:value={formCharacter.name} wrapDiv required />
+        <InputCard id="charLabels" label="Labels" items={tempData.labelsDetails.map((label) => ({
+            value: label.name,
+            title: label.title ?? label.name
+        }))} bind:selectedItems={formCharacter.labels} wrapDiv />
+        <BaseInput id='create-label' wrapDiv>
+            <button type="button" onclick={()=>{
+                formTitle = "New Label";
+                buildBaseCharacterFormData();
+                keepEditorOpen = true;
+                showLabelForm = true;
+            }}>Create Label</button>
+        </BaseInput>
+    {/if}
+</FormPopup>
 <style>
     .world-characters{
         display:flex;
         flex-direction:column;
         gap:1rem;
         padding:1rem;
+        height: 100%;
+        overflow: hidden;
     }
-    .characters-list{
-        display:flex;
-        flex-direction:column;
-        gap:1rem;
+    .btn-create{
+        display: flex;
+        justify-content: center;
     }
-    .character-card{
-        border:1px solid var(--border-subtle);
-        border-radius:6px;
-        padding:0.5rem 1rem;
+    .btn-create button{
+        height: 34px;
+        width: 50%;
     }
-    .character-properties{
-        margin-top:5px
+    button {
+        margin-right: 5px;
+        background-color: var(--bg-button);
+        color: var(--color-text);
+        border: var(--border-subtle) 1px solid;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        transition: background-color 0.2s, border-color 0.2s;
     }
-    .character-labels{
-        margin-top:1rem;
-        padding-top:0.75rem;
-        border-top:1px solid var(--border-subtle);
+    button:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
     }
-    .labels-heading{
-        display:flex;
-        align-items:center;
-        justify-content:space-between;
-        gap:0.75rem;
-    }
-    .property-heading{
-        margin:0;
-        color:var(--color-accent-light);
-        font-size:1rem;
-    }
-    .label-chips{
-        display:flex;
-        flex-wrap:wrap;
-        gap:0.5rem;
-        margin-top:0.65rem;
-    }
-    .label-option{
-        position:relative;
-    }
-    .label-chip,.new-label-button,.delete-label-button{
-        cursor:pointer;
-        border:1px solid var(--border-subtle);
-        padding:0.35rem 0.7rem;
-        color:var(--color-text);
-        background:var(--bg-button);
-        font:inherit;
-    }
-    .label-chip,.new-label-button{
-        border-radius:999px;
-    }
-    .label-option .label-chip{
-        padding-right:2.35rem;
-    }
-    .delete-label-button{
-        position:absolute;
-        top:50%;
-        right:0.2rem;
-        z-index:1;
-        display:grid;
-        place-items:center;
-        width:1.45rem;
-        height:1.45rem;
-        padding:0;
-        border-radius:50%;
-        transform:translateY(-50%);
-        line-height:1;
-    }
-    .label-chip:hover,.new-label-button:hover,.delete-label-button:hover{
-        background:var(--bg-card-hover);
-        border-color:var(--color-accent);
-    }
-    .delete-label-button:hover{
-        color:#e05555;
-    }
-    .label-chip.selected{
-        color:var(--color-accent);
-        background:var(--color-accent-light);
-        border-color:var(--color-accent-light);
-    }
-    .label-option:has(.label-chip.selected) .delete-label-button{
-        color:var(--color-accent);
-        background:var(--color-accent-light);
-        border-color:var(--color-accent-light);
-    }
-    .label-option:has(.label-chip.selected) .delete-label-button:hover{
-        color:#e05555;
-        background:var(--bg-card-hover);
-        border-color:var(--color-accent);
-    }
-    .new-label-button{
-        border-radius:4px;
-        color:var(--color-accent-light);
-    }
-    .label-chip:focus-visible,.new-label-button:focus-visible,.delete-label-button:focus-visible{
-        outline:2px solid var(--color-accent);
-        outline-offset:2px;
-    }
-    @media (max-width:480px){
-        .labels-heading{align-items:flex-start;flex-direction:column;}
+    button:hover {
+        background-color: var(--bg-card-hover);
+        border-color: var(--color-accent);
     }
 </style>

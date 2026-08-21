@@ -4,10 +4,14 @@
         onEdit: (item: Record<string, unknown>) => void;
         onDelete: (item: Record<string, unknown>) => void;
         items: Record<string, unknown>[];
+        /** Original Object, if passed is passed in `onEdit` and `onDelete`.
+         * Attention: Ref needs to by in the same order of items
+        */
+        ref?:any[];
         headers: string[];
         mappedHeaders?: Record<string, string>;
     }
-    let { onEdit: onSelect, onDelete, items, headers, mappedHeaders }: Props = $props();
+    let { onEdit: onSelect, onDelete, items = $bindable([]), headers, mappedHeaders,ref }: Props = $props();
 </script>
 
 <table>
@@ -20,14 +24,14 @@
         </tr>
     </thead>
     <tbody>
-        {#each items as item}
+        {#each items as item,index}
             <tr>
                 {#each headers as header}
                     <td data-header={header}>{mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}</td>
                 {/each}
                 <td class="actions-cell" data-header="Actions">
-                    <button onclick={() => onSelect(item)}>Edit</button>
-                    <button onclick={() => onDelete(item)}>Delete</button>
+                    <button onclick={() => onSelect(ref ? ref[index] : item)}>Edit</button>
+                    <button onclick={() => onDelete(ref ? ref[index] : item)}>Delete</button>
                 </td>
             </tr>
         {/each}
