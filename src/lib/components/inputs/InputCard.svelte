@@ -31,6 +31,8 @@
 <style>
     .list{
         display: flex;
+        flex-wrap: wrap;
+        gap: 5px;
     }
     .cards{
         padding: 1rem;

@@ -7,76 +7,16 @@
     import InputCard from "$lib/components/inputs/InputCard.svelte";
     import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
+    import type { Character } from "$lib/types/data/declarative";
 
     let editor = getCurrentWorldEditor(page.params.worldName);
-    //editor
-    //TODO: add the data when the editor backend is ready.
-    let tempData =$state({
-        labelsDetails:[
-            {
-                name:'npc',
-                title:'NPC' as string | undefined,
-                description:'is a Non-player character',
-                usedBy:[
-                    {
-                        type:'dialogue',
-                        mappingId:'dial.small-talk-npc',
-                        id:'small-talk-npc',
-                        name:'NPC Small Talk',
-                    }
-                ]
-            }
-        ],
-        characters:[
-            {
-                id:'char1',
-                name:'Character 1',
-                labels:['npc'],
-                vars:[
-                    {
-                        id:'desc',
-                        name:'Description',
-                        type:'string',
-                        value:'The first character in the world'
-                    },
-                    {
-                        id:'health',
-                        name:'Health',
-                        type:'number',
-                        min:0,
-                        max:100,
-                        value:100
-                    }
-                ]
-                //TODO: autonomy
-            },
-            {
-                id:'char2',
-                name:'Character 2',
-                labels:[],
-                vars:[
-                    {
-                        id:'desc',
-                        name:'Description',
-                        type:'string',
-                        value:'The second character in the world'
-                    },
-                    {
-                        id:'health',
-                        name:'Health',
-                        type:'number',
-                        min:0,
-                        max:100,
-                        value:80
-                    }
-                ]
-            }
-        ]
-    })
-    let charsList = $derived(tempData.characters.map((character) => ({
+    let labelsInfo = $state(editor.getLabels());
+    let characters = $state(editor.getCharacters());
+
+    let charsList = $derived(characters.map((character) => ({
             Id: character.id,
             Name: character.name,
-            Labels: character.labels.join(', '),
+            Labels: character.labels?.join(', ') ?? '',
             Variables: character.vars.map((v) => `${v.name}`).join(', ')
     })));
     let openObjectEditor = $state(false);
@@ -103,26 +43,12 @@
             setTimeout(()=>{keepEditorOpen = false});
             return
         }
-        if(currentCharId === null){
-            if(tempData.characters.some((e)=>e.id == formCharacter.id)){
-                showError('The Passed ID already existed')
-                setTimeout(()=>{openObjectEditor = true})
-                return
-            }
-            createCharacter(formCharacter);
-            return
-        }
-        const index = tempData.characters.findIndex((e)=>e.id == currentCharId);
-        if(index <  0){
-            showError('Failed Editing character, Original ID not found');
-            return
-        }
-        tempData.characters[index] = formCharacter as any;
-        currentCharId = null;
+        createCharacter(formCharacter);
     }
 
     function createLabel(label: any) {
-        tempData.labelsDetails.push({ name: label.name, description: label.description, usedBy: [], title: label.title });
+        editor.addLabel(label.name,{description:label.description,title:label.title})
+        labelsInfo = editor.getLabels();
     }
     function buildBaseCharacterFormData() {
         formCharacter = {
@@ -140,13 +66,20 @@
         }
     }
     function createCharacter(character: Record<string,any>) {
-        const newCharacter = {
+        const newCharacter:Character = {
             id: character.id,
             name: character.name,
             labels: character.labels,
+            controlledByPlayer:false,
             vars: []
         };
-        tempData.characters.push(newCharacter);
+        if(currentCharId){
+            editor.updateObjectWithOid(currentCharId,newCharacter);
+            currentCharId = null;
+            characters = editor.getCharacters();
+            return;
+        }
+        editor.addCharacter(newCharacter);
     }
 
 </script>
@@ -157,17 +90,18 @@
     <ObjectTable
         bind:items={charsList}
         headers={['Id','Name', 'Labels', 'Variables']}
-        ref = {tempData.characters}
+        ref = {characters}
         onEdit={(character) => {
             formTitle = 'Editing Character'
             
             formCharacter = $state.snapshot(character);
             
-            currentCharId = character.id as string;
+            currentCharId = character.oid as string;
             openObjectEditor = true;
         }}
         onDelete={(character) => {
-            tempData.characters = tempData.characters.filter((c) => c.id !== character.id);
+            showError('Not Implemented');
+            //tempData.characters = tempData.characters.filter((c) => c.id !== character.id);
         }}/>
     <div class="btn-create">
         <button onclick={()=>{
@@ -191,7 +125,7 @@
     {:else}
         <InputText id="charId" label="ID" bind:value={formCharacter.id} wrapDiv required />
         <InputText id="charName" label="Name" bind:value={formCharacter.name} wrapDiv required />
-        <InputCard id="charLabels" label="Labels" items={tempData.labelsDetails.map((label) => ({
+        <InputCard id="charLabels" label="Labels" items={labelsInfo.map((label) => ({
             value: label.name,
             title: label.title ?? label.name
         }))} bind:selectedItems={formCharacter.labels} wrapDiv />

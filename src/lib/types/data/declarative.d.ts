@@ -1,3 +1,4 @@
+import type { Editor } from './editor';
 import * as Getters from './getters';
 export type PlaceToShowInUI = 'statusCard'|'statusBar'|'attribute';
 

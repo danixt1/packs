@@ -25,6 +25,10 @@ namespace TObjectEditorPopUp {
         max?:{value:number, errorMessage?:string};
         required?:{value:boolean, errorMessage?:string};
     }
-
+    interface PropertySelectableCards extends Property{
+        type:'selectableCards';
+        title:string;
+        cards:{value:string, title?:string, description?:string}[];
+    }
     type Properties = (PropertyString | PropertyTextArea | PropertyNumber)[];
 }

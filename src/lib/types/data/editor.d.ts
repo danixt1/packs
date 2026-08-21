@@ -1,8 +1,8 @@
-interface LabelInfo{
+export interface LabelInfo{
     title?:string;
     description?:string;
 
 }
-interface Editor{
+export interface Editor{
     labelsDescription?: Record<string, LabelInfo>
 }

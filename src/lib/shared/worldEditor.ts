@@ -1,31 +1,53 @@
 import type { ActionDeclaration, Character, Collector, ConditionalList, ConditionExists, ConditionIsValid, ConditionRelational, DialogueTree, Display, EffectFomAction, EffectInterrupt, Item, Place, TextTemplate, VariableDeclarator, VariableModify, VariableToGet, World } from "$lib/types/data/declarative";
 import { world as mainWorld } from '$lib/data/world';
+import type { LabelInfo } from "$lib/types/data/editor";
 let currentEditor:null|WorldEditor = null;
 
-type Relation = ({
+type VarRelation = ({
     relation:'use'
     relationWith:'text-template'|'display'|'action'|'dialogue',
     subLocation:string
 } | {relation:'declare', relationWith:'item'|'char'|'place'|'world', data:VariableDeclarator } 
 | {relation:'modify',relationWith:'action',subLocation:string}) & {oid:string};
 
+interface LabelMapper{
+    name:string
+    title?:string
+    description?:string
+    usedBy:{type:'char'|'item'|'dialogue',id:string,usedAs:string}[]
+}
+interface itemWithOid{
+    /** Object identificator */
+    oid:string;
+}
+export interface CharacterEditor extends Character, itemWithOid{}
+export interface PlaceEditor extends Place, itemWithOid{}
+export interface DialogueEditor extends DialogueTree, itemWithOid{}
+export interface TextTemplateEditor extends TextTemplate, itemWithOid{}
+export interface ItemEditor extends Item, itemWithOid{}
+export interface DisplayEditor extends Display, itemWithOid{}
+
 export class WorldEditor {
-    private relationVars:Record<string,Relation[]> = {};
-    private labelslinks:Record<string,string[]> = {};
+    private relationVars:Record<string,VarRelation[]> = {};
+    private labelslinks:Record<string,LabelMapper> = {};
     private objectsByOid:Record<string,any> = {};
     public worldName:string;
 
-    private characters:Record<string,Character> = {};
-    private places:Record<string,Place> = {};
+    private characters:Record<string,CharacterEditor> = {};
+    private places:Record<string,PlaceEditor> = {};
     private actionChar:Record<string,ActionDeclaration> = {};
-    private dialogues:Record<string,DialogueTree> = {};
-    private textTemplates:Record<string,TextTemplate> = {};
-    private items:Record<string,Item> = {};
-    private displays:Record<string,Display> = {};
+    private dialogues:Record<string,DialogueEditor> = {};
+    private textTemplates:Record<string,TextTemplateEditor> = {};
+    private items:Record<string,ItemEditor> = {};
+    private displays:Record<string,DisplayEditor> = {};
 
     //TODO autonomous actions
     constructor(world:World){
         this.worldName = world.name;
+        const editorInfo = world.editor;
+        if(editorInfo){
+            Object.entries(editorInfo.labelsDescription ?? []).forEach(([k,v])=>this.addLabel(k,v));
+        }
         world.vars              .forEach( e => this.linkVariableDeclarator(e,'world'));
         world.characters        .forEach( e => this.addCharacter(e));
         world.places            .forEach( e => this.addPlace(e));
@@ -35,15 +57,27 @@ export class WorldEditor {
         world.dialogues         ?.forEach(e => this.addDialogue(e));
         world.displays          ?.forEach(e => this.addDisplay(e));
     }
+    public addLabel(name:string,info:LabelInfo){
+        if(!this.labelslinks[name]){
+            this.labelslinks[name] = {
+                name,
+                usedBy:[]
+            }
+        }
+        this.labelslinks[name].description = info.description;
+        this.labelslinks[name].title = info.title;
+    }
     public addActionCharacter(action:ActionDeclaration){
         const oid = 'action:'+action.name;
         this.actionChar[action.name] = action;
         this.objectsByOid[oid] = action;
-        action.onActivate.forEach(e =>this.analyzeEffect(e,oid,'onActivate'));
-        action.onComplete.forEach(e => this.analyzeEffect(e,oid,'onComplete'));
-        action.onInterrupt?.forEach(e => this.analyzeEffect(e,oid,'onInterrupt'));
+
+        action.onActivate   .forEach(e => this.analyzeEffect(e,oid,'onActivate'));
+        action.onComplete   .forEach(e => this.analyzeEffect(e,oid,'onComplete'));
+        action.onInterrupt ?.forEach(e => this.analyzeEffect(e,oid,'onInterrupt'));
+
         if(action.display){
-            this.extractVariablesRefInText(action.display.name).forEach((e)=>this.analyzeGetter(e,oid,'display-name'))
+            this.extractVariablesRefInText(action.display.name)       .forEach((e)=>this.analyzeGetter(e,oid,'display-name'))
             this.extractVariablesRefInText(action.display.description).forEach((e)=>this.analyzeGetter(e,oid,'display-description'))
         }
         if(action.interruption){
@@ -64,26 +98,42 @@ export class WorldEditor {
     public addCharacter(char:Character){
         const oid = 'char:'+char.id;
         this.objectsByOid[oid] = char;
-        this.characters[char.id] = char;
+        this.characters[char.id] = {...char, oid};
         char.vars.forEach(e =>this.linkVariableDeclarator(e,oid));
-        char.labels?.forEach(e =>this.linkLabel(e,oid));
+        char.labels?.forEach(e =>this.linkLabel(e,oid,'label'));
     }
     public addPlace(place:Place){
         const oid = 'place:' + place.id;
         this.objectsByOid[oid] = place;
-        this.places[place.id] = place;
+        this.places[place.id] = {...place, oid};
         place.vars.forEach(e =>this.linkVariableDeclarator(e,oid));
     }
     public addDialogue(dialogue:DialogueTree){
         const oid = 'dialogue:'+dialogue.id;
         this.objectsByOid[oid] = dialogue;
-        this.dialogues[dialogue.id] = dialogue;
+        this.dialogues[dialogue.id] = {...dialogue, oid};
 
         if(dialogue.match){
             const match = dialogue.match;
             //TODO think in a way to build links as usage of the labels.
             if(match.conditions){
                 this.analyzeConditionalLists(match.conditions,oid,'conditions(dialogue)');
+            }
+            const opts = {
+                targetLabelsAny: 'Target has any of the labels',
+                targetLabelsAll: 'Target has all of the labels',
+                targetLabelsNone: 'Target has none of the labels',
+                selfLabelsAny: 'Self has any of the labels',
+                selfLabelsAll: 'Self has all of the labels',
+                selfLabelsNone: 'Self has none of the labels'
+            }
+            for(const [index,value] of Object.entries(opts) as [keyof typeof opts,string][]){
+                if(!match[index]){
+                    continue
+                }
+                for(const labelName of match[index]){
+                    this.linkLabel(labelName,oid,value);
+                }
             }
         }
         for(const node of dialogue.nodes){
@@ -103,24 +153,34 @@ export class WorldEditor {
         textTemplate.name = textTemplate.name.replaceAll(' ','_');
         const oid = 'text-template:'+textTemplate.name;
         this.objectsByOid[oid] = textTemplate;
-        this.textTemplates[textTemplate.name] = textTemplate;
+        this.textTemplates[textTemplate.name] = {...textTemplate, oid};
     }
     public addItem(item:Item){
         const oid = 'item:'+item.id;
         this.objectsByOid[oid] = item;
-        this.items[item.id] = item;
+        this.items[item.id] = {...item, oid};
         item.vars.forEach(e => this.linkVariableDeclarator(e,oid));
     }
     public addDisplay(display:Display){
         const oid = 'display:'+display.varName;
         this.objectsByOid[oid] = display;
-        this.displays[display.varName] = display;
+        this.displays[display.varName] = {...display, oid};
         this.linkVariableUsage(display.varName,oid,'display');
+    }
+    public getCharacters():CharacterEditor[]{
+        return Object.values(this.characters);
+    }
+    public getLabels(){
+        return Object.values(this.labelslinks)
     }
     public getObject(oid:string){
         return this.objectsByOid[oid];
     }
-    public updateObject(oid:string,obj:any){
+
+    public updateObject(obj:itemWithOid){
+        this.updateObjectWithOid(obj.oid,obj);
+    }
+    public updateObjectWithOid(oid:string,obj:any){
         const objName = oid.substring(0,oid.indexOf(':'));
         const options:Record<string,(data:any)=>void> = {
             'action':this.addActionCharacter,
@@ -218,11 +278,22 @@ export class WorldEditor {
             break;
         }
     }
-    private linkLabel(label:string,oidLinkedObj:string){
+    private linkLabel(label:string,oidLinkedObj:string,usedAs:string){
         if(!this.labelslinks[label]){
-            this.labelslinks[label] = [];
+            this.labelslinks[label] = {
+                name:label,
+                usedBy:[]
+            };
         }
-        this.labelslinks[label].push(oidLinkedObj);
+        const referedType = getObjName(oidLinkedObj) as 'char'|'item'|'dialogue'
+        if(!['char','item','dialogue'].includes(referedType)){
+            throw new Error('Invalid object type');
+        }
+        this.labelslinks[label].usedBy.push({
+            id:oidLinkedObj,
+            type:referedType,
+            usedAs
+        })
     }
     private linkVariableSetter(varName:string,originOid:string,subLocation:string){
         if(!['action','dialogue'].includes(getObjName(originOid))){
