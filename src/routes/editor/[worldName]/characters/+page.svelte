@@ -7,6 +7,7 @@
     import InputCard from "$lib/components/inputs/InputCard.svelte";
     import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
+
     let editor = getCurrentWorldEditor(page.params.worldName);
     //editor
     //TODO: add the data when the editor backend is ready.
@@ -79,15 +80,22 @@
             Variables: character.vars.map((v) => `${v.name}`).join(', ')
     })));
     let openObjectEditor = $state(false);
+    let showLabelForm = $state(false);
     let keepEditorOpen = $state(false);
 
     let formTitle = $state('');
         
     let formCharacter = $state<Record<string, any>>({});
     let formLabel = $state<Record<string, any>>({});
-    let showLabelForm = $state(false);
     let currentCharId:string|null = $state(null);
 
+    function onCancel(){
+        if(showLabelForm){
+            showLabelForm = false;
+            return
+        }
+        openObjectEditor = false;
+    }
     function formSubmit(){
         if(showLabelForm){
             createLabel(formLabel);
@@ -172,6 +180,7 @@
     bind:open={openObjectEditor}
     title={formTitle}
     onClose={() => { openObjectEditor = false; }}
+    onCancel={onCancel}
     onSubmit={formSubmit}
     keepOpen={keepEditorOpen}>
 
@@ -189,7 +198,7 @@
         <BaseInput id='create-label' wrapDiv>
             <button type="button" onclick={()=>{
                 formTitle = "New Label";
-                buildBaseCharacterFormData();
+                buildBaseLabelFormData();
                 keepEditorOpen = true;
                 showLabelForm = true;
             }}>Create Label</button>

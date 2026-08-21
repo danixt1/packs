@@ -5,11 +5,12 @@
         open: boolean;
         title?: string;
         onClose?: () => void;
+        onCancel?:() => void;
         onSubmit: () => void;
         keepOpen?:boolean
         children: Snippet;
     }
-    let { open = $bindable(false), title, onClose, onSubmit, children,keepOpen = false }: Props = $props();
+    let { open = $bindable(false), title, onClose, onSubmit, children,keepOpen = false, onCancel }: Props = $props();
 
     function close() {
         if(keepOpen){
@@ -20,6 +21,7 @@
     }
 </script>
 <svelte:window onkeydown={(event) => { if (open && event.key === 'Escape') close(); }} />
+
 {#if open}
     <div class="popup-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) close(); }}>
         <dialog open class="popup" aria-labelledby="object-editor-title">
@@ -28,7 +30,7 @@
                 {@render children()}
                 <div class="form-actions">
                     <button type="submit">Create</button>
-                    <button type="button" onclick={close}>Cancel</button>
+                    <button type="button" onclick={()=>{onCancel?.(),close()}}>Cancel</button>
                 </div>
             </form>
         </dialog>

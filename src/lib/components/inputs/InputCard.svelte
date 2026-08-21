@@ -3,7 +3,7 @@
 
     interface Props {
         id: string;
-        label?: string;
+        label: string;
         wrapDiv?: boolean;
         items: {value:string,title:string}[];
         selectedItems?: string[];
@@ -17,31 +17,51 @@
         selectedItems.push(name);
     }
 </script>
-<BaseInput id={id} label={label} wrapDiv={wrapDiv}>
+<BaseInput id={id} >
     <div class = "cards">
-        {#each items as item (item.value)}
-            <div class="card">
-                <input type="checkbox" id={item.value} checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
-                <label for={item.value}>{item.title}</label>
-            </div>
-        {/each}
+        <div class="def-label">{label}</div>
+        <div class="list">
+            {#each items as item (item.value)}
+                <input type="checkbox" id={item.value} class="card-checkbox" checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
+                <label for={item.value} class="card-label">{item.title}</label>
+            {/each}
+        </div>
     </div>
 </BaseInput>
 <style>
+    .list{
+        display: flex;
+    }
     .cards{
+        padding: 1rem;
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;
+        flex-direction: column;
     }
-    .card{
+    .card-checkbox {
+        position: absolute;
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+    .card-label {
         display: flex;
-        align-items: center;
-        padding: 0.5rem 1rem;
-        border: 1px solid var(--border-subtle);
-        border-radius: 50%;
-        background-color: var(--bg-panel-solid);
+        flex-direction: column;
+        background: var(--bg-panel-solid);
+        border: 1px solid var(--border-default);
+        border-radius: 15px;
+        cursor: pointer;
+        user-select: none;
+        transition: all 0.2s ease-in-out;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        padding: 6px 10px;
     }
-    .card input[type="checkbox"] {
-        margin-right: 0.5rem;
+    .card-checkbox:checked + .card-label {
+      background-color: var(--bg-card-hover);
+    }
+
+    .card-checkbox:checked + .card-label {
+        color: var(--color-text)
     }
 </style>
