@@ -97,6 +97,29 @@
 		font-family:
 			Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 	}
+	:global(.def-input){
+        box-sizing: border-box;
+        width: 100%;
+        border: 1px solid var(--border-subtle);
+        border-radius: 4px;
+        padding: 0.55rem;
+        color: var(--color-text);
+        background: var(--bg-base);
+        font: inherit;
+	}
+	:global(.def-input:focus){
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+	}
+	:global(.def-label){
+		font-weight: bold;
+	}
+	:global(.form-group){
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        padding: 1rem;
+	}
 	.page-layout {
 		display: flex;
 		flex-direction: column;
