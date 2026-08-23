@@ -7,7 +7,7 @@
     import InputCard from "$lib/components/inputs/InputCard.svelte";
     import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
-    import type { Character } from "$lib/types/data/declarative";
+    import type { Character, VariableDeclarator } from "$lib/types/data/declarative";
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
@@ -20,7 +20,9 @@
             Variables: character.vars.map((v) => `${v.name}`).join(', ')
     })));
     let openObjectEditor = $state(false);
+    //TODO make a state manager.
     let showLabelForm = $state(false);
+    let showVarForm = $state(false);
     let keepEditorOpen = $state(false);
 
     let formTitle = $state('');
@@ -74,12 +76,19 @@
             vars: []
         };
         if(currentCharId){
-            editor.updateObjectWithOid(currentCharId,newCharacter);
+            editor.updateObjectWithOid(currentCharId,character);
             currentCharId = null;
             characters = editor.getCharacters();
             return;
         }
+        if(editor.getObject('char:'+newCharacter.id)){
+            showError('Character already exists');
+            keepEditorOpen = true;
+            setTimeout(()=>keepEditorOpen = false)
+            return
+        }
         editor.addCharacter(newCharacter);
+        characters = editor.getCharacters();
     }
 
 </script>
@@ -100,8 +109,8 @@
             openObjectEditor = true;
         }}
         onDelete={(character) => {
-            showError('Not Implemented');
-            //tempData.characters = tempData.characters.filter((c) => c.id !== character.id);
+            editor.deleteObject(character.oid as string);
+            characters = editor.getCharacters();
         }}/>
     <div class="btn-create">
         <button onclick={()=>{
@@ -136,6 +145,23 @@
                 keepEditorOpen = true;
                 showLabelForm = true;
             }}>Create Label</button>
+        </BaseInput>
+        {@const varsList =  formCharacter.vars.map((e:VariableDeclarator)=>{return {Name:e.name,Type:e.type,Value:e.value,'Has Display':e.display != undefined}})}
+        <h3>Variables</h3>
+        <ObjectTable
+            items={varsList}
+            ref={formCharacter.vars}
+            headers={['Name','Type','Value','Has Display']}
+            onEdit={()=>{}}
+            onDelete={(v)=>{
+                formCharacter.vars = formCharacter.vars.filter((e:VariableDeclarator)=>e.name !=v.name);
+            }}
+        />
+        <BaseInput id='create-var' wrapDiv>
+            <button type="button" onclick={()=>{
+                formTitle = "New Variable";
+                //TODO
+            }}>New Variable</button>
         </BaseInput>
     {/if}
 </FormPopup>
