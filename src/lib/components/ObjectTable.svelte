@@ -30,8 +30,8 @@
                     <td data-header={header}>{mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}</td>
                 {/each}
                 <td class="actions-cell" data-header="Actions">
-                    <button onclick={() => onSelect(ref ? ref[index] : item)}>Edit</button>
-                    <button onclick={() => onDelete(ref ? ref[index] : item)}>Delete</button>
+                    <button type="button" onclick={() => onSelect(ref ? ref[index] : item)}>Edit</button>
+                    <button type="button" onclick={() => onDelete(ref ? ref[index] : item)}>Delete</button>
                 </td>
             </tr>
         {/each}
