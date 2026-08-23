@@ -29,7 +29,7 @@
                 <h2 id="object-editor-title">{title ?? 'Create Object'}</h2>
                 {@render children()}
                 <div class="form-actions">
-                    <button type="submit">Create</button>
+                    <button type="submit">Confirm</button>
                     <button type="button" onclick={()=>{onCancel?.(),close()}}>Cancel</button>
                 </div>
             </form>
@@ -50,11 +50,13 @@
     .popup {
         padding: 0;
         width: min(100%, 30rem);
+        max-height: 90vh;
         border: 1px solid var(--border-subtle);
         border-radius: 8px;
         background: var(--bg-panel-solid);
         color: var(--color-text);
         box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.55);
+        overflow: auto;
     }
     h2 {
         margin: 0;
