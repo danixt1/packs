@@ -10,11 +10,11 @@ type VarRelation = ({
 } | {relation:'declare', relationWith:'item'|'char'|'place'|'world', data:VariableDeclarator } 
 | {relation:'modify',relationWith:'action',subLocation:string}) & {oid:string};
 
-interface LabelMapper{
+export interface LabelMapper{
     name:string
     title?:string
     description?:string
-    usedBy:{type:'char'|'item'|'dialogue',id:string,usedAs:string}[]
+    usedBy:{type:'char'|'item'|'dialogue',oid:string,usedAs:string}[]
 }
 interface itemWithOid{
     /** Object identificator */
@@ -30,6 +30,7 @@ export interface DisplayEditor extends Display, itemWithOid{}
 export class WorldEditor {
     private relationVars:Record<string,VarRelation[]> = {};
     private labelslinks:Record<string,LabelMapper> = {};
+    private refsByOID:Record<string,{is:'label'|'var',prop:string}[]> = {};
     private objectsByOid:Record<string,any> = {};
     public worldName:string;
 
@@ -75,7 +76,6 @@ export class WorldEditor {
         action.onActivate   .forEach(e => this.analyzeEffect(e,oid,'onActivate'));
         action.onComplete   .forEach(e => this.analyzeEffect(e,oid,'onComplete'));
         action.onInterrupt ?.forEach(e => this.analyzeEffect(e,oid,'onInterrupt'));
-
         if(action.display){
             this.extractVariablesRefInText(action.display.name)       .forEach((e)=>this.analyzeGetter(e,oid,'display-name'))
             this.extractVariablesRefInText(action.display.description).forEach((e)=>this.analyzeGetter(e,oid,'display-description'))
@@ -167,6 +167,27 @@ export class WorldEditor {
         this.displays[display.varName] = {...display, oid};
         this.linkVariableUsage(display.varName,oid,'display');
     }
+    public deleteObject(oid:string){
+        if(!this.objectsByOid[oid]){
+            return;
+        }
+        const objName = getObjName(oid);
+        const opts:Record<string,any> = {
+            'char':this.characters,
+            'item':this.items,
+            'place':this.places,
+            'action':this.actionChar,
+            'dialogue':this.dialogues,
+            'display':this.displays
+        }
+        let selected = opts[objName];
+        if(!selected){
+            throw new Error('Invalid data OID:"'+objName + '" not found');
+        }
+        delete selected[oid.slice(oid.indexOf(':') + 1)];
+        delete this.objectsByOid[oid];
+        this.delAllRefs(oid);
+    }
     public getCharacters():CharacterEditor[]{
         return Object.values(this.characters);
     }
@@ -195,6 +216,8 @@ export class WorldEditor {
         if(!selected){
             throw new Error('Invalid oid, type "'+objName + '" not found');
         }
+        // Expensive, but if the OID of the character was updated it gonna generate duplication.
+        this.deleteObject(oid);
         selected.call(this,obj);
     }
     private extractVariablesRefInText(text:string){
@@ -276,7 +299,29 @@ export class WorldEditor {
                     this.analyzeGetter(cond.right,originOid,subLocation + '-right');
                 }
             break;
+            default:
+                console.error('Invalid condition, type is not defined');
+                break;
         }
+    }
+    private delAllRefs(oid:string){
+        let refs = this.refsByOID[oid];
+        if(!refs){
+            return
+        }
+        for(const ref of refs){
+            if(ref.is == 'var'){
+                this.relationVars[ref.prop] = this.relationVars[ref.prop].filter((e)=>e.oid != oid);
+                if(this.relationVars[ref.prop].length === 0){
+                    delete this.relationVars[ref.prop]
+                }
+                continue;
+            }
+            if(ref.is == 'label'){
+                this.labelslinks[ref.prop].usedBy = this.labelslinks[ref.prop].usedBy.filter((e)=>e.oid != oid);
+            }
+        }
+        delete this.refsByOID[oid];
     }
     private linkLabel(label:string,oidLinkedObj:string,usedAs:string){
         if(!this.labelslinks[label]){
@@ -285,12 +330,16 @@ export class WorldEditor {
                 usedBy:[]
             };
         }
+        if(!this.refsByOID[oidLinkedObj]){
+            this.refsByOID[oidLinkedObj] = [];
+        }
         const referedType = getObjName(oidLinkedObj) as 'char'|'item'|'dialogue'
         if(!['char','item','dialogue'].includes(referedType)){
             throw new Error('Invalid object type');
         }
+        this.refsByOID[oidLinkedObj].push({is:'label',prop:label});
         this.labelslinks[label].usedBy.push({
-            id:oidLinkedObj,
+            oid:oidLinkedObj,
             type:referedType,
             usedAs
         })
@@ -299,6 +348,13 @@ export class WorldEditor {
         if(!['action','dialogue'].includes(getObjName(originOid))){
             throw new Error('Invalid object type');
         }
+        if(!this.relationVars[varName]){
+            this.relationVars[varName] = [];
+        }
+        if(!this.refsByOID[originOid]){
+            this.refsByOID[originOid] = [];
+        }
+        this.refsByOID[originOid].push({is:'var',prop:varName});
         this.relationVars[varName].push({
             relation:'modify',
             relationWith:'action',
@@ -307,13 +363,17 @@ export class WorldEditor {
         })
     }
     private linkVariableUsage(varName:string,oid:string,subLocation:string){
-        if(!this.relationVars[varName]){
-            this.relationVars[varName] = [];
-        };
         let referedType = getObjName(oid) as 'text-template'|'display'|'action'|'dialogue';
         if(!['text-template','display','action','dialogue'].includes(referedType)){
             throw new Error('Invalid object type');
         }
+        if(!this.refsByOID[oid]){
+            this.refsByOID[oid] = [];
+        }
+        if(!this.relationVars[varName]){
+            this.relationVars[varName] = [];
+        };
+        this.refsByOID[oid].push({is:'var',prop:varName})
         this.relationVars[varName].push({
             relation:'use',
             relationWith:referedType,
@@ -322,13 +382,18 @@ export class WorldEditor {
         })
     }
     private linkVariableDeclarator(varData:VariableDeclarator,oid:string){
-        if(!this.relationVars[varData.name]){
-            this.relationVars[varData.name] = [];
-        };
         let referedType = getObjName(oid) as 'char'|'item'|'place';
         if(!['char','item','place'].includes(referedType)){
             throw new Error('Invalid object type');
         }
+
+        if(!this.relationVars[varData.name]){
+            this.relationVars[varData.name] = [];
+        };
+        if(!this.refsByOID[oid]){
+            this.refsByOID[oid] = [];
+        }
+        this.refsByOID[oid].push({is:'var',prop:varData.name})
         this.relationVars[varData.name].push({
             relation:'declare',
             relationWith:referedType,
