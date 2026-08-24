@@ -2,35 +2,30 @@
     import "$lib/types/components/ObjectEditorPopUp.d.ts";
     import type { Snippet } from 'svelte';
     interface Props{
-        open: boolean;
+        open?: boolean;
         title?: string;
         onClose?: () => void;
         onCancel?:() => void;
         onSubmit: () => void;
-        keepOpen?:boolean
         children: Snippet;
     }
-    let { open = $bindable(false), title, onClose, onSubmit, children,keepOpen = false, onCancel }: Props = $props();
+    let { open = false, title, onClose, onSubmit, children, onCancel }: Props = $props();
 
-    function close() {
-        if(keepOpen){
-            return;
-        }
-        open = false;
+    function dismiss() {
         onClose?.();
     }
 </script>
-<svelte:window onkeydown={(event) => { if (open && event.key === 'Escape') close(); }} />
+<svelte:window onkeydown={(event) => { if (open && event.key === 'Escape') dismiss(); }} />
 
 {#if open}
-    <div class="popup-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) close(); }}>
+    <div class="popup-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
         <dialog open class="popup" aria-labelledby="object-editor-title">
-            <form onsubmit={(event) => { event.preventDefault(); onSubmit(); close(); }}>
+            <form onsubmit={(event) => { event.preventDefault(); onSubmit(); }}>
                 <h2 id="object-editor-title">{title ?? 'Create Object'}</h2>
                 {@render children()}
                 <div class="form-actions">
                     <button type="submit">Confirm</button>
-                    <button type="button" onclick={()=>{onCancel?.(),close()}}>Cancel</button>
+                    <button type="button" onclick={onCancel}>Cancel</button>
                 </div>
             </form>
         </dialog>

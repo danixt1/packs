@@ -6,9 +6,13 @@
         label: string;
         wrapDiv?: boolean;
         items: {value:string,title:string}[];
-        selectedItems?: string[];
+        selectedItems: string[];
     }
-    let { id, label, wrapDiv, items,selectedItems = $bindable([]) }: Props = $props();
+    let { id, label, wrapDiv, items,selectedItems = $bindable() }: Props = $props();
+    // In case of object with the property not declared
+    if(!selectedItems){
+        selectedItems = [];
+    }
     function updateChecked(name:string){
         if(selectedItems.includes(name)){
             selectedItems = selectedItems.filter((e) => e != name)
@@ -17,7 +21,7 @@
         selectedItems.push(name);
     }
 </script>
-<BaseInput id={id} >
+<BaseInput id={id} wrapDiv={wrapDiv}>
     <div class = "cards">
         <div class="def-label">{label}</div>
         <div class="list">
@@ -35,7 +39,6 @@
         gap: 5px;
     }
     .cards{
-        padding: 1rem;
         display: flex;
         flex-wrap: wrap;
         gap: 0.5rem;

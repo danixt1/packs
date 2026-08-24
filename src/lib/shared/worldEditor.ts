@@ -67,6 +67,7 @@ export class WorldEditor {
         }
         this.labelslinks[name].description = info.description;
         this.labelslinks[name].title = info.title;
+        this.objectsByOid['label:'+name] = info;
     }
     public addActionCharacter(action:ActionDeclaration){
         const oid = 'action:'+action.name;

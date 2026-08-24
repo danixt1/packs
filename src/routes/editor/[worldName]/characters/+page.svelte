@@ -8,6 +8,9 @@
     import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     import type { Character, VariableDeclarator } from "$lib/types/data/declarative";
+    import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
+
+    type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
@@ -19,55 +22,23 @@
             Labels: character.labels?.join(', ') ?? '',
             Variables: character.vars.map((v) => `${v.name}`).join(', ')
     })));
-    let openObjectEditor = $state(false);
-    //TODO make a state manager.
-    let showLabelForm = $state(false);
-    let showVarForm = $state(false);
-    let keepEditorOpen = $state(false);
 
-    let formTitle = $state('');
-        
-    let formCharacter = $state<Record<string, any>>({});
-    let formLabel = $state<Record<string, any>>({});
-    let currentCharId:string|null = $state(null);
-
-    function onCancel(){
-        if(showLabelForm){
-            showLabelForm = false;
-            return
+    function createLabel(label: any = formFlow.data) {
+        if(editor.getObject('label:'+label.name)){
+            showError('Label '+label.name + ' already exists');
+            return 'stay'
         }
-        openObjectEditor = false;
-    }
-    function formSubmit(){
-        if(showLabelForm){
-            createLabel(formLabel);
-            showLabelForm = false;
-            setTimeout(()=>{keepEditorOpen = false});
-            return
-        }
-        createCharacter(formCharacter);
-    }
-
-    function createLabel(label: any) {
         editor.addLabel(label.name,{description:label.description,title:label.title})
         labelsInfo = editor.getLabels();
+        return 'back';
     }
-    function buildBaseCharacterFormData() {
-        formCharacter = {
-            id: '',
-            name: '',
-            labels: [],
-            vars: []
-        };
-    }
-    function buildBaseLabelFormData(){
-        formLabel = {
-            name:'',
-            title:'',
-            description:''
+    function createCharacter(character: Record<string,any> = formFlow.data): FormPopupTransition {
+        
+        if(character._baseOID){
+            editor.updateObjectWithOid(character._baseOID,character);
+            characters = editor.getCharacters();
+            return 'close';
         }
-    }
-    function createCharacter(character: Record<string,any>) {
         const newCharacter:Character = {
             id: character.id,
             name: character.name,
@@ -75,22 +46,31 @@
             controlledByPlayer:false,
             vars: []
         };
-        if(currentCharId){
-            editor.updateObjectWithOid(currentCharId,character);
-            currentCharId = null;
-            characters = editor.getCharacters();
-            return;
-        }
         if(editor.getObject('char:'+newCharacter.id)){
             showError('Character already exists');
-            keepEditorOpen = true;
-            setTimeout(()=>keepEditorOpen = false)
-            return
+            return 'stay';
         }
         editor.addCharacter(newCharacter);
         characters = editor.getCharacters();
+        return 'close';
     }
-
+    function setCharacterTitle(){
+        return formFlow.data._baseOID ? 'Editing Character' : 'Create Character';
+    }
+    let formFlow = $state(createFormPopupFlow<CharacterForm>('character', {
+        character: {
+            title: setCharacterTitle,
+            onSubmit: () => createCharacter()
+        },
+        label: {
+            title: 'New Label',
+            parent: 'character',
+            onSubmit: createLabel
+        },
+        variable: { title: 'New Variable', parent: 'character' },
+        ai: { title: 'Configure AI', parent: 'character' }
+    }));
+    let data = $derived(formFlow.data);
 </script>
 <div class="world-characters">
     <div>
@@ -101,12 +81,9 @@
         headers={['Id','Name', 'Labels', 'Variables']}
         ref = {characters}
         onEdit={(character) => {
-            formTitle = 'Editing Character'
-            
-            formCharacter = $state.snapshot(character);
-            
-            currentCharId = character.oid as string;
-            openObjectEditor = true;
+            data = $state.snapshot(character);
+            formFlow.open('character',data);
+            data._baseOID = character.oid;
         }}
         onDelete={(character) => {
             editor.deleteObject(character.oid as string);
@@ -114,55 +91,60 @@
         }}/>
     <div class="btn-create">
         <button onclick={()=>{
-            formTitle = 'Create Character';
-            buildBaseCharacterFormData();
-            openObjectEditor = true}}>Add Character</button>
+            formFlow.open('character');}}>Add Character</button>
     </div>
 </div>
 <FormPopup
-    bind:open={openObjectEditor}
-    title={formTitle}
-    onClose={() => { openObjectEditor = false; }}
-    onCancel={onCancel}
-    onSubmit={formSubmit}
-    keepOpen={keepEditorOpen}>
+    open={formFlow.isOpen}
+    title={formFlow.title}
+    onClose={() => formFlow.dismiss()}
+    onCancel={() => formFlow.cancel()}
+    onSubmit={() => formFlow.submit()}>
 
-    {#if showLabelForm}
-        <InputText id="labelName"  label="Name(id)" bind:value={formLabel.name} wrapDiv required/>
-        <InputText id="labelTitle" label="Title" bind:value={formLabel.title} wrapDiv />
-        <InputText id="labelDesc" label="Description" bind:value={formLabel.description} wrapDiv/>
-    {:else}
-        <InputText id="charId" label="ID" bind:value={formCharacter.id} wrapDiv required />
-        <InputText id="charName" label="Name" bind:value={formCharacter.name} wrapDiv required />
+    {#if formFlow.activeForm === 'label'}
+        <InputText id="labelName"  label="Name(id)" bind:value={data.name} wrapDiv required/>
+        <InputText id="labelTitle" label="Title" bind:value={data.title} wrapDiv />
+        <InputText id="labelDesc" label="Description" bind:value={data.description} wrapDiv/>
+    {:else if formFlow.activeForm === 'character'}
+        <InputText id="charId" label="ID" bind:value={data.id} wrapDiv required />
+        <InputText id="charName" label="Name" bind:value={data.name} wrapDiv required />
         <InputCard id="charLabels" label="Labels" items={labelsInfo.map((label) => ({
             value: label.name,
             title: label.title ?? label.name
-        }))} bind:selectedItems={formCharacter.labels} wrapDiv />
+        }))} bind:selectedItems={data.labels} wrapDiv />
         <BaseInput id='create-label' wrapDiv>
             <button type="button" onclick={()=>{
-                formTitle = "New Label";
-                buildBaseLabelFormData();
-                keepEditorOpen = true;
-                showLabelForm = true;
+                formFlow.enter('label');
             }}>Create Label</button>
         </BaseInput>
-        {@const varsList =  formCharacter.vars.map((e:VariableDeclarator)=>{return {Name:e.name,Type:e.type,Value:e.value,'Has Display':e.display != undefined}})}
-        <h3>Variables</h3>
-        <ObjectTable
-            items={varsList}
-            ref={formCharacter.vars}
-            headers={['Name','Type','Value','Has Display']}
-            onEdit={()=>{}}
-            onDelete={(v)=>{
-                formCharacter.vars = formCharacter.vars.filter((e:VariableDeclarator)=>e.name !=v.name);
-            }}
-        />
-        <BaseInput id='create-var' wrapDiv>
-            <button type="button" onclick={()=>{
-                formTitle = "New Variable";
-                //TODO
-            }}>New Variable</button>
+        <BaseInput id='variable-list' wrapDiv>
+            {@const varsList =data.vars ?  formFlow.data.vars.map((e:VariableDeclarator)=>{
+                return {Name:e.name,Type:e.type,Value:e.value,'Has Display':e.display != undefined}}) : []}
+            <h3>Variables</h3>
+            {#if varsList.length > 0}
+            <ObjectTable
+                items={varsList}
+                ref={data.vars}
+                headers={['Name','Type','Value','Has Display']}
+                onEdit={()=>{}}
+                onDelete={(v)=>{
+                    data.vars = data.vars.filter((e:VariableDeclarator)=>e.name !=v.name);
+                }}
+            />
+            {:else}
+            <p>No Variables</p>
+            {/if}
+            <BaseInput id='create-var' wrapDiv>
+                <button type="button" onclick={()=>{
+                    formFlow.enter('variable');
+                }}>New Variable</button>
+            </BaseInput>
         </BaseInput>
+
+    {:else if formFlow.activeForm === 'variable'}
+        <p>Variable editor coming soon.</p>
+    {:else if formFlow.activeForm === 'ai'}
+        <p>AI editor coming soon.</p>
     {/if}
 </FormPopup>
 <style>
