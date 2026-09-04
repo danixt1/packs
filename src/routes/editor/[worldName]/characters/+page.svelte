@@ -9,6 +9,9 @@
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     import type { Character, VariableDeclarator } from "$lib/types/data/declarative";
     import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
+    import Input from "$lib/components/Input.svelte";
+    import InputSelect from "$lib/components/inputs/InputSelect.svelte";
+    import InputNumber from "$lib/components/inputs/InputNumber.svelte";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
 
@@ -54,8 +57,37 @@
         characters = editor.getCharacters();
         return 'close';
     }
-    function setCharacterTitle(){
+    function setVariableFromForm(varData:Record<string,any> = formFlow.data): FormPopupTransition {
+        let char = formFlow.getDataFromPanel('character');
+        if(!char){
+            showError('Reference character not found');
+            return 'back';
+        }
+        let vars = char.vars || [];
+        if(char._varRef){
+            let index = vars.findIndex((v:VariableDeclarator)=>v.name == char._varRef);
+            delete char._varRef;
+            if(index >= 0){
+                vars[index] = varData as VariableDeclarator;
+            }else{
+                showError('Variable not found');
+                return 'back';
+            }
+        }else{
+            if(vars.find((v:VariableDeclarator)=>v.name == varData.name)){
+                showError('Variable with this name already exists');
+                return 'stay';
+            }
+            vars.push(varData as VariableDeclarator);
+        }
+        char.vars = vars;
+        return 'back';
+    }
+    function setCharacterTitle():string{
         return formFlow.data._baseOID ? 'Editing Character' : 'Create Character';
+    }
+    function setVariableTitle():string{
+        return formFlow.data._varRef ? 'Editing Variable' : 'Create Variable';
     }
     let formFlow = $state(createFormPopupFlow<CharacterForm>('character', {
         character: {
@@ -67,7 +99,11 @@
             parent: 'character',
             onSubmit: createLabel
         },
-        variable: { title: 'New Variable', parent: 'character' },
+        variable: {
+            title: setVariableTitle,
+            parent: 'character',
+            onSubmit: setVariableFromForm
+        },
         ai: { title: 'Configure AI', parent: 'character' }
     }));
     let data = $derived(formFlow.data);
@@ -81,8 +117,7 @@
         headers={['Id','Name', 'Labels', 'Variables']}
         ref = {characters}
         onEdit={(character) => {
-            data = $state.snapshot(character);
-            formFlow.open('character',data);
+            formFlow.enter('character',$state.snapshot(character));
             data._baseOID = character.oid;
         }}
         onDelete={(character) => {
@@ -102,12 +137,12 @@
     onSubmit={() => formFlow.submit()}>
 
     {#if formFlow.activeForm === 'label'}
-        <InputText id="labelName"  label="Name(id)" bind:value={data.name} wrapDiv required/>
-        <InputText id="labelTitle" label="Title" bind:value={data.title} wrapDiv />
-        <InputText id="labelDesc" label="Description" bind:value={data.description} wrapDiv/>
+        <InputText id="labelName"  label="Name(id)" bind:value={data.name} wrapDiv required autocomplete="off"/>
+        <InputText id="labelTitle" label="Title" bind:value={data.title} wrapDiv autocomplete="off"/>
+        <InputText id="labelDesc" label="Description" bind:value={data.description} wrapDiv autocomplete="off"/>
     {:else if formFlow.activeForm === 'character'}
-        <InputText id="charId" label="ID" bind:value={data.id} wrapDiv required />
-        <InputText id="charName" label="Name" bind:value={data.name} wrapDiv required />
+        <InputText id="charId" label="ID" bind:value={data.id} wrapDiv required autocomplete="off" />
+        <InputText id="charName" label="Name" bind:value={data.name} wrapDiv required autocomplete="off" />
         <InputCard id="charLabels" label="Labels" items={labelsInfo.map((label) => ({
             value: label.name,
             title: label.title ?? label.name
@@ -126,7 +161,10 @@
                 items={varsList}
                 ref={data.vars}
                 headers={['Name','Type','Value','Has Display']}
-                onEdit={()=>{}}
+                onEdit={(v)=>{
+                    data._varRef = v.name;
+                    formFlow.enter('variable',$state.snapshot(v));
+                }}
                 onDelete={(v)=>{
                     data.vars = data.vars.filter((e:VariableDeclarator)=>e.name !=v.name);
                 }}
@@ -142,7 +180,25 @@
         </BaseInput>
 
     {:else if formFlow.activeForm === 'variable'}
-        <p>Variable editor coming soon.</p>
+        <InputText id="varName" label="Name" bind:value={data.name} wrapDiv required autocomplete="off" />
+        <InputSelect id="varType" label="Type" items={[
+            {value:'string',title:'String'},
+            {value:'number',title:'Number'},
+            {value:'boolean',title:'Boolean'},
+        ]} bind:selected={data.type} wrapDiv />
+        {#if data.type === 'string'}
+            <InputText id="varValue" label="Value" bind:value={data.value} wrapDiv autocomplete="off" />
+        {:else if data.type === 'number'}
+            <InputNumber id="varValue" label="Value" bind:value={data.value} wrapDiv />
+            <InputNumber id="varMin" label="Min" bind:value={data.min} wrapDiv />
+            <InputNumber id="varMax" label="Max" bind:value={data.max} wrapDiv />
+        {:else if data.type === 'boolean'}
+            <!-- TODO: it's a little messy, need to make a on/off switch-->
+            <InputSelect id="varValue" label="Value" items={[
+                {value:'true',title:'True'},
+                {value:'false',title:'False'},
+            ]} bind:selected={data.value} wrapDiv />
+        {/if}
     {:else if formFlow.activeForm === 'ai'}
         <p>AI editor coming soon.</p>
     {/if}

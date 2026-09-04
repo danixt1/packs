@@ -11,13 +11,14 @@ export interface FormPopupFlow<FormId extends string> {
     activeForm: FormId;
     readonly title: string;
     history: FormId[];
-    dataPanels:Record<string,any>[]
-    open(form?: FormId,data?:Record<string,any>): void;
-    enter(form: FormId): void;
+    dataPanels:{name:string,data:Record<string,any>}[]
+    open(form?: FormId): void;
+    enter(form: FormId,data?:Record<string,any>): void;
     submit(): void;
     cancel(): void;
     dismiss(): void;
     close(): void;
+    getDataFromPanel(name:string):Record<string,any>|undefined;
     data:Record<string,any>;
 }
 
@@ -47,22 +48,25 @@ export function createFormPopupFlow<FormId extends string>(
             return formTitle(this.activeForm);
         },
         history: [],
-        open(form = initialForm,data) {
-            this.data = {}
-            if(data){
-                this.data = data;
-            }
+        getDataFromPanel(name:string){
+            const panel = this.dataPanels.find(panel => panel.name === name);
+            return panel?.data;
+        },
+        open(form = initialForm) {
             this.isOpen = true;
             this.activeForm = form;
             this.history = [];
+            this.dataPanels = [];
+            this.data = {};
         },
-        enter(form) {
+        enter(form,data?:Record<string,any>) {
             if (!this.isOpen) {
                 this.open(form);
-                return;
             }
-            this.dataPanels.push(this.data);
-            this.data = {};
+            if(this.history.length > 0){
+                this.dataPanels.push({name: this.activeForm, data: this.data});
+            }
+            this.data = data || {};
             this.history = [...this.history, this.activeForm];
             this.activeForm = form;
         },
@@ -92,7 +96,7 @@ export function createFormPopupFlow<FormId extends string>(
             const previousForm = this.history.at(-1) ?? forms[this.activeForm].parent;
             const lastForm = this.dataPanels.pop();
             if(lastForm){
-                this.data = lastForm;
+                this.data = lastForm.data;
             }
             if (!previousForm) {
                 this.close();
