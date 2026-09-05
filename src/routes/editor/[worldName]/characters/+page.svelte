@@ -12,6 +12,7 @@
     import InputSelect from "$lib/components/inputs/InputSelect.svelte";
     import InputNumber from "$lib/components/inputs/InputNumber.svelte";
     import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
+    import EditorWrapper from "$lib/components/EditorWrapper.svelte";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
 
@@ -108,7 +109,8 @@
     }));
     let data = $derived(formFlow.data);
 </script>
-<div class="world-characters">
+<svelte:window onkeydown={(event) => { if (!formFlow.isOpen && event.key === 'n')formFlow.open('character') }} />
+<EditorWrapper>
     <div>
         <h2>Characters</h2>
     </div>
@@ -128,7 +130,7 @@
         <button onclick={()=>{
             formFlow.open('character');}}>Add Character</button>
     </div>
-</div>
+</EditorWrapper>
 <FormPopup
     open={formFlow.isOpen}
     title={formFlow.title}
@@ -215,14 +217,6 @@
     {/if}
 </FormPopup>
 <style>
-    .world-characters{
-        display:flex;
-        flex-direction:column;
-        gap:1rem;
-        padding:1rem;
-        height: 100%;
-        overflow: hidden;
-    }
     .btn-create{
         display: flex;
         justify-content: center;
