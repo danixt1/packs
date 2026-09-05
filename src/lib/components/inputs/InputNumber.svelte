@@ -9,9 +9,10 @@
         min?: number;
         max?: number;
         label?: string;
+        placeholder?: string;
         wrapDiv?: boolean;
     }
-    let { id, name, value = $bindable(), required, min, max,label, wrapDiv }: Props = $props();
+    let { id, name, value = $bindable(), required, min, max,label, placeholder, wrapDiv }: Props = $props();
 </script>
 <BaseInput id={id} label={label} wrapDiv={wrapDiv}>
 <input
@@ -23,5 +24,6 @@
     {required}
     {min}
     {max}
-    />
+    {placeholder}
+/>
 </BaseInput>

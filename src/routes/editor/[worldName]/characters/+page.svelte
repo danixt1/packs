@@ -9,9 +9,9 @@
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     import type { Character, VariableDeclarator } from "$lib/types/data/declarative";
     import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
-    import Input from "$lib/components/Input.svelte";
     import InputSelect from "$lib/components/inputs/InputSelect.svelte";
     import InputNumber from "$lib/components/inputs/InputNumber.svelte";
+    import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
 
@@ -189,15 +189,26 @@
         {#if data.type === 'string'}
             <InputText id="varValue" label="Value" bind:value={data.value} wrapDiv autocomplete="off" />
         {:else if data.type === 'number'}
-            <InputNumber id="varValue" label="Value" bind:value={data.value} wrapDiv />
-            <InputNumber id="varMin" label="Min" bind:value={data.min} wrapDiv />
-            <InputNumber id="varMax" label="Max" bind:value={data.max} wrapDiv />
+            <BaseInput id="varValues" wrapDiv>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Min</th>
+                            <th>Actual</th>
+                            <th>Max</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><InputNumber id="varMin"  bind:value={data.min} placeholder="Min(Not set)" /></td>
+                            <td><InputNumber id="varValue" bind:value={data.value} placeholder="Actual" /></td>
+                            <td><InputNumber id="varMax" bind:value={data.max} placeholder="Max(Not set)" /></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </BaseInput>
         {:else if data.type === 'boolean'}
-            <!-- TODO: it's a little messy, need to make a on/off switch-->
-            <InputSelect id="varValue" label="Value" items={[
-                {value:'true',title:'True'},
-                {value:'false',title:'False'},
-            ]} bind:selected={data.value} wrapDiv />
+            <InputSwitch id="varValue" label="Activate?" bind:value={data.value} wrapDiv />
         {/if}
     {:else if formFlow.activeForm === 'ai'}
         <p>AI editor coming soon.</p>
