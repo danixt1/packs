@@ -1,18 +1,16 @@
 <script lang="ts">
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
+    import { InputText, InputNumber, InputSelect,InputSwitch,InputCard } from "$lib/components/inputs";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import FormPopup from "$lib/components/FormPopup.svelte";
-    import InputText from "$lib/components/inputs/InputText.svelte";
-    import InputCard from "$lib/components/inputs/InputCard.svelte";
     import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     import type { Character, VariableDeclarator } from "$lib/types/data/declarative";
     import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
-    import InputSelect from "$lib/components/inputs/InputSelect.svelte";
-    import InputNumber from "$lib/components/inputs/InputNumber.svelte";
-    import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
+    import { VarList } from "$lib/components/editor/vars";
+    import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
 
@@ -126,10 +124,9 @@
             editor.deleteObject(character.oid as string);
             characters = editor.getCharacters();
         }}/>
-    <div class="btn-create">
-        <button onclick={()=>{
-            formFlow.open('character');}}>Add Character</button>
-    </div>
+    <ButtonEditorCreate text="Add Character" onClick={()=>{
+        formFlow.open('character');
+    }}/>
 </EditorWrapper>
 <FormPopup
     open={formFlow.isOpen}
@@ -154,32 +151,7 @@
                 formFlow.enter('label');
             }}>Create Label</button>
         </BaseInput>
-        <BaseInput id='variable-list' wrapDiv>
-            {@const varsList =data.vars ?  formFlow.data.vars.map((e:VariableDeclarator)=>{
-                return {Name:e.name,Type:e.type,Value:e.value,'Has Display':e.display != undefined}}) : []}
-            <h3>Variables</h3>
-            {#if varsList.length > 0}
-            <ObjectTable
-                items={varsList}
-                ref={data.vars}
-                headers={['Name','Type','Value','Has Display']}
-                onEdit={(v)=>{
-                    data._varRef = v.name;
-                    formFlow.enter('variable',$state.snapshot(v));
-                }}
-                onDelete={(v)=>{
-                    data.vars = data.vars.filter((e:VariableDeclarator)=>e.name !=v.name);
-                }}
-            />
-            {:else}
-            <p>No Variables</p>
-            {/if}
-            <BaseInput id='create-var' wrapDiv>
-                <button type="button" onclick={()=>{
-                    formFlow.enter('variable');
-                }}>New Variable</button>
-            </BaseInput>
-        </BaseInput>
+        <VarList bind:formFlow={formFlow} withCreateButton />
 
     {:else if formFlow.activeForm === 'variable'}
         <InputText id="varName" label="Name" bind:value={data.name} wrapDiv required autocomplete="off" />
@@ -217,14 +189,6 @@
     {/if}
 </FormPopup>
 <style>
-    .btn-create{
-        display: flex;
-        justify-content: center;
-    }
-    .btn-create button{
-        height: 34px;
-        width: 50%;
-    }
     button {
         margin-right: 5px;
         background-color: var(--bg-button);
