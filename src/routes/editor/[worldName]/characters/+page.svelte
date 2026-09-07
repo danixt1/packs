@@ -1,15 +1,16 @@
 <script lang="ts">
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
-    import { InputText, InputNumber, InputSelect,InputSwitch,InputCard } from "$lib/components/inputs";
+    import { InputText,InputCard } from "$lib/components/inputs";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import FormPopup from "$lib/components/FormPopup.svelte";
     import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
-    import type { Character, VariableDeclarator } from "$lib/types/data/declarative";
+    import type { Character } from "$lib/types/data/declarative";
     import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
+    import { variableTitle, submitVariable } from "$lib/shared/variablesForm";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
-    import { VarList } from "$lib/components/editor/vars";
+    import { VarList,VarInputs } from "$lib/components/editor/vars";
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
@@ -56,37 +57,14 @@
         characters = editor.getCharacters();
         return 'close';
     }
-    function setVariableFromForm(varData:Record<string,any> = formFlow.data): FormPopupTransition {
-        let char = formFlow.getDataFromPanel('character');
-        if(!char){
-            showError('Reference character not found');
-            return 'back';
-        }
-        let vars = char.vars || [];
-        if(char._varRef){
-            let index = vars.findIndex((v:VariableDeclarator)=>v.name == char._varRef);
-            delete char._varRef;
-            if(index >= 0){
-                vars[index] = varData as VariableDeclarator;
-            }else{
-                showError('Variable not found');
-                return 'back';
-            }
-        }else{
-            if(vars.find((v:VariableDeclarator)=>v.name == varData.name)){
-                showError('Variable with this name already exists');
-                return 'stay';
-            }
-            vars.push(varData as VariableDeclarator);
-        }
-        char.vars = vars;
-        return 'back';
-    }
     function setCharacterTitle():string{
         return formFlow.data._baseOID ? 'Editing Character' : 'Create Character';
     }
     function setVariableTitle():string{
-        return formFlow.data._varRef ? 'Editing Variable' : 'Create Variable';
+        return variableTitle(formFlow, 'character');
+    }
+    function setVariableFromForm(): FormPopupTransition {
+        return submitVariable(formFlow, 'character');
     }
     let formFlow = $state(createFormPopupFlow<CharacterForm>('character', {
         character: {
@@ -154,36 +132,7 @@
         <VarList bind:formFlow={formFlow} withCreateButton />
 
     {:else if formFlow.activeForm === 'variable'}
-        <InputText id="varName" label="Name" bind:value={data.name} wrapDiv required autocomplete="off" />
-        <InputSelect id="varType" label="Type" items={[
-            {value:'string',title:'String'},
-            {value:'number',title:'Number'},
-            {value:'boolean',title:'Boolean'},
-        ]} bind:selected={data.type} wrapDiv />
-        {#if data.type === 'string'}
-            <InputText id="varValue" label="Value" bind:value={data.value} wrapDiv autocomplete="off" />
-        {:else if data.type === 'number'}
-            <BaseInput id="varValues" wrapDiv>
-                <table>
-                    <thead>
-                        <tr>
-                            <th>Min</th>
-                            <th>Actual</th>
-                            <th>Max</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td><InputNumber id="varMin"  bind:value={data.min} placeholder="Min(Not set)" /></td>
-                            <td><InputNumber id="varValue" bind:value={data.value} placeholder="Actual" /></td>
-                            <td><InputNumber id="varMax" bind:value={data.max} placeholder="Max(Not set)" /></td>
-                        </tr>
-                    </tbody>
-                </table>
-            </BaseInput>
-        {:else if data.type === 'boolean'}
-            <InputSwitch id="varValue" label="Activate?" bind:value={data.value} wrapDiv />
-        {/if}
+        <VarInputs formFlow={formFlow} />
     {:else if formFlow.activeForm === 'ai'}
         <p>AI editor coming soon.</p>
     {/if}

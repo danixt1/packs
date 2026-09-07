@@ -37,6 +37,7 @@
     {/if}
     {#if withCreateButton}
         <button type="button" class="btn btn-primary" onclick={()=>{
+            delete formFlow.data._varRef;
             formFlow.enter('variable' as FormId);
         }}>New Variable</button>
     {/if}

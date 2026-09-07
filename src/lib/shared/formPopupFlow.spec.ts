@@ -24,9 +24,28 @@ it('opens the root form and exposes its title', () => {
     expect(flow.title).toBe('Create Character');
 });
 
+it('closes on the first cancel when enter opens a root form', () => {
+    const { flow } = buildFlow();
+
+    flow.enter('character', { id: 'hero' });
+    flow.cancel();
+
+    expect(flow.isOpen).toBe(false);
+    expect(flow.activeForm).toBe('character');
+});
+
+it('preserves data when enter opens a form', () => {
+    const { flow } = buildFlow();
+
+    flow.enter('character', { id: 'hero' });
+
+    expect(flow.data).toEqual({ id: 'hero' });
+});
+
 it('enters a child form and restores its parent when cancelled or dismissed', () => {
     const { flow } = buildFlow();
     flow.open();
+    flow.data = { id: 'hero' };
     flow.enter('label');
 
     expect(flow.activeForm).toBe('label');
@@ -35,6 +54,7 @@ it('enters a child form and restores its parent when cancelled or dismissed', ()
     flow.cancel();
     expect(flow.activeForm).toBe('character');
     expect(flow.isOpen).toBe(true);
+    expect(flow.data).toEqual({ id: 'hero' });
 
     flow.enter('variable');
     flow.dismiss();

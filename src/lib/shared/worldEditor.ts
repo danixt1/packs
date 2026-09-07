@@ -192,6 +192,9 @@ export class WorldEditor {
     public getCharacters():CharacterEditor[]{
         return Object.values(this.characters);
     }
+    public getItems():ItemEditor[]{
+        return Object.values(this.items);
+    }
     public getLabels(){
         return Object.values(this.labelslinks)
     }

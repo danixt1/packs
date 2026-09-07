@@ -62,10 +62,10 @@ export function createFormPopupFlow<FormId extends string>(
         enter(form,data?:Record<string,any>) {
             if (!this.isOpen) {
                 this.open(form);
+                this.data = data || {};
+                return;
             }
-            if(this.history.length > 0){
-                this.dataPanels.push({name: this.activeForm, data: this.data});
-            }
+            this.dataPanels.push({name: this.activeForm, data: this.data});
             this.data = data || {};
             this.history = [...this.history, this.activeForm];
             this.activeForm = form;
