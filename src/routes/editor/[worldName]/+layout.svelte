@@ -16,8 +16,8 @@
             name:'characters'
         },
         {
-            display:'Locations',
-            name:'locations'
+            display:'Places',
+            name:'places'
         },
         {
             display:'Events',
