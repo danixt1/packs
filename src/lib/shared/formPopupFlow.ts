@@ -18,6 +18,16 @@ export interface FormPopupFlow<FormId extends string> {
     cancel(): void;
     dismiss(): void;
     close(): void;
+    /**
+     * Returns the properties that should be passed to the `FormPopup` component.
+     */
+    getFormPopupProperties(): {
+        open: boolean;
+        title: string;
+        onSubmit: () => void;
+        onCancel: () => void;
+        onClose: () => void;
+    };
     getDataFromPanel(name:string):Record<string,any>|undefined;
     data:Record<string,any>;
 }
@@ -105,7 +115,16 @@ export function createFormPopupFlow<FormId extends string>(
 
             this.activeForm = previousForm;
             this.history = this.history.slice(0, -1);
-        }
+        },
+        getFormPopupProperties() {
+            return {
+                open: this.isOpen,
+                title: this.title,
+                onSubmit: () => this.submit(),
+                onCancel: () => this.cancel(),
+                onClose: () => this.close(),
+            };
+        },
     };
 
     return flow;

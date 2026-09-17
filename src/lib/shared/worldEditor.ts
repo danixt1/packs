@@ -5,7 +5,7 @@ let currentEditor:null|WorldEditor = null;
 
 type VarRelation = ({
     relation:'use'
-    relationWith:'text-template'|'display'|'action'|'dialogue',
+    relationWith:'text-template'|'display'|'action-character'|'action-autonomous'|'dialogue',
     subLocation:string
 } | {relation:'declare', relationWith:'item'|'char'|'place'|'world', data:VariableDeclarator } 
 | {relation:'modify',relationWith:'action',subLocation:string}) & {oid:string};
@@ -26,25 +26,28 @@ export interface DialogueEditor extends DialogueTree, itemWithOid{}
 export interface TextTemplateEditor extends TextTemplate, itemWithOid{}
 export interface ItemEditor extends Item, itemWithOid{}
 export interface DisplayEditor extends Display, itemWithOid{}
-
+export interface ActionEditor extends ActionDeclaration, itemWithOid{
+    actionType:'character'|'autonomous'
+}
 export class WorldEditor {
     private relationVars:Record<string,VarRelation[]> = {};
     private labelslinks:Record<string,LabelMapper> = {};
     private refsByOID:Record<string,{is:'label'|'var',prop:string}[]> = {};
     private objectsByOid:Record<string,any> = {};
     public worldName:string;
+    public description:string;
 
     private characters:Record<string,CharacterEditor> = {};
     private places:Record<string,PlaceEditor> = {};
-    private actionChar:Record<string,ActionDeclaration> = {};
+    private actions:Record<string,ActionEditor> = {};
     private dialogues:Record<string,DialogueEditor> = {};
     private textTemplates:Record<string,TextTemplateEditor> = {};
     private items:Record<string,ItemEditor> = {};
     private displays:Record<string,DisplayEditor> = {};
 
-    //TODO autonomous actions
     constructor(world:World){
         this.worldName = world.name;
+        this.description = world.description;
         const editorInfo = world.editor;
         if(editorInfo){
             Object.entries(editorInfo.labelsDescription ?? []).forEach(([k,v])=>this.addLabel(k,v));
@@ -52,7 +55,8 @@ export class WorldEditor {
         world.vars              .forEach( e => this.linkVariableDeclarator(e,'world'));
         world.characters        .forEach( e => this.addCharacter(e));
         world.places            .forEach( e => this.addPlace(e));
-        world.characterActions  .forEach( e => this.addActionCharacter(e));
+        world.characterActions  .forEach( e => this.addAction(e));
+        world.autonomousActions?.forEach( e => this.addAction(e,'autonomous'));
         world.textTemplates     .forEach( e => this.addTextTemplate(e));
         world.items             .forEach( e => this.addItem(e));
         world.dialogues         ?.forEach(e => this.addDialogue(e));
@@ -69,9 +73,9 @@ export class WorldEditor {
         this.labelslinks[name].title = info.title;
         this.objectsByOid['label:'+name] = info;
     }
-    public addActionCharacter(action:ActionDeclaration){
-        const oid = 'action:'+action.name;
-        this.actionChar[action.name] = action;
+    public addAction(action:ActionDeclaration,type:'character'|'autonomous' = 'character'){
+        const oid = `action-${type}:${action.name}`;
+        this.actions[action.name] = {...action, oid, actionType:type};
         this.objectsByOid[oid] = action;
 
         action.onActivate   .forEach(e => this.analyzeEffect(e,oid,'onActivate'));
@@ -177,7 +181,7 @@ export class WorldEditor {
             'char':this.characters,
             'item':this.items,
             'place':this.places,
-            'action':this.actionChar,
+            'action':this.actions,
             'dialogue':this.dialogues,
             'display':this.displays
         }
@@ -198,6 +202,12 @@ export class WorldEditor {
     public getLabels(){
         return Object.values(this.labelslinks)
     }
+    public getActions():ActionEditor[]{
+        return Object.values(this.actions);
+    }
+    public getPlaces():PlaceEditor[]{
+        return Object.values(this.places);
+    }
     public getObject(oid:string){
         return this.objectsByOid[oid];
     }
@@ -208,7 +218,7 @@ export class WorldEditor {
     public updateObjectWithOid(oid:string,obj:any){
         const objName = oid.substring(0,oid.indexOf(':'));
         const options:Record<string,(data:any)=>void> = {
-            'action':this.addActionCharacter,
+            'action':this.addAction,
             'char':this.addCharacter,
             'place':this.addPlace,
             'dialogue':this.addDialogue,
@@ -349,7 +359,7 @@ export class WorldEditor {
         })
     }
     private linkVariableSetter(varName:string,originOid:string,subLocation:string){
-        if(!['action','dialogue'].includes(getObjName(originOid))){
+        if(!['action-character','action-autonomous','dialogue'].includes(getObjName(originOid))){
             throw new Error('Invalid object type');
         }
         if(!this.relationVars[varName]){
@@ -367,8 +377,8 @@ export class WorldEditor {
         })
     }
     private linkVariableUsage(varName:string,oid:string,subLocation:string){
-        let referedType = getObjName(oid) as 'text-template'|'display'|'action'|'dialogue';
-        if(!['text-template','display','action','dialogue'].includes(referedType)){
+        let referedType = getObjName(oid) as 'text-template'|'display'|'action-character'|'action-autonomous'|'dialogue';
+        if(!['text-template','display','action-character','action-autonomous','dialogue'].includes(referedType)){
             throw new Error('Invalid object type');
         }
         if(!this.refsByOID[oid]){

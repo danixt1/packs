@@ -51,7 +51,7 @@ it('Remove character and all links',()=>{
 })
 it('Add action(from characters)',()=>{
     const editor = new WorldEditor(buildBlankWorld());
-    editor.addActionCharacter({
+    editor.addAction({
         name:'test',
         executionTime:1,
         activationConditions:[],
