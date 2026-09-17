@@ -1,9 +1,9 @@
 export type FormPopupTransition = 'stay' | 'back' | 'close';
 
 export interface FormPopupFormDefinition<FormId extends string> {
-    title: string | (() => string);
+    title: string | ((form:FormPopupFlow<FormId>) => string);
     parent?: FormId;
-    onSubmit?: () => FormPopupTransition | void;
+    onSubmit?: (form:FormPopupFlow<FormId>) => FormPopupTransition | void;
 }
 
 export interface FormPopupFlow<FormId extends string> {
@@ -46,7 +46,7 @@ export function createFormPopupFlow<FormId extends string>(
 ): FormPopupFlow<FormId> {
     function formTitle(form: FormId) {
         const title = forms[form].title;
-        return typeof title === 'function' ? title() : title;
+        return typeof title === 'function' ? title(flow) : title;
     }
 
     const flow: InternalFormPopupFlow<FormId> = {
@@ -82,7 +82,7 @@ export function createFormPopupFlow<FormId extends string>(
         },
         submit() {
             const definition = forms[this.activeForm];
-            const transition = definition.onSubmit?.() ?? (definition.parent ? 'back' : 'close');
+            const transition = definition.onSubmit?.(this) ?? (definition.parent ? 'back' : 'close');
             this.applyTransition(transition);
         },
         cancel() {
