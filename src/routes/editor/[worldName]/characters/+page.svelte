@@ -1,17 +1,21 @@
 <script lang="ts">
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
+    import { showError } from "$lib/notify";
+    import type { Character } from "$lib/types/data/declarative";
+    import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
+
+    //Components
     import { InputText,InputCard } from "$lib/components/inputs";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import FormPopup from "$lib/components/FormPopup.svelte";
-    import { showError } from "$lib/notify";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
-    import type { Character } from "$lib/types/data/declarative";
-    import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
-    import { variableTitle, submitVariable } from "$lib/shared/variablesForm";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
-    import { VarList,VarInputs } from "$lib/components/editor/vars";
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
+    
+    //Variable System Logic
+    import { variableTitle, submitVariable } from "$lib/shared/variablesForm";
+    import { VarList,VarInputs } from "$lib/components/editor/vars";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
 
@@ -45,9 +49,9 @@
         const newCharacter:Character = {
             id: character.id,
             name: character.name,
-            labels: character.labels,
+            labels: character.labels || [],
             controlledByPlayer:false,
-            vars: []
+            vars: character.vars || []
         };
         if(editor.getObject('char:'+newCharacter.id)){
             showError('Character already exists');
@@ -57,18 +61,9 @@
         characters = editor.getCharacters();
         return 'close';
     }
-    function setCharacterTitle():string{
-        return formFlow.data._baseOID ? 'Editing Character' : 'Create Character';
-    }
-    function setVariableTitle():string{
-        return variableTitle(formFlow, 'character');
-    }
-    function setVariableFromForm(): FormPopupTransition {
-        return submitVariable(formFlow, 'character');
-    }
     let formFlow = $state(createFormPopupFlow<CharacterForm>('character', {
         character: {
-            title: setCharacterTitle,
+            title: (e)=>e.data._baseOID ? 'Editing Character' : 'Create Character',
             onSubmit: () => createCharacter()
         },
         label: {
@@ -77,9 +72,9 @@
             onSubmit: createLabel
         },
         variable: {
-            title: setVariableTitle,
+            title: (e)=>variableTitle(e, 'character'),
             parent: 'character',
-            onSubmit: setVariableFromForm
+            onSubmit: (e)=>submitVariable(e, 'character')
         },
         ai: { title: 'Configure AI', parent: 'character' }
     }));
@@ -101,17 +96,13 @@
         onDelete={(character) => {
             editor.deleteObject(character.oid as string);
             characters = editor.getCharacters();
-        }}/>
+        }}
+    />
     <ButtonEditorCreate text="Add Character" onClick={()=>{
         formFlow.open('character');
     }}/>
 </EditorWrapper>
-<FormPopup
-    open={formFlow.isOpen}
-    title={formFlow.title}
-    onClose={() => formFlow.dismiss()}
-    onCancel={() => formFlow.cancel()}
-    onSubmit={() => formFlow.submit()}>
+<FormPopup {...formFlow.getFormPopupProperties()} >
 
     {#if formFlow.activeForm === 'label'}
         <InputText id="labelName"  label="Name(id)" bind:value={data.name} wrapDiv required autocomplete="off"/>
