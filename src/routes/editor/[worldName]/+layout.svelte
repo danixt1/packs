@@ -20,10 +20,6 @@
             name:'places'
         },
         {
-            display:'Events',
-            name:'events'
-        },
-        {
             display:'Dialogues',
             name:'dialogues'
         },

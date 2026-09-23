@@ -7,8 +7,9 @@
         wrapDiv?: boolean;
         items: {value:string,title:string}[];
         selectedItems: string[];
+        onChange?:(prop:string,isChecked:boolean)=>void
     }
-    let { id, label, wrapDiv, items,selectedItems = $bindable() }: Props = $props();
+    let { id, label, wrapDiv, items,selectedItems = $bindable(),onChange = ()=>{} }: Props = $props();
     // In case of object with the property not declared
     if(!selectedItems){
         selectedItems = [];
@@ -16,14 +17,16 @@
     function updateChecked(name:string){
         if(selectedItems.includes(name)){
             selectedItems = selectedItems.filter((e) => e != name)
+            onChange(name,false)
             return
         }
         selectedItems.push(name);
+        onChange(name,true)
     }
 </script>
 <BaseInput id={id} wrapDiv={wrapDiv}>
     <div class = "cards">
-        <div class="def-label">{label}</div>
+        <div class="def-label" id={id}>{label}</div>
         <div class="list">
             {#each items as item (item.value)}
                 <input type="checkbox" id={item.value} class="card-checkbox" checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
