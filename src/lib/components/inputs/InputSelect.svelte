@@ -10,29 +10,18 @@
     }
     let { id, label, wrapDiv, items, selected = $bindable() }: Props = $props();
     
-    function updateSelected(value: string) {
-        selected = value;
-    }
 </script>
 
 <BaseInput {id} {wrapDiv}>
     <div class="select-container">
         {#if label}
-            <span class="def-label">{label}</span>
+            <label class="def-label" for={id}>{label}</label>
         {/if}
-        <div class="list">
+        <select {id} bind:value={selected} class="def-select">
             {#each items as item (item.value)}
-                <input 
-                    type="radio" 
-                    id="{id}-{item.value}" 
-                    name={id} 
-                    class="item-radio"
-                    checked={selected === item.value}
-                    onchange={() => updateSelected(item.value)}
-                />
-                <label for="{id}-{item.value}" class="item-label">{item.title}</label>
+                <option value={item.value}>{item.title}</option>
             {/each}
-        </div>
+        </select>
     </div>
 </BaseInput>
 
@@ -43,44 +32,34 @@
         gap: 0.5rem;
     }
     
-    .list {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 5px;
-    }
-    
-    .item-radio {
-        position: absolute;
-        opacity: 0;
-        width: 0;
-        height: 0;
-    }
-    
-    .item-label {
-        display: inline-block;
+    .def-select {
+        width: 100%;
         padding: 6px 12px;
         background: var(--bg-panel-solid);
         border: 1px solid var(--border-default);
         border-radius: 15px;
         cursor: pointer;
-        user-select: none;
         transition: all 0.2s ease-in-out;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         font-size: 0.9rem;
         color: var(--color-text);
+        appearance: none;
+        background-image: linear-gradient(45deg, transparent 50%, var(--color-text) 50%),
+            linear-gradient(135deg, var(--color-text) 50%, transparent 50%);
+        background-position: calc(100% - 16px) 50%, calc(100% - 11px) 50%;
+        background-size: 5px 5px, 5px 5px;
+        background-repeat: no-repeat;
     }
-    
-    .item-radio:checked + .item-label {
+
+    .def-select:hover,
+    .def-select:focus {
         background-color: var(--bg-card-hover);
-        color: var(--color-text);
         border-color: var(--border-strong);
+        outline: none;
     }
-    
-    .item-label:hover {
-        background-color: var(--bg-card-hover);
-    }
-    
-    .item-radio:checked + .item-label:hover {
-        background-color: var(--bg-card-hover);
+
+    .def-select option {
+        background: var(--bg-panel-solid);
+        color: var(--color-text);
     }
 </style>
