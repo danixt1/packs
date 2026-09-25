@@ -20,7 +20,7 @@
             onChange(name,false)
             return
         }
-        selectedItems.push(name);
+        selectedItems = [...selectedItems, name];
         onChange(name,true)
     }
 </script>
