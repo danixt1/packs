@@ -7,8 +7,9 @@
         wrapDiv?: boolean;
         items: {value:string, title:string}[];
         selected: string;
+        disabled?:boolean
     }
-    let { id, label, wrapDiv, items, selected = $bindable() }: Props = $props();
+    let { id, label, wrapDiv, items, selected = $bindable(),disabled }: Props = $props();
     
 </script>
 
@@ -17,7 +18,7 @@
         {#if label}
             <label class="def-label" for={id}>{label}</label>
         {/if}
-        <select {id} bind:value={selected} class="def-select">
+        <select {id} bind:value={selected} class="def-select" disabled={disabled}>
             {#each items as item (item.value)}
                 <option value={item.value}>{item.title}</option>
             {/each}
