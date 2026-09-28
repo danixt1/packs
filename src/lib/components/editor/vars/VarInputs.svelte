@@ -1,12 +1,58 @@
-<script lang="ts">
+<script lang="ts" generics="FormId extends string">
+    /**
+     * A fomr called "variable" is required to use this components.
+     * 
+     * the definition of the form is defined by the component itself.
+    */
     import type { FormPopupFlow } from "$lib/shared/formPopupFlow";
-    import { InputText, InputNumber, InputSelect,InputSwitch,InputCard } from "$lib/components/inputs";
+    import { InputText, InputNumber, InputSelect,InputSwitch } from "$lib/components/inputs";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
-    interface Props {
-        formFlow:FormPopupFlow<any>;
+    import type { VariableDeclarator } from "$lib/types/data/declarative";
+    import { showError } from "$lib/notify";
+
+    interface Props<FormId extends string> {
+        formFlow:"variable" extends FormId ? FormPopupFlow<FormId> : never;
+        parentFormId?:string
     }
-    let {formFlow}:Props = $props();
+    let {formFlow, parentFormId = formFlow.initialForm}:Props<FormId> = $props();
     let data = $derived(formFlow.data);
+    (()=>{
+        formFlow.setFormDefinition('variable' as FormId,{
+            title(form) {
+                return formFlow.getDataFromPanel(parentFormId)?._varRef
+                ? 'Editing Variable'
+                : 'Create Variable';
+            },
+            onSubmit(form) {
+                const parent = formFlow.getDataFromPanel(parentFormId);
+                if (!parent) {
+                    showError('Reference object not found');
+                    return 'back';
+                }
+                const vars: VariableDeclarator[] = parent.vars ?? [];
+                if (parent._varRef) {
+                    const index = vars.findIndex((v) => v.name === parent._varRef);
+                    delete parent._varRef;
+                    if (index >= 0) {
+                        vars[index] = data as VariableDeclarator;
+                    } else {
+                        showError('Variable not found');
+                        return 'back';
+                    }
+                } else {
+                    if (vars.find((v) => v.name === data.name)) {
+                        showError('Variable with this name already exists');
+                        return 'stay';
+                    }
+                    vars.push(data as VariableDeclarator);
+                }
+
+                parent.vars = vars;
+                return 'back';
+
+            },
+        });
+    })();
 </script>
 <InputText id="varName" label="Name" bind:value={data.name} wrapDiv required autocomplete="off" />
 <InputSelect id="varType" label="Type" items={[

@@ -12,9 +12,6 @@
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
-    
-    //Variable System Logic
-    import { variableTitle, submitVariable } from "$lib/shared/variablesForm";
     import { VarList,VarInputs } from "$lib/components/editor/vars";
 
     type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
@@ -71,11 +68,7 @@
             parent: 'character',
             onSubmit: createLabel
         },
-        variable: {
-            title: (e)=>variableTitle(e, 'character'),
-            parent: 'character',
-            onSubmit: (e)=>submitVariable(e, 'character')
-        },
+        variable: {},
         ai: { title: 'Configure AI', parent: 'character' }
     }));
     let data = $derived(formFlow.data);

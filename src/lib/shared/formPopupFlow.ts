@@ -1,7 +1,7 @@
 export type FormPopupTransition = 'stay' | 'back' | 'close';
 
 export interface FormPopupFormDefinition<FormId extends string> {
-    title: string | ((form:FormPopupFlow<FormId>) => string);
+    title?: string | ((form:FormPopupFlow<FormId>) => string);
     parent?: FormId;
     onSubmit?: (form:FormPopupFlow<FormId>) => FormPopupTransition | void;
 }
@@ -10,14 +10,16 @@ export interface FormPopupFlow<FormId extends string> {
     isOpen: boolean;
     activeForm: FormId;
     readonly title: string;
+    readonly initialForm:string;
     history: FormId[];
-    dataPanels:{name:string,data:Record<string,any>}[]
+    dataPanels:{name:string,data:Record<string,any>}[];
     open(form?: FormId): void;
     enter(form: FormId,data?:Record<string,any>): void;
     submit(): void;
     cancel(): void;
     dismiss(): void;
     close(): void;
+    setFormDefinition(form:FormId,definition:FormPopupFormDefinition<FormId>):void
     /**
      * Returns the properties that should be passed to the `FormPopup` component.
      */
@@ -45,7 +47,7 @@ export function createFormPopupFlow<FormId extends string>(
     forms: Record<FormId, FormPopupFormDefinition<FormId>>
 ): FormPopupFlow<FormId> {
     function formTitle(form: FormId) {
-        const title = forms[form].title;
+        const title = forms[form].title || '';
         return typeof title === 'function' ? title(flow) : title;
     }
 
@@ -56,6 +58,9 @@ export function createFormPopupFlow<FormId extends string>(
         activeForm: initialForm,
         get title() {
             return formTitle(this.activeForm);
+        },
+        get initialForm(){
+            return initialForm;
         },
         history: [],
         getDataFromPanel(name:string){
@@ -124,6 +129,9 @@ export function createFormPopupFlow<FormId extends string>(
                 onCancel: () => this.cancel(),
                 onClose: () => this.close(),
             };
+        },
+        setFormDefinition(form, definition) {
+            forms[form] = definition;
         },
     };
 
