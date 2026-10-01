@@ -1,11 +1,13 @@
-<script lang="ts">
+<script lang="ts" generics="FormId extends string">
     import {InputSelect,InputText} from "$lib/components/inputs";
+    import { showError } from "$lib/notify";
     import type { FormPopupFlow } from "$lib/shared/formPopupFlow";
 
-    interface Props{
-        formFlow:FormPopupFlow<any>
+    interface Props<FormId extends string>{
+        formFlow:"getter" extends FormId ? FormPopupFlow<FormId> : never;
+        parentFormId?:string
     }
-    let {formFlow}:Props = $props();
+    let {formFlow,parentFormId = formFlow.initialForm}:Props<FormId> = $props();
     let data = $derived(formFlow.data);
     const OBJECTS_OPTS = {
         general:[
@@ -78,7 +80,45 @@
         if(data._get === 'variable'){
             data.variable = '';
         }
-    })
+    });
+    (()=>{
+        formFlow.setFormDefinition('getter' as FormId,{
+            title: (e)=>'Get Something',
+            onSubmit(form) {
+                const parent = form.getDataFromPanel(form.data._parent || parentFormId);
+                if(!parent){
+                    console.error('Passed form was not found!');
+                    showError('Internal: Invalid parent form');
+                    return 'back';
+                }
+                const addTo = parent._getter;
+                if(!addTo){
+                    console.error('Expected property _getter in the parent form');
+                    showError('Internal: not added _getter');
+                    return 'back'
+                }
+                let inProperty = form.data._in;
+                if(inProperty != 'temp'){
+                    inProperty +=`:${form.data._target}-${form.data._get}`
+                }else{
+                    inProperty +=':variable';
+                }
+                if(!form.data.variable){
+                    showError('Add the variable to get the value');
+                    return 'stay'
+                }
+                const getter = {
+                    type:'getter',
+                    in:inProperty,
+                    variable:form.data.variable,
+                    fallback:form.data.fallback
+                }
+                parent[addTo] = getter;
+                delete parent._getter;
+                return 'back';
+            },
+        });
+    })();
 </script>
 <div class="form-group base-data">
     <InputSelect id={'getter-location'} label={'In:'} bind:selected={data._in}
@@ -105,11 +145,12 @@
     {/if}
 </div>
 {#if data._get === 'variable'}
-    <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable}/>
+    <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable} autocomplete='off'/>
 {:else if data._get === 'metadata'}
     <InputSelect id={'getter-metadata'} label={'Metadata:'} wrapDiv bind:selected={data.variable}
     items={metadataOptions}/>
 {/if}
+<InputText id={'getter-fallback'} label={'Fallback value:'} wrapDiv bind:value={data.fallback} autocomplete='off'/>
 <style>
     .base-data{
         display: flex;
