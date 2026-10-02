@@ -89,16 +89,17 @@
         }
         if(data._in === 'runtime'){
             objectsOptions = OBJECTS_OPTS.runtime;
-            data._target = OBJECTS_OPTS.runtime[0].value;
+            if(OBJECTS_OPTS.runtime.find(o=>o.value === data._target) === undefined){
+                data._target = OBJECTS_OPTS.runtime[0].value;
+            }
         }else{
             objectsOptions = OBJECTS_OPTS.general;
-            data._target = OBJECTS_OPTS.general[0].value;
+            if(OBJECTS_OPTS.general.find(o=>o.value === data._target) === undefined){
+                data._target = OBJECTS_OPTS.general[0].value;
+            }
         }
         if(data._in ==='temp'){
             data._get = 'variable';
-        }
-        if(data._get === 'variable'){
-            data.variable = '';
         }
     });
     (()=>{

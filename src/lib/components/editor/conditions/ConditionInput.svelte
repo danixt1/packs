@@ -7,7 +7,10 @@
     import ButtonPopUp from "../ButtonPopUp.svelte";
 
     interface Props<FormId extends string> {
-        formFlow:"condition" extends FormId ? FormPopupFlow<FormId> : never;
+        /**
+         * It's necessary to Configure a GetterInput to the ConditionInput, so the formFlow must be passed to the GetterInput as well.
+         */
+        formFlow:"condition"|"getter" extends FormId ? FormPopupFlow<FormId> : never;
         parentFormId?:string;
     }
     let {formFlow = $bindable(),parentFormId = formFlow.initialForm}:Props<FormId> = $props();
@@ -65,7 +68,33 @@
 
     function openGetter(prop: string){
         formFlow.data._getter = prop;
-        formFlow.enter('getter' as FormId, { _parent: 'condition', _enableLiterals: true });
+        const getterName = formFlow.data._getter;
+        const additionalData:Record<string,any> = {
+            _parent: 'condition',
+            _enableLiterals: true
+        };
+        if(formFlow.data[getterName] !== undefined){
+            const fullIn = formFlow.data[getterName]['in'];
+            if(fullIn){
+                const [inProperty, targetGet] = fullIn.split(':');
+                additionalData['_in'] = inProperty;
+                additionalData['fallback'] = formFlow.data[getterName]['fallback'];
+                additionalData['variable'] = formFlow.data[getterName]['variable'];
+                if(targetGet){
+                    const [target, get] = targetGet.split('-');
+                    additionalData['_target'] = target;
+                    additionalData['_get'] = get;
+                }
+            }else{
+                const propData = formFlow.data[getterName];
+                additionalData['_literalValue'] = propData;
+                additionalData['_mode'] = 'literal';
+                if(typeof propData === 'string')additionalData['_literalType'] = 'string';
+                else if(typeof propData === 'number')additionalData['_literalType'] = 'number';
+                else if(typeof propData === 'boolean')additionalData['_literalType'] = 'boolean';
+            }
+        }
+        formFlow.enter('getter' as FormId, additionalData);
     }
 </script>
 <InputSelect id={'condition-input'}
@@ -75,9 +104,9 @@ items={[
     {title:'Exists',value:'condition-exists'},
     {title:'Is Valid',value:'condition-is-valid'}
     ]}
-bind:selected={data.type} />
+bind:selected={data.type} wrapDiv/>
 {#if data.type === 'condition-relational'}
-    <div class="opts">
+    <div class="form-group">
         <ButtonPopUp text={leftLabel} onclick={()=>openGetter('left')}/>
         <InputSelect id={'condition-relational-operator'}
         items={[
@@ -92,16 +121,12 @@ bind:selected={data.type} />
 
     </div>
 {:else if data.type === 'condition-exists'}
-    <div class="opts">
+    <div class="form-group">
         <ButtonPopUp text={checkLabel} onclick={()=>openGetter('variableToCheck')}/>
     </div>
 {:else if data.type === 'condition-is-valid'}
-    <div class="opts">
+    <div class="form-group">
         <ButtonPopUp text={checkLabel}
         onclick={()=>openGetter('variableToCheck')}/>
     </div>
 {/if}
-
-<style>
-
-</style>
