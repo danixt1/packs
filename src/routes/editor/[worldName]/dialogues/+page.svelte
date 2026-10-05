@@ -2,7 +2,7 @@
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
     import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
-    import type { DialogueMatch, DialogueTree } from "$lib/types/data/declarative";
+    import type { DialogueMatch, DialogueTree,DialogueNode } from "$lib/types/data/declarative";
 
     import { InputText, InputTextArea,InputCard } from "$lib/components/inputs";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
@@ -53,7 +53,6 @@
             }
         }
     });
-
     function updateMatchLabels(key:string, label:string, isChecked:boolean){
         const current = Array.isArray(formFlow.data[key]) ? formFlow.data[key] : [];
         formFlow.data[key] = isChecked
@@ -91,6 +90,22 @@
         <InputText id="dial-name" label="Name" bind:value={formFlow.data.name} required wrapDiv autocomplete='off' />
         <InputText id="dial-intent" label="Dialogue Purpose" bind:value={formFlow.data.intent} required wrapDiv autocomplete='off' />
         <InputNumber id='dial-priority' label="Priority" bind:value={formFlow.data.priority} wrapDiv/>
+        <div class="form-group">
+            <h2>Nodes</h2>
+            <ObjectTable items={(formFlow.data.nodes || []).map((e:DialogueNode)=>({
+                Id:e.id,
+                Text:e.text
+            }))}
+            headers={['Id','Text']}
+            ref={formFlow.data.nodes || []}
+            onEdit={(e)=>{
+                formFlow.enter('node',$state.snapshot(e));
+                formFlow.data._baseid = e.id;}}
+            onDelete={(e)=>{
+                formFlow.data.nodes = (formFlow.data.nodes || []).filter((n:DialogueNode)=>n.id !== e.id);
+            }} />
+            <ButtonPopUp text="Add Node" onclick={()=>{formFlow.enter('node')}}/>
+        </div>
         <div class="form-group">
             <ButtonPopUp text="Configure matching rules" onclick={()=>formFlow.enter('match',formFlow.data.match || {})}/>
         </div>

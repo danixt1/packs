@@ -208,6 +208,9 @@ export class WorldEditor {
     public getPlaces():PlaceEditor[]{
         return Object.values(this.places);
     }
+    public getDialogues():DialogueEditor[]{
+        return Object.values(this.dialogues);
+    }
     public getObject(oid:string){
         return this.objectsByOid[oid];
     }
