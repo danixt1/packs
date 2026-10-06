@@ -74,24 +74,12 @@
             _enableLiterals: true
         };
         if(formFlow.data[getterName] !== undefined){
-            const fullIn = formFlow.data[getterName]['in'];
-            if(fullIn){
-                const [inProperty, targetGet] = fullIn.split(':');
-                additionalData['_in'] = inProperty;
-                additionalData['fallback'] = formFlow.data[getterName]['fallback'];
-                additionalData['variable'] = formFlow.data[getterName]['variable'];
-                if(targetGet){
-                    const [target, get] = targetGet.split('-');
-                    additionalData['_target'] = target;
-                    additionalData['_get'] = get;
-                }
+            if(typeof formFlow.data[getterName] != 'object'){
+                additionalData['_literalValue'] = formFlow.data[getterName];
             }else{
-                const propData = formFlow.data[getterName];
-                additionalData['_literalValue'] = propData;
-                additionalData['_mode'] = 'literal';
-                if(typeof propData === 'string')additionalData['_literalType'] = 'string';
-                else if(typeof propData === 'number')additionalData['_literalType'] = 'number';
-                else if(typeof propData === 'boolean')additionalData['_literalType'] = 'boolean';
+                if(formFlow.data[getterName]['in']){
+                    Object.assign(additionalData,formFlow.data[getterName]);
+                }
             }
         }
         formFlow.enter('getter' as FormId, additionalData);

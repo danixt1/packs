@@ -1,5 +1,6 @@
 <script lang="ts" generics="FormId extends string">
     import {InputSelect,InputText} from "$lib/components/inputs";
+    import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
     import { showError } from "$lib/notify";
     import type { FormPopupFlow } from "$lib/shared/formPopupFlow";
 
@@ -82,6 +83,29 @@
         return value === undefined || value === null ? undefined : String(value);
     }
     $effect(()=>{
+        if(data.in){
+            const fullIn = data.in;
+            const [inProperty, targetGet] = fullIn.split(':');
+            data._in = inProperty;
+            if(targetGet){
+                const [target, get] = targetGet.split('-');
+                data._target = target;
+                data._get = get;
+            }
+            delete data.in;
+            return;
+        }
+        if(data._literalValue !== undefined && data._literalType === undefined){
+            
+            if(!supportLiterals){
+                throw new Error('Literal value is set but support for literals is disabled');
+            }
+            data._mode = 'literal';
+            if(typeof data._literalValue === 'string')data._literalType = 'string';
+            else if(typeof data._literalValue === 'number')data._literalType = 'number';
+            else if(typeof data._literalValue === 'boolean')data._literalType = 'boolean';
+            return;
+        }
         if (supportLiterals && data._mode === undefined) {
             data._mode = 'getter';
             data._literalType = 'string';
@@ -198,11 +222,7 @@
         {title:'Boolean',value:'boolean'}
     ]} />
     {#if data._literalType === 'boolean'}
-        <InputSelect id={'getter-literal-value'} label={'Value:'} wrapDiv bind:selected={data._literalValue}
-        items={[
-            {title:'true',value:'true'},
-            {title:'false',value:'false'}
-        ]} />
+        <InputSwitch id={'getter-literal-value'} label={'Value:'} wrapDiv bind:value={data._literalValue} />
     {:else}
         <InputText id={'getter-literal-value'} label={'Value:'} wrapDiv bind:value={data._literalValue} autocomplete='off'/>
     {/if}
