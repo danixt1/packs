@@ -4,7 +4,7 @@
     interface Props {
         id: string;
         name?: string;
-        value: number;
+        value: number | null | undefined;
         required?: boolean;
         min?: number;
         max?: number;

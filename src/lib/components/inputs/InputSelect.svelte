@@ -5,8 +5,8 @@
         id: string;
         label: string;
         wrapDiv?: boolean;
-        items: {value:string, title:string}[];
-        selected: string;
+        items: {value:any, title:string}[];
+        selected: any;
         disabled?:boolean
     }
     let { id, label, wrapDiv, items, selected = $bindable(),disabled }: Props = $props();

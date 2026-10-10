@@ -1,47 +1,47 @@
 <script lang="ts">
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
-    import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
     import type { Place } from "$lib/types/data/declarative";
 
     import { InputText, InputTextArea,InputCard } from "$lib/components/inputs";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
-    import FormPopup from "$lib/components/FormPopup.svelte";
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import { showError } from "$lib/notify";
 
-    // Variable components
-    import { variableTitle, submitVariable } from "$lib/shared/variablesForm";
-    import { VarInputs,VarList } from "$lib/components/editor/vars";
+    import Popup from "$lib/components/Popup.svelte";
+    import Form from "$lib/components/Form.svelte";
+    import ListVars from "$lib/components/lists/ListVars.svelte";
+    import { createPageSwitch } from "$lib/shared/pageSwitch";
+    import FormVar from "$lib/components/forms/FormVar.svelte";
 
+    let openPopup = $state(false);
+
+    let placeData = $state<Record<string,any>>({});
+    let varData = $state<Record<string,any>>({});
+    let switcher = $state(createPageSwitch());
+    let pageSwitch = $state(switcher.createSwitch());
+    let varsSwitcher = $state(switcher.createSwitch());
+    let editingVar:number|null = $state(null);
     let editor = getCurrentWorldEditor(page.params.worldName);
     let places = $state(editor.getPlaces());
-    let formFlow = $state(createFormPopupFlow<'place'|'variable'>('place',{
-        place:{
-            title:(f)=>f.data._baseOID ? `Edit Place` : 'Create Place',
-            onSubmit: ()=>buildPlace(),
-        },
-        variable:{
-            title:(f)=>variableTitle(f,'place'),
-            onSubmit:(f)=>submitVariable(f,'place')
-        }
-    }));
 
     const charactersInfo = editor.getCharacters().map((c) => {return {value:c.id,title:c.name}});
-    function buildPlace(place: Record<string,any> = formFlow.data): FormPopupTransition {
+
+    function buildPlace(place: Record<string,any> = placeData) {
         if(place._baseOID){
             editor.updateObjectWithOid(place._baseOID,place);
             places = editor.getPlaces();
-            return 'close';
+            openPopup = false;
+            return;
         }
         if(place.id.match(/[\s,'"]/)){
             showError('Id cannot have special characters and spaces');
-            return 'stay';
+            return;
         }
         if(editor.getObject('place:'+place.id)){
             showError('Place id Already exist');
-            return 'stay';
+            return;
         }
         const newPlace:Place = {
             id:place.id,
@@ -52,8 +52,9 @@
             vars:place.vars || []
         }
         editor.addPlace(newPlace);
+        placeData = {};
         places = editor.getPlaces();
-        return 'close';
+        openPopup = false;
     }
 </script>
 
@@ -75,7 +76,9 @@
         headers={['Id','Name','Connects To','Description','Variables']}
         ref={places}
         onEdit={(e)=>{
-            formFlow.enter('place', $state.snapshot(e));formFlow.data._baseOID = e.oid
+            placeData = $state.snapshot(e);
+            placeData._baseOID = e.oid;
+            openPopup = true;
         }}
         onDelete={(e)=>{
             editor.deleteObject(e.oid as string);
@@ -83,18 +86,23 @@
         }}
         />
     {/if}
-    <ButtonEditorCreate text="New Place" onClick={()=>formFlow.open('place')} />
+    <ButtonEditorCreate text="New Place" onClick={()=>openPopup = true} />
 </EditorWrapper>
-
-<FormPopup {...formFlow.getFormPopupProperties()}>
-    {#if formFlow.activeForm === 'place'}
-        <InputText id="place-id" label="Place ID" bind:value={formFlow.data.id} required wrapDiv autocomplete='off'/>
-        <InputText id="place-name" label="Place Name" bind:value={formFlow.data.name} required wrapDiv autocomplete='off'/>
-        <InputTextArea id="place-description" label="Description" bind:value={formFlow.data.description} wrapDiv />
-        <InputCard id="place-characters" label="Characters In Place" bind:selectedItems={formFlow.data.charactersId} items={charactersInfo} wrapDiv />
-        <InputCard id="connected-places" label="Connected Places" bind:selectedItems={formFlow.data.connectedPlacesId} items={places.map((p) => {return {value:p.id,title:p.name}})} wrapDiv />
-        <VarList formFlow={formFlow} withCreateButton/>
-    {:else}
-        <VarInputs formFlow={formFlow}/>
+<Popup title={'Items'} open={openPopup}>
+    {#if pageSwitch.isPageEnabled}
+        <Form onSubmit={()=>buildPlace()} onCancel={()=>openPopup = false} useWrapDiv>
+            <InputText id="place-id" label="Place ID" bind:value={placeData.id} required autocomplete='off'/>
+            <InputText id="place-name" label="Place Name" bind:value={placeData.name} required autocomplete='off'/>
+            <InputTextArea id="place-description" label="Description" bind:value={placeData.description} />
+            <InputCard id="place-characters" label="Characters In Place" bind:selectedItems={placeData.charactersId} items={charactersInfo} />
+            <InputCard id="connected-places" label="Connected Places" bind:selectedItems={placeData.connectedPlaces} items={places.map((p) => {return {value:p.id,title:p.name}})} />
+            <ListVars bind:values={placeData.vars}
+            onEdit={(values,index)=>{varsSwitcher.enablePage();varData = $state.snapshot(values);editingVar=index}}
+            onCreatePressed={()=>{varData = {};varsSwitcher.enablePage()}}/>
+        </Form>
     {/if}
-</FormPopup>
+    {#if varsSwitcher.isPageEnabled}
+        <FormVar value={varData} autoAttach={{attachTo:placeData,editingVar:editingVar,onFinish:()=>{editingVar=null;pageSwitch.enablePage()}}}
+        onCancel={()=>{pageSwitch.enablePage()}}/>
+    {/if}
+</Popup>
