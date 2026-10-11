@@ -3,22 +3,30 @@
     import { page } from '$app/state';
     import { showError } from "$lib/notify";
     import type { Character } from "$lib/types/data/declarative";
-    import { createFormPopupFlow, type FormPopupTransition } from "$lib/shared/formPopupFlow";
 
     //Components
     import { InputText,InputCard } from "$lib/components/inputs";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
-    import FormPopup from "$lib/components/FormPopup.svelte";
     import BaseInput from "$lib/components/inputs/BaseInput.svelte";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
-    import { VarList,VarInputs } from "$lib/components/editor/vars";
-
-    type CharacterForm = 'character' | 'label' | 'variable' | 'ai';
+    import Form from "$lib/components/Form.svelte";
+    import { createPageSwitch } from "$lib/shared/pageSwitch";
+    import Popup from "$lib/components/Popup.svelte";
+    import ListVars from "$lib/components/lists/ListVars.svelte";
+    import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
     let characters = $state(editor.getCharacters());
+
+    let openPopup = $state(false);
+    let data = $state<Record<string,any>>({});
+    let labelData = $state<Record<string,any>>({});
+
+    let switcher = $state(createPageSwitch());
+    let pageSwitcher = (()=>switcher.createSwitch({form:{onSubmit:()=>createCharacter(),onCancel:()=>openPopup = false}}))();
+    let labelSwtcher = (()=>switcher.createSwitch({form:{onSubmit:()=>createLabel(),onCancel:()=>pageSwitcher.enablePage()}}))()
 
     let charsList = $derived(characters.map((character) => ({
             Id: character.id,
@@ -27,53 +35,39 @@
             Variables: character.vars.map((v) => `${v.name}`).join(', ')
     })));
 
-    function createLabel(label: any = formFlow.data) {
+    function createLabel(label: any = labelData) {
         if(editor.getObject('label:'+label.name)){
             showError('Label '+label.name + ' already exists');
-            return 'stay'
+            return;
         }
         editor.addLabel(label.name,{description:label.description,title:label.title})
         labelsInfo = editor.getLabels();
-        return 'back';
+        pageSwitcher.enablePage();
     }
-    function createCharacter(character: Record<string,any> = formFlow.data): FormPopupTransition {
+    function createCharacter(character: Record<string,any> = data) {
         
         if(character._baseOID){
             editor.updateObjectWithOid(character._baseOID,character);
             characters = editor.getCharacters();
-            return 'close';
+            openPopup = false;
+            return;
         }
         const newCharacter:Character = {
             id: character.id,
             name: character.name,
             labels: character.labels || [],
-            controlledByPlayer:false,
+            controlledByPlayer:character.controlledByPlayer,
             vars: character.vars || []
         };
         if(editor.getObject('char:'+newCharacter.id)){
             showError('Character already exists');
-            return 'stay';
+            return;
         }
         editor.addCharacter(newCharacter);
         characters = editor.getCharacters();
-        return 'close';
+        openPopup = false;
     }
-    let formFlow = $state(createFormPopupFlow<CharacterForm>('character', {
-        character: {
-            title: (e)=>e.data._baseOID ? 'Editing Character' : 'Create Character',
-            onSubmit: () => createCharacter()
-        },
-        label: {
-            title: 'New Label',
-            parent: 'character',
-            onSubmit: createLabel
-        },
-        variable: {},
-        ai: { title: 'Configure AI', parent: 'character' }
-    }));
-    let data = $derived(formFlow.data);
 </script>
-<svelte:window onkeydown={(event) => { if (!formFlow.isOpen && event.key === 'n')formFlow.open('character') }} />
 <EditorWrapper>
     <div>
         <h2>Characters</h2>
@@ -83,8 +77,9 @@
         headers={['Id','Name', 'Labels', 'Variables']}
         ref = {characters}
         onEdit={(character) => {
-            formFlow.enter('character',$state.snapshot(character));
+            data = $state.snapshot(character);
             data._baseOID = character.oid;
+            openPopup = true;
         }}
         onDelete={(character) => {
             editor.deleteObject(character.oid as string);
@@ -92,35 +87,38 @@
         }}
     />
     <ButtonEditorCreate text="Add Character" onClick={()=>{
-        formFlow.open('character');
+        data = {};
+        openPopup = true;
     }}/>
 </EditorWrapper>
-<FormPopup {...formFlow.getFormPopupProperties()} >
-
-    {#if formFlow.activeForm === 'label'}
-        <InputText id="labelName"  label="Name(id)" bind:value={data.name} wrapDiv required autocomplete="off"/>
-        <InputText id="labelTitle" label="Title" bind:value={data.title} wrapDiv autocomplete="off"/>
-        <InputText id="labelDesc" label="Description" bind:value={data.description} wrapDiv autocomplete="off"/>
-    {:else if formFlow.activeForm === 'character'}
+<Popup open={openPopup} title={'Character'} > 
+    <Form {...switcher.data.form} >
+    {#if pageSwitcher.isPageEnabled}
         <InputText id="charId" label="ID" bind:value={data.id} wrapDiv required autocomplete="off" />
         <InputText id="charName" label="Name" bind:value={data.name} wrapDiv required autocomplete="off" />
+        <InputSwitch id='controlledByPlayer' label="Controlled by player?" wrapDiv bind:value={data.controlledByPlayer} />
         <InputCard id="charLabels" label="Labels" items={labelsInfo.map((label) => ({
             value: label.name,
             title: label.title ?? label.name
         }))} bind:selectedItems={data.labels} wrapDiv />
         <BaseInput id='create-label' wrapDiv>
             <button type="button" onclick={()=>{
-                formFlow.enter('label');
+                labelSwtcher.enablePage();
             }}>Create Label</button>
         </BaseInput>
-        <VarList bind:formFlow={formFlow} withCreateButton />
-
-    {:else if formFlow.activeForm === 'variable'}
-        <VarInputs formFlow={formFlow} />
-    {:else if formFlow.activeForm === 'ai'}
-        <p>AI editor coming soon.</p>
     {/if}
-</FormPopup>
+    {#if !labelSwtcher.isPageEnabled}
+        <ListVars switcher={switcher} bind:values={data.vars}
+        onCancel={()=>pageSwitcher.enablePage()}
+        onAfterSubmit={()=>pageSwitcher.enablePage()} />
+    {/if}
+    {#if labelSwtcher.isPageEnabled}
+        <InputText id="labelName"  label="Name(id)" bind:value={labelData.name} wrapDiv required autocomplete="off"/>
+        <InputText id="labelTitle" label="Title" bind:value={labelData.title} wrapDiv autocomplete="off"/>
+        <InputText id="labelDesc" label="Description" bind:value={labelData.description} wrapDiv autocomplete="off"/>
+    {/if}
+    </Form>
+</Popup>
 <style>
     button {
         margin-right: 5px;

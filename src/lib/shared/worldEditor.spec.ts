@@ -70,6 +70,6 @@ it('Add action(from characters)',()=>{
         ]
     })
     let refs = (editor as any)['refsByOID'];
-    expect(refs['action:test']).toStrictEqual([{is:'var',prop:'ifLeft'}]);
+    expect(refs['action-character:test']).toStrictEqual([{is:'var',prop:'ifLeft'}]);
 
 })
