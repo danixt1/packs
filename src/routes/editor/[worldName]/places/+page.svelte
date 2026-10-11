@@ -19,9 +19,8 @@
     let placeData = $state<Record<string,any>>({});
     
     let switcher = $state(createPageSwitch());
-    let pageSwitch = $state(switcher.createSwitch({
-        form:{onSubmit:()=>buildPlace(),onCancel:()=>openPopup = false}}));
-    let varsSwitcher = $state(switcher.createSwitch());
+    const pageSwitch =(()=>{return switcher.createSwitch({
+        form:{onSubmit:()=>buildPlace(),onCancel:()=>openPopup = false}})})();
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let places = $state(editor.getPlaces());
@@ -106,7 +105,7 @@
             </div>
         {/if}
         <ListVars bind:values={placeData.vars}
-            bind:switcher={varsSwitcher}
+            bind:switcher={switcher}
             onCancel={()=>{pageSwitch.enablePage()}}
             onAfterSubmit={()=>{pageSwitch.enablePage()}} />
     </Form>

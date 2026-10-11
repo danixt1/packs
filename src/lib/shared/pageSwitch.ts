@@ -3,13 +3,23 @@ export interface Switch {
     isPageEnabled:boolean;
     enablePage:() => void;
     localData:Record<string,any>;
+    remove:() =>void;
+}
+export interface PageSwitch{
+    enable(switchToEnable:Switch):void;
+    data:Record<string,any>;
+    switches:Switch[];
+    activeSwitch:null | Switch
+    createSwitch(initialData?:Record<string,any>,name?:string):Switch;
+    getActiveSwitch(): null | Switch;
+    enableSwitchByName(name:string):boolean;
 }
 /**
  * A very simple page switcher that allows only one page to be enabled at a time.
  * This is useful for cases where you have multiple pages that can be opened, but only one should be active at a time.
  * The page switcher does not handle any UI logic, it simply provides a way to manage the state of the pages.
  */
-export function createPageSwitch(){
+export function createPageSwitch():PageSwitch{
     let internal = {
         enable(switchToEnable:Switch){
             if(this.activeSwitch && this.activeSwitch !== switchToEnable){
@@ -29,7 +39,10 @@ export function createPageSwitch(){
                 enablePage:()=>{
                     this.enable(pageSwitch);
                 },
-                localData:initialData
+                localData:initialData,
+                remove:()=> {
+                    this.switches = this.switches.filter(e => e == pageSwitch);
+                },
             };
             this.switches.push(pageSwitch);
             pageSwitch = this.switches[this.switches.length - 1];

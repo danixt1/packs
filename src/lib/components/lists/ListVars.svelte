@@ -1,12 +1,13 @@
 <script lang="ts">
-    import type { Switch } from "$lib/shared/pageSwitch";
+    import type { PageSwitch } from "$lib/shared/pageSwitch";
+    import { onDestroy } from "svelte";
     import FormVar from "../forms/FormVar.svelte";
     import ObjectTable from "../ObjectTable.svelte";
 
     interface Props {
         values: Record<string,any>[];
-        switcher:Switch;
-        /** What happens when clicking edit, adding `switcgher` invalidate that*/
+        switcher?:PageSwitch;
+        /** What happens when clicking edit, adding `switcher` invalidate that*/
         onEdit?: (v:Record<string,any>,index:number) => void;
         /** Works only with `switcher`*/
         onCancel?:() => void;
@@ -17,27 +18,31 @@
     }
     let { values = $bindable(), onEdit,onCancel,onAfterSubmit, onCreatePressed, switcher = $bindable()}: Props = $props();
     let formData = $state<Record<string,any>>({});
-    let obj = $derived({vars:values})
+    let obj = $derived({vars:values});
+    let pageSwitcher = $state(switcher ? switcher.createSwitch() : null);
+    onDestroy(()=>{
+        pageSwitcher?.remove();
+    })
     $effect(()=>{
         if(values === undefined){
             values = [];
         }
     })
     $effect(()=>{
-        if(!switcher){
+        if(!pageSwitcher){
             return;
         }
-        if(!switcher.localData.form){
-            switcher.localData.form ={}
+        if(!pageSwitcher.localData.form){
+            pageSwitcher.localData.form ={}
         }
     })
 </script>
 <div class="form-group">
-    {#if switcher && switcher.isPageEnabled}
+    {#if pageSwitcher && pageSwitcher.isPageEnabled}
         <FormVar 
         bind:value={formData} 
         onCancel={()=>{onCancel?.()}} 
-        bind:writeFormPropsTo={switcher.localData.form}
+        bind:writeFormPropsTo={pageSwitcher.localData.form}
         autoAttach={obj}
         onAfterSubmit={(v)=>{
             onAfterSubmit?.(v);
@@ -60,9 +65,9 @@
                 ref={values}
                 onEdit={(v)=>{
                     const editPos = values.findIndex((e) => e.name === v.name);
-                    if(switcher && editPos >= 0){
+                    if(pageSwitcher && editPos >= 0){
                         formData = {...$state.snapshot(v), _editing: editPos};
-                        switcher.enablePage();
+                        pageSwitcher.enablePage();
                     }else{
                         onEdit?.(v,editPos);
                     }
@@ -72,11 +77,11 @@
                 }}
             />
         {/if}
-        {#if switcher || onCreatePressed}
+        {#if pageSwitcher || onCreatePressed}
             <button type="button" class="btn btn-primary" onclick={()=>{
-                if(switcher){
+                if(pageSwitcher){
                     formData = {};
-                    switcher.enablePage();
+                    pageSwitcher.enablePage();
                     return;
                 }
                 if(onCreatePressed)onCreatePressed();
