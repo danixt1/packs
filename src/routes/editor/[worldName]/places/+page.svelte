@@ -13,30 +13,36 @@
     import Form from "$lib/components/Form.svelte";
     import ListVars from "$lib/components/lists/ListVars.svelte";
     import { createPageSwitch } from "$lib/shared/pageSwitch";
-    import FormVar from "$lib/components/forms/FormVar.svelte";
 
     let openPopup = $state(false);
 
     let placeData = $state<Record<string,any>>({});
-    let varData = $state<Record<string,any>>({});
+    
     let switcher = $state(createPageSwitch());
-    let pageSwitch = $state(switcher.createSwitch());
+    let pageSwitch = $state(switcher.createSwitch({
+        form:{onSubmit:()=>buildPlace(),onCancel:()=>openPopup = false}}));
     let varsSwitcher = $state(switcher.createSwitch());
-    let editingVar:number|null = $state(null);
+
     let editor = getCurrentWorldEditor(page.params.worldName);
     let places = $state(editor.getPlaces());
-
+    
     const charactersInfo = editor.getCharacters().map((c) => {return {value:c.id,title:c.name}});
-
+    
     function buildPlace(place: Record<string,any> = placeData) {
+        if(place.id.match(/[\s,'"]/)){
+            showError('Id cannot have special characters and spaces');
+            return;
+        }
         if(place._baseOID){
+            if(place._baseOID != 'place:' + place.id){
+                if(editor.getObject('place:'+place.id)){
+                    showError('Place id Already exist');
+                    return;
+                }
+            }
             editor.updateObjectWithOid(place._baseOID,place);
             places = editor.getPlaces();
             openPopup = false;
-            return;
-        }
-        if(place.id.match(/[\s,'"]/)){
-            showError('Id cannot have special characters and spaces');
             return;
         }
         if(editor.getObject('place:'+place.id)){
@@ -86,23 +92,22 @@
         }}
         />
     {/if}
-    <ButtonEditorCreate text="New Place" onClick={()=>openPopup = true} />
+    <ButtonEditorCreate text="New Place" onClick={()=>{openPopup = true;placeData = {}}} />
 </EditorWrapper>
 <Popup title={'Items'} open={openPopup}>
-    {#if pageSwitch.isPageEnabled}
-        <Form onSubmit={()=>buildPlace()} onCancel={()=>openPopup = false} useWrapDiv>
-            <InputText id="place-id" label="Place ID" bind:value={placeData.id} required autocomplete='off'/>
-            <InputText id="place-name" label="Place Name" bind:value={placeData.name} required autocomplete='off'/>
-            <InputTextArea id="place-description" label="Description" bind:value={placeData.description} />
-            <InputCard id="place-characters" label="Characters In Place" bind:selectedItems={placeData.charactersId} items={charactersInfo} />
-            <InputCard id="connected-places" label="Connected Places" bind:selectedItems={placeData.connectedPlaces} items={places.map((p) => {return {value:p.id,title:p.name}})} />
-            <ListVars bind:values={placeData.vars}
-            onEdit={(values,index)=>{varsSwitcher.enablePage();varData = $state.snapshot(values);editingVar=index}}
-            onCreatePressed={()=>{varData = {};varsSwitcher.enablePage()}}/>
-        </Form>
-    {/if}
-    {#if varsSwitcher.isPageEnabled}
-        <FormVar value={varData} autoAttach={{attachTo:placeData,editingVar:editingVar,onFinish:()=>{editingVar=null;pageSwitch.enablePage()}}}
-        onCancel={()=>{pageSwitch.enablePage()}}/>
-    {/if}
+    <Form {...switcher.data.form}>
+        {#if pageSwitch.isPageEnabled}
+            <div class="form-group">
+                <InputText id="place-id" label="Place ID" bind:value={placeData.id} required autocomplete='off'/>
+                <InputText id="place-name" label="Place Name" bind:value={placeData.name} required autocomplete='off'/>
+                <InputTextArea id="place-description" label="Description" bind:value={placeData.description} />
+                <InputCard id="place-characters" label="Characters In Place" bind:selectedItems={placeData.charactersId} items={charactersInfo} />
+                <InputCard id="connected-places" label="Connected Places" bind:selectedItems={placeData.connectedPlaces} items={places.map((p) => {return {value:p.id,title:p.name}})} />
+            </div>
+        {/if}
+        <ListVars bind:values={placeData.vars}
+            bind:switcher={varsSwitcher}
+            onCancel={()=>{pageSwitch.enablePage()}}
+            onAfterSubmit={()=>{pageSwitch.enablePage()}} />
+    </Form>
 </Popup>

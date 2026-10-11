@@ -2,41 +2,50 @@
     import type { Switch } from "$lib/shared/pageSwitch";
     import FormVar from "../forms/FormVar.svelte";
     import ObjectTable from "../ObjectTable.svelte";
-    
-    interface UseFormVar{
-        onCancel?: () => void;
-        onAfterSubmit?: (data:Record<string,any>) => void;
-        switcher:Switch;
-    }
+
     interface Props {
         values: Record<string,any>[];
-        /** Only use that if is outside from a form*/
-        formVar?: UseFormVar;
-        /** What happens when clicking edit, adding formVar override that*/
+        switcher:Switch;
+        /** What happens when clicking edit, adding `switcgher` invalidate that*/
         onEdit?: (v:Record<string,any>,index:number) => void;
-        /** Insert the button create and call this variable when it's clicked, adding formVar override that*/
+        /** Works only with `switcher`*/
+        onCancel?:() => void;
+        /** Works only with `switcher`*/
+        onAfterSubmit?:(data:Record<string,any>) => void;
+        /** Insert the button create and call this variable when it's clicked, adding `switcher` invalidate that*/
         onCreatePressed?:() => void;
     }
-    let { values = $bindable(), onEdit, onCreatePressed, formVar }: Props = $props();
-    if(values === undefined){
-        values = [];
-    }
-    let editing = $state<null|number>(null);
+    let { values = $bindable(), onEdit,onCancel,onAfterSubmit, onCreatePressed, switcher = $bindable()}: Props = $props();
+    let formData = $state<Record<string,any>>({});
+    let obj = $derived({vars:values})
+    $effect(()=>{
+        if(values === undefined){
+            values = [];
+        }
+    })
+    $effect(()=>{
+        if(!switcher){
+            return;
+        }
+        if(!switcher.localData.form){
+            switcher.localData.form ={}
+        }
+    })
 </script>
 <div class="form-group">
-    {#if formVar && formVar.switcher.isPageEnabled}
-        <FormVar onCancel={()=>{formVar?.onCancel?.()}} onAfterSubmit={(v)=>{
-            if(editing !== null){
-                values[editing] = v;
-                editing = null;
-            }else{
-                values.push(v);
-            }
-            formVar?.onAfterSubmit?.(v);
+    {#if switcher && switcher.isPageEnabled}
+        <FormVar 
+        bind:value={formData} 
+        onCancel={()=>{onCancel?.()}} 
+        bind:writeFormPropsTo={switcher.localData.form}
+        autoAttach={obj}
+        onAfterSubmit={(v)=>{
+            onAfterSubmit?.(v);
+            obj = {vars:values}
         }} />
     {:else}
         <h3>Variables</h3>
-        {#if values.length === 0}
+        {#if !values || values.length === 0}
             <p>No variables to show.</p>
         {:else}
             <ObjectTable  
@@ -50,11 +59,12 @@
                 headers={["Name", "Type", "Value"]}
                 ref={values}
                 onEdit={(v)=>{
-                    editing = values.findIndex((e) => e.name === v.name);
-                    if(formVar){
-                        formVar.switcher.enablePage();
+                    const editPos = values.findIndex((e) => e.name === v.name);
+                    if(switcher && editPos >= 0){
+                        formData = {...$state.snapshot(v), _editing: editPos};
+                        switcher.enablePage();
                     }else{
-                        onEdit?.(v,editing);
+                        onEdit?.(v,editPos);
                     }
                 }}
                 onDelete={(v)=>{
@@ -62,10 +72,11 @@
                 }}
             />
         {/if}
-        {#if formVar || onCreatePressed}
+        {#if switcher || onCreatePressed}
             <button type="button" class="btn btn-primary" onclick={()=>{
-                if(formVar){
-                    formVar.switcher.enablePage();
+                if(switcher){
+                    formData = {};
+                    switcher.enablePage();
                     return;
                 }
                 if(onCreatePressed)onCreatePressed();

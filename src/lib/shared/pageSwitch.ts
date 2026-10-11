@@ -2,6 +2,7 @@ export interface Switch {
     name?:string;
     isPageEnabled:boolean;
     enablePage:() => void;
+    localData:Record<string,any>;
 }
 /**
  * A very simple page switcher that allows only one page to be enabled at a time.
@@ -16,22 +17,24 @@ export function createPageSwitch(){
             }
             switchToEnable.isPageEnabled = true;
             this.activeSwitch = switchToEnable;
+            this.data = switchToEnable.localData;
         },
+        data:{} as Record<string,any>,
         switches:[] as Switch[],
         activeSwitch:null as Switch | null,
-        createSwitch(name?:string){
+        createSwitch(initialData:Record<string,any> = {},name?:string){
             let pageSwitch:Switch = {
                 name,
                 isPageEnabled:false,
                 enablePage:()=>{
                     this.enable(pageSwitch);
-                }
+                },
+                localData:initialData
             };
             this.switches.push(pageSwitch);
             pageSwitch = this.switches[this.switches.length - 1];
             if(this.activeSwitch === null){
-                this.activeSwitch = pageSwitch;
-                pageSwitch.isPageEnabled = true;
+                this.enable(pageSwitch);
             }
             return pageSwitch;
         },

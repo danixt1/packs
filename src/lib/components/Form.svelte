@@ -5,23 +5,13 @@
         onSubmit: () => void;
         /** Adding a onCancel fn creates a Cancel button */
         onCancel?: () => void;
-        /** Use the default `wrapDiv` from the inputs direct in the form*/
-        useWrapDiv?: boolean;
         children:Snippet;
     }
-    let { onSubmit, onCancel, useWrapDiv = false, children }: Props = $props();
+    let { onSubmit, onCancel, children }: Props = $props();
 </script>
-{#snippet baseStructure()}
-    {#if useWrapDiv}
-        <div class="form-group">
-            {@render children()}
-        </div>
-    {:else}
-        {@render children()}
-    {/if}
-{/snippet}
+
 <form onsubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-    {@render baseStructure()}
+    {@render children()}
     <div class="form-actions">
         <button type="submit">Confirm</button>
         {#if onCancel}
