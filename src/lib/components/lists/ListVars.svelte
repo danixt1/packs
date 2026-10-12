@@ -18,6 +18,7 @@
     }
     let { values = $bindable(), onEdit,onCancel,onAfterSubmit, onCreatePressed, switcher = $bindable()}: Props = $props();
     let formData = $state<Record<string,any>>({});
+    let editing = $state<number | null>(null);
     let obj = $derived({vars:values});
     let pageSwitcher = $state(switcher ? switcher.createSwitch() : null);
     onDestroy(()=>{
@@ -41,11 +42,13 @@
     {#if pageSwitcher && pageSwitcher.isPageEnabled}
         <FormVar 
         bind:value={formData} 
-        onCancel={()=>{onCancel?.()}} 
+        editing={editing}
+        onCancel={()=>{editing = null; onCancel?.()}} 
         bind:writeFormPropsTo={pageSwitcher.localData.form}
         autoAttach={obj}
         onAfterSubmit={(v)=>{
             onAfterSubmit?.(v);
+            editing = null;
             obj = {vars:values}
         }} />
     {:else}
@@ -66,7 +69,8 @@
                 onEdit={(v)=>{
                     const editPos = values.findIndex((e) => e.name === v.name);
                     if(pageSwitcher && editPos >= 0){
-                        formData = {...$state.snapshot(v), _editing: editPos};
+                        editing = editPos;
+                        formData = $state.snapshot(v);
                         pageSwitcher.enablePage();
                     }else{
                         onEdit?.(v,editPos);
@@ -80,6 +84,7 @@
         {#if pageSwitcher || onCreatePressed}
             <button type="button" class="btn btn-primary" onclick={()=>{
                 if(pageSwitcher){
+                    editing = null;
                     formData = {};
                     pageSwitcher.enablePage();
                     return;

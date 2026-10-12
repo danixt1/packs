@@ -12,13 +12,15 @@
         onCancel?: () => void;
         onAfterSubmit?: (data:VariableDeclarator) => void;
         value?:Record<string,any>;
+        /** Index of the variable being edited, or null when creating one. */
+        editing?: number | null;
         /** Automatic modify the data in some object with properties `vars`, while respecting edit/add rules.*/
         autoAttach?:Record<string,any>;
         /** Instead of making a Form pass the property who should by passed to Form*/
         writeFormPropsTo?:Record<string,any>;
         //onFinish?:()=>void
     }
-    let { onCancel, onAfterSubmit, value:data = $bindable({}), autoAttach,writeFormPropsTo = $bindable()}: Props = $props();
+    let { onCancel, onAfterSubmit, value:data = $bindable({}), editing = null, autoAttach,writeFormPropsTo = $bindable()}: Props = $props();
     $effect(()=>{
         if(!writeFormPropsTo){
             return;
@@ -43,16 +45,14 @@
             const finalData = $state.snapshot(data);
             let attachTo = autoAttach;
             
-            if(typeof finalData._editing === 'number'){
+            if(typeof editing === 'number'){
                 
-                const editing = finalData._editing;
                 for(let i = 0;i < attachTo.vars.length;i++){
                     if(attachTo.vars[i].name == finalData.name && i != editing){
                         showError('Already exist another variable with this name!');
                         return;
                     }
                 }
-                delete finalData._editing;
                 attachTo.vars[editing] = finalData;
             }else{
                 if(!attachTo.vars){
