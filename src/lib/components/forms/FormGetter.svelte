@@ -1,0 +1,209 @@
+<script lang="ts">
+    import {InputSelect,InputText} from "$lib/components/inputs";
+    import { showError } from "$lib/notify";
+    import Form from "../Form.svelte";
+
+    interface GetterDeclarator {
+        type: 'getter';
+        in: string;
+        variable: string;
+        fallback?: string | number | boolean;
+    }
+
+    interface Props {
+        onCancel?: () => void;
+        onAfterSubmit?: (data: GetterDeclarator) => void;
+        value?: Record<string,any>;
+        /** Object that receives the generated getter when `attachTo` is provided. */
+        autoAttach?: Record<string, any>;
+        /** Property in `autoAttach` that receives the generated getter. */
+        attachTo?: string;
+        writeFormPropsTo?:Record<string,any>;
+    }
+    let { onCancel, onAfterSubmit, value = $bindable(), autoAttach = $bindable(), attachTo, writeFormPropsTo = $bindable() }: Props = $props();
+    let data = $state<Record<string, any>>({});
+    const OBJECTS_OPTS = {
+        general:[
+            {title:'Character',value:'character'},
+            {title:'Character > Place',value:'character/place'},
+            {title:'Place',value:'place'},
+            {title:'Item',value:'item'},
+            {title:'Autonomy',value:'autonomy'}
+        ],
+        runtime:[
+            {title:'Event',value:'event'},
+            {title:'Action',value:'action'}
+        ]
+    }
+    const METADATA_OPTS = {
+        character:[
+            {title:'Id Place',value:'idPlace'},
+            {title:'Is Player?',value:'isPlayer'},
+            {title:'Is Observed?',value:'isObserved'},
+            {title:'Name',value:'name'},
+            {title:'Id',value:'id'}
+        ],
+        'character/place':[
+            {title:'Name',value:'name'},
+            {title:'Description',value:'description'},
+            {title:'Id',value:'id'}
+        ],
+        place:[
+            {title:'Name',value:'name'},
+            {title:'Description',value:'description'},
+            {title:'Id',value:'id'}
+        ],
+        item:[
+            {title:'Name',value:'name'},
+            {title:'Description',value:'description'},
+            {title:'Id',value:'id'}
+        ],
+        event:[
+            {title:'Event',value:'event'},
+            {title:'Actor Id',value:'actorId'},
+            {title:'Target Id',value:'targetId'},
+            {title:'Place Id',value:'placeId'}
+        ],
+        action:[
+            // TODO: need to make the has category options
+            {title:'Has Category',value:'hasCategory:'},
+            {title:'Action Name',value:'actionName'},
+            {title:'Execution Time',value:'executionTime'},
+            {title:'Is From Player',value:'isFromPlayer'}
+        ],
+        autonomy:[
+            {title:'Current Goal',value:'currentGoal'},
+            {title:'Last Action Name',value:'lastActionName'},
+            {title:'Cycle',value:'cycle'}
+        ]
+    }
+    let metadataOptions = $derived(METADATA_OPTS[data._target as keyof typeof METADATA_OPTS] ?? []);
+    let objectsOptions = $state(OBJECTS_OPTS.general);
+    $effect(()=>{
+        if(!writeFormPropsTo){
+            return;
+        }
+        if(writeFormPropsTo.onSubmit !== onSubmit || writeFormPropsTo.onCancel !== onCancel){
+            writeFormPropsTo = {...writeFormPropsTo,onSubmit,onCancel};
+        }
+    })
+    $effect(()=>{
+        if(!value){
+            data = {};
+            return;
+        }
+        if(value.type === 'getter'){
+            data = {
+                _in: value.in.split(':')[0],
+                _target: value.in.split(':')[1]?.split('-')[0],
+                _get: value.in.split(':')[1]?.split('-')[1],
+                variable: value.variable,
+                fallback: value.fallback
+            };
+        }
+    });
+    $effect(()=>{
+        if(data.in){
+            const fullIn = data.in;
+            const [inProperty, targetGet] = fullIn.split(':');
+            data._in = inProperty;
+            if(targetGet){
+                const [target, get] = targetGet.split('-');
+                data._target = target;
+                data._get = get;
+            }
+            delete data.in;
+            return;
+        }
+        if(data._in === 'runtime'){
+            objectsOptions = OBJECTS_OPTS.runtime;
+            if(OBJECTS_OPTS.runtime.find(o=>o.value === data._target) === undefined){
+                data._target = OBJECTS_OPTS.runtime[0].value;
+            }
+        }else{
+            objectsOptions = OBJECTS_OPTS.general;
+            if(OBJECTS_OPTS.general.find(o=>o.value === data._target) === undefined){
+                data._target = OBJECTS_OPTS.general[0].value;
+            }
+        }
+        if(data._in ==='temp'){
+            data._get = 'variable';
+        }
+    });
+    function onSubmit(){
+        let inProperty = data._in;
+        if(!inProperty){
+            showError('Select where to get the value');
+            return;
+        }
+        if(inProperty !== 'temp'){
+            inProperty += `:${data._target}-${data._get}`;
+        }else{
+            inProperty += ':variable';
+        }
+        if(!data.variable){
+            showError('Add the variable to get the value');
+            return;
+        }
+
+        const finalData: GetterDeclarator = {
+            type: 'getter',
+            in: inProperty,
+            variable: data.variable,
+        };
+        if(['string', 'number', 'boolean'].includes(typeof data.fallback) && data.fallback !== ''){
+            finalData.fallback = data.fallback;
+        }
+        value = finalData;
+        if(autoAttach && attachTo){
+            autoAttach[attachTo] = finalData;
+        }
+        onAfterSubmit?.(finalData);
+    }
+</script>
+{#snippet inputs()}
+    <div class="form-group base-data">
+        <InputSelect id={'getter-location'} label={'In:'} bind:selected={data._in}
+        items={[
+            {title:'Target',value:'target'},
+            {title:'Runtime',value:'runtime'},
+            {title:'Temporary Slot',value:'temp'}
+        ]} />
+        {#if data._in != 'temp'}
+            <InputSelect id={'getter-target'} label={'Object:'} bind:selected={data._target}
+            items={objectsOptions}/>
+        {/if}
+        {#if data._in != 'temp'}
+            <InputSelect id={'getter-get'} label={'Get:'} bind:selected={data._get}
+            items={[
+                {title:'Variable',value:'variable'},
+                {title:'Metadata',value:'metadata'}
+            ]}/>
+        {:else}
+            <InputSelect id={'getter-get'} label={'Get:'} disabled bind:selected={data._get} 
+            items={[
+                {title:'Variable',value:'variable'}
+            ]}/>
+        {/if}
+    </div>
+    {#if data._get === 'variable'}
+        <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable} autocomplete='off'/>
+    {:else if data._get === 'metadata'}
+        <InputSelect id={'getter-metadata'} label={'Metadata:'} wrapDiv bind:selected={data.variable}
+        items={metadataOptions}/>
+    {/if}
+    <InputText id={'getter-fallback'} label={'Fallback value:'} wrapDiv bind:value={data.fallback} autocomplete='off'/>
+{/snippet}
+{#if writeFormPropsTo}
+    {@render inputs()}
+{:else}
+    <Form onSubmit={onSubmit} onCancel={onCancel}>
+        {@render inputs()}
+    </Form>
+{/if}
+<style>
+    .base-data{
+        display: flex;
+        flex-direction: row;
+    }
+</style>
