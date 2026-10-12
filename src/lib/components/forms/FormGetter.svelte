@@ -93,10 +93,13 @@
             return;
         }
         if(value.type === 'getter'){
+            const [scope, source] = value.in.split(':', 2);
+            const isSelfGetter = scope === 'self-variable' || scope === 'self-metadata';
+            const sourceParts = isSelfGetter ? [scope.slice('self-'.length)] : (source?.split('-') ?? []);
             data = {
-                _in: value.in.split(':')[0],
-                _target: value.in.split(':')[1]?.split('-')[0],
-                _get: value.in.split(':')[1]?.split('-')[1],
+                _in: isSelfGetter ? 'self' : scope,
+                _target: isSelfGetter ? 'character' : sourceParts[0],
+                _get: isSelfGetter ? sourceParts[0] : sourceParts[1],
                 variable: value.variable,
                 fallback: value.fallback
             };
@@ -105,13 +108,12 @@
     $effect(()=>{
         if(data.in){
             const fullIn = data.in;
-            const [inProperty, targetGet] = fullIn.split(':');
-            data._in = inProperty;
-            if(targetGet){
-                const [target, get] = targetGet.split('-');
-                data._target = target;
-                data._get = get;
-            }
+            const [scope, source] = fullIn.split(':', 2);
+            const isSelfGetter = scope === 'self-variable' || scope === 'self-metadata';
+            const sourceParts = isSelfGetter ? [scope.slice('self-'.length)] : (source?.split('-') ?? []);
+            data._in = isSelfGetter ? 'self' : scope;
+            data._target = isSelfGetter ? 'character' : sourceParts[0];
+            data._get = isSelfGetter ? sourceParts[0] : sourceParts[1];
             delete data.in;
             return;
         }
@@ -126,6 +128,9 @@
                 data._target = OBJECTS_OPTS.general[0].value;
             }
         }
+        if(data._in === 'self'){
+            data._target = 'character';
+        }
         if(data._in ==='temp'){
             data._get = 'variable';
         }
@@ -136,7 +141,9 @@
             showError('Select where to get the value');
             return;
         }
-        if(inProperty !== 'temp'){
+        if(inProperty === 'self'){
+            inProperty = `self-${data._get}`;
+        }else if(inProperty !== 'temp'){
             inProperty += `:${data._target}-${data._get}`;
         }else{
             inProperty += ':variable';
@@ -165,11 +172,12 @@
     <div class="form-group base-data">
         <InputSelect id={'getter-location'} label={'In:'} bind:selected={data._in}
         items={[
+            {title:'Self',value:'self'},
             {title:'Target',value:'target'},
             {title:'Runtime',value:'runtime'},
             {title:'Temporary Slot',value:'temp'}
         ]} />
-        {#if data._in != 'temp'}
+        {#if data._in !== 'temp' && data._in !== 'self'}
             <InputSelect id={'getter-target'} label={'Object:'} bind:selected={data._target}
             items={objectsOptions}/>
         {/if}
