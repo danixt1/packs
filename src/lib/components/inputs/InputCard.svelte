@@ -24,16 +24,18 @@
         onChange(name,true)
     }
 </script>
-<BaseInput id={id} wrapDiv={wrapDiv}>
-    <div class = "cards">
-        <div class="def-label" id={id}>{label}</div>
+<BaseInput {id} {wrapDiv}>
+    <fieldset class="cards" {id} data-testid={`input-${id}`}>
+        <legend class="def-label">{label}</legend>
         <div class="list">
             {#each items as item (item.value)}
-                <input type="checkbox" id={item.value} class="card-checkbox" checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
-                <label for={item.value} class="card-label">{item.title}</label>
+                <label class:selected={selectedItems.includes(item.value)} class="card-label">
+                    <input type="checkbox" id={item.value} class="card-checkbox" checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
+                    {item.title}
+                </label>
             {/each}
         </div>
-    </div>
+    </fieldset>
 </BaseInput>
 <style>
     .list{
@@ -46,6 +48,9 @@
         flex-wrap: wrap;
         gap: 0.5rem;
         flex-direction: column;
+        border: 0;
+        margin: 0;
+        padding: 0;
     }
     .card-checkbox {
         position: absolute;
@@ -65,11 +70,11 @@
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         padding: 6px 10px;
     }
-    .card-checkbox:checked + .card-label {
+        .card-label.selected {
       background-color: var(--bg-card-hover);
     }
 
-    .card-checkbox:checked + .card-label {
+        .card-label.selected {
         color: var(--color-text)
     }
 </style>

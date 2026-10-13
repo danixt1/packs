@@ -18,6 +18,7 @@
 <input
     type="number"
     id={id}
+    data-testid={`input-${id}`}
     name={name}
     bind:value={value}
     class="def-input"

@@ -12,13 +12,23 @@
 {#if wrapDiv}
     <div class="form-group">
         {#if label}
-            <label class="def-label" for={id}>{label}</label>
+            <label class="def-label input-label">{label}{@render children()}</label>
+        {:else}
+            {@render children()}
         {/if}
-        {@render children()}
     </div>
 {:else}
     {#if label}
-        <label class="def-label" for={id}>{label}</label>
+        <label class="def-label input-label">{label}{@render children()}</label>
+    {:else}
+        {@render children()}
     {/if}
-    {@render children()}
 {/if}
+
+<style>
+    .input-label {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+    }
+</style>

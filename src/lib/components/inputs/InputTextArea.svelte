@@ -15,6 +15,7 @@
 <BaseInput id={id} label={label} wrapDiv={wrapDiv}>
     <textarea
     id={id}
+    data-testid={`input-${id}`}
     name={name}
     bind:value={value}
     class="def-input"

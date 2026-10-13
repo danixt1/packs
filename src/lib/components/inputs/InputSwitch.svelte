@@ -17,6 +17,8 @@
 <BaseInput {id} {label} {wrapDiv}>
     <button
         type="button"
+        {id}
+        data-testid={`input-${id}`}
         class="switch"
         class:on={value}
         role="switch"

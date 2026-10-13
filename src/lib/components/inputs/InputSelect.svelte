@@ -14,26 +14,15 @@
     
 </script>
 
-<BaseInput {id} {wrapDiv}>
-    <div class="select-container">
-        {#if label}
-            <label class="def-label" for={id}>{label}</label>
-        {/if}
-        <select {id} bind:value={selected} class="def-select" disabled={disabled} {onchange}>
-            {#each items as item (item.value)}
-                <option value={item.value}>{item.title}</option>
-            {/each}
-        </select>
-    </div>
+<BaseInput {id} {label} {wrapDiv}>
+    <select {id} data-testid={`input-${id}`} bind:value={selected} class="def-select" disabled={disabled} {onchange}>
+        {#each items as item (item.value)}
+            <option value={item.value}>{item.title}</option>
+        {/each}
+    </select>
 </BaseInput>
 
 <style>
-    .select-container {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-    }
-    
     .def-select {
         width: 100%;
         padding: 6px 12px;
