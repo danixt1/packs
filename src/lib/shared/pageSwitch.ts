@@ -41,7 +41,11 @@ export function createPageSwitch():PageSwitch{
                 },
                 localData:initialData,
                 remove:()=> {
-                    this.switches = this.switches.filter(e => e == pageSwitch);
+                    this.switches = this.switches.filter(e => e !== pageSwitch);
+                    if (this.activeSwitch === pageSwitch) {
+                        this.activeSwitch = null;
+                        this.data = {};
+                    }
                 },
             };
             this.switches.push(pageSwitch);

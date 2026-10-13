@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { PageSwitch } from "$lib/shared/pageSwitch";
+    import type { PageSwitch, Switch } from "$lib/shared/pageSwitch";
     import { onDestroy } from "svelte";
     import type { EffectFomAction } from "$lib/types/data/declarative";
     import FormEffect from "../forms/FormEffect.svelte";
@@ -8,6 +8,9 @@
     interface Props {
         values?: EffectFomAction[];
         switcher?: PageSwitch;
+        page?: Switch;
+        /** Non-serialized identity used when several effect lists share a PageSwitch. */
+        scope?: string;
         onEdit?: (value: EffectFomAction, index: number) => void;
         onCancel?: () => void;
         onAfterSubmit?: (value: EffectFomAction) => void;
@@ -17,6 +20,8 @@
     let {
         values = $bindable<EffectFomAction[]>(),
         switcher = $bindable(),
+        page,
+        scope,
         onEdit,
         onCancel,
         onAfterSubmit,
@@ -25,13 +30,28 @@
 
     let formData = $state<EffectFomAction | undefined>();
     let editing = $state<number | null>(null);
-    let pageSwitcher = $state(switcher ? switcher.createSwitch({
-        in:{type:'list',name:'effect'}, form:{}
-    }) : null);
+    let pageSwitcher = $state<Switch | null>(null);
     let items = $state<EffectFomAction[]>([]);
+    let ownsPageSwitcher = $state(false);
+
+    $effect(() => {
+        if (!pageSwitcher && page) {
+            pageSwitcher = page;
+            ownsPageSwitcher = false;
+            return;
+        }
+        if (!pageSwitcher && switcher) {
+            pageSwitcher = switcher.createSwitch({
+                in:{type:'list',name:'effect', scope}, form:{}
+            }, scope);
+            ownsPageSwitcher = true;
+        }
+    });
 
     onDestroy(() => {
-        pageSwitcher?.remove();
+        if (ownsPageSwitcher) {
+            pageSwitcher?.remove();
+        }
     });
 
     $effect(() => {

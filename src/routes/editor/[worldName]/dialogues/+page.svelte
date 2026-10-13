@@ -1,9 +1,9 @@
 <script lang="ts">
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
-    import type { DialogueMatch, DialogueNode, DialogueTree } from "$lib/types/data/declarative";
+    import type { DialogueChoice, DialogueMatch, DialogueNode, DialogueTree } from "$lib/types/data/declarative";
 
-    import { InputCard, InputSelect, InputText, InputTextArea } from "$lib/components/inputs";
+    import { InputCard, InputSelect, InputSwitch, InputText, InputTextArea } from "$lib/components/inputs";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
     import Form from "$lib/components/Form.svelte";
     import Popup from "$lib/components/Popup.svelte";
@@ -22,6 +22,9 @@
     let nodeData = $state<Record<string, any>>({});
     let matchData = $state<Record<string, any>>({});
     let choiceData = $state<Record<string,any>>({});
+
+    const nodeOnEnterScope = 'dialogue-node-on-enter-effects';
+    const choiceEffectsScope = 'dialogue-choice-effects';
 
     let switcher = $state(createPageSwitch());
     let dialoguePage = (() => switcher.createSwitch({
@@ -48,6 +51,14 @@
             onCancel: ()=> nodePage.enablePage()
         }
     }))()
+    let nodeOnEnterPage = (() => switcher.createSwitch({
+        in: { type: 'list', name: 'effect', scope: nodeOnEnterScope },
+        form: {}
+    }, nodeOnEnterScope))();
+    let choiceEffectsPage = (() => switcher.createSwitch({
+        in: { type: 'list', name: 'effect', scope: choiceEffectsScope },
+        form: {}
+    }, choiceEffectsScope))();
     let labelsInfo = $state(editor.getLabels());
     let selectedLabelKey = $derived(
         matchData._in && matchData._label
@@ -152,12 +163,41 @@
         }
         dialoguePage.enablePage();
     }
-    function saveChoice(){
-
-    }
     function openNode(node?: DialogueNode) {
         nodeData = node ? $state.snapshot(node) : {};
+        nodeData.onEnter ??= [];
         
+        nodePage.enablePage();
+    }
+
+    function openChoice(choice?: DialogueChoice) {
+        choiceData = choice ? $state.snapshot(choice) : { conditions: [], effects: [] };
+        choiceData.conditions ??= [];
+        choiceData.effects ??= [];
+        choicePage.enablePage();
+    }
+
+    function saveChoice() {
+        if (!choiceData.id || !choiceData.text) {
+            showError('Choice id and text are required');
+            return;
+        }
+        const choice: DialogueChoice = {
+            id: choiceData.id,
+            text: choiceData.text,
+            conditions: choiceData.conditions ?? [],
+            effects: choiceData.effects ?? [],
+            nextNodeId: choiceData.nextNodeId || undefined,
+            endDialogue: choiceData.endDialogue === true
+        };
+        const choices = [...(nodeData.choices ?? [])] as DialogueChoice[];
+        const index = choices.findIndex((item) => item.id === choice.id);
+        if (index >= 0) {
+            choices[index] = choice;
+        } else {
+            choices.push(choice);
+        }
+        nodeData.choices = choices;
         nodePage.enablePage();
     }
 
@@ -233,18 +273,31 @@
                     { title: 'Narrator', value: 'narrator' },
                     ...editor.getCharacters().map((character) => ({ title: `char:${character.name} (${character.id})`, value: { type: 'character', id: character.id } }))
                 ]} />
+                <h2>On enter effects:</h2>
+                <ButtonPopUp text={`Configure effects (${nodeData.onEnter?.length ?? 0})`} onclick={() => switcher.enableSwitchByName(nodeOnEnterScope)} />
                 <h2>Choices:</h2>
                 {#if (nodeData.choices || []).length > 0}
                     <ObjectTable items = {(nodeData.choices ?? []).map((e:any)=>({Id:e.id,Text:e.text,Next:e.nextNodeId}))}
                     headers={['Id','Text','Next']}
                     ref={nodeData.choices ?? []}
-                    onEdit = {(e)=>{choiceData = $state.snapshot(e);choicePage.enablePage()}}
+                    onEdit = {(e)=>openChoice(e as unknown as DialogueChoice)}
                     onDelete = {(e)=>{nodeData.choices = nodeData.choices.filter((n:any)=> e.id != n.id)}}
                     />
                 {:else}
                     <p>No Choices Added!</p>
                 {/if}
-                <ButtonPopUp text="Add Choice" onclick = {()=>{choiceData = {};choicePage.enablePage()}}/>
+                <ButtonPopUp text="Add Choice" onclick={() => openChoice()} />
+            </div>
+        {:else if switcher.data.in?.type === 'list' && switcher.data.in?.scope === nodeOnEnterScope}
+            <div class="form-group">
+                <h2>Node entry effects</h2>
+                <ListEffects
+                    bind:values={nodeData.onEnter}
+                    page={nodeOnEnterPage}
+                    switcher={switcher}
+                    onCancel={() => nodePage.enablePage()}
+                    onAfterSubmit={() => nodePage.enablePage()}
+                />
             </div>
         {:else}
             {#if matchPage.isPageEnabled}
@@ -280,14 +333,29 @@
                 <InputText id="choice-id" label="Id:" bind:value={choiceData.id} autocomplete='off' wrapDiv />
                 <InputTextArea id="choice-text" label="Text:" bind:value={choiceData.text} wrapDiv required />
                 <InputText id="choice-next-node" label="Next node:" bind:value={choiceData.nextNodeId} autocomplete="off" wrapDiv />
+                <InputSwitch id="choice-end-dialogue" label="End dialogue" bind:value={choiceData.endDialogue} wrapDiv />
+                <div class="form-group">
+                    <h2>Conditions</h2>
+                    <ListConditions bind:values={choiceData.conditions} bind:switcher={switcher} onCancel={() => choicePage.enablePage()} onAfterSubmit={() => choicePage.enablePage()} />
+                </div>
+                <ButtonPopUp text={`Configure effects (${choiceData.effects?.length ?? 0})`} onclick={() => switcher.enableSwitchByName(choiceEffectsScope)} />
             {:else if switcher.data.in?.name != 'effect'}
                 <div class="form-group">
                     <h2>Conditions</h2>
                     <ListConditions bind:values={matchData.conditions} bind:switcher={switcher} onCancel={() => matchPage.enablePage()} onAfterSubmit={() => matchPage.enablePage()} />
                 </div>
             {/if}
-            {#if (switcher.data.in && switcher.data.in.type === 'list' && switcher.data.in.name === 'effect') || choicePage.isPageEnabled}
-                <ListEffects bind:values={choiceData.effects} switcher={switcher} onCancel={() => choicePage.enablePage()} onAfterSubmit={() => choicePage.enablePage()} />
+            {#if switcher.data.in?.type === 'list' && switcher.data.in?.scope === choiceEffectsScope}
+                <div class="form-group">
+                    <h2>Choice effects</h2>
+                    <ListEffects
+                        bind:values={choiceData.effects}
+                        page={choiceEffectsPage}
+                        switcher={switcher}
+                        onCancel={() => choicePage.enablePage()}
+                        onAfterSubmit={() => choicePage.enablePage()}
+                    />
+                </div>
             {/if}
         {/if}
     </Form>
