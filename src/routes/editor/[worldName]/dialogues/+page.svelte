@@ -10,6 +10,7 @@
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import ListConditions from "$lib/components/lists/ListConditions.svelte";
+    import ListEffects from "$lib/components/lists/ListEffects.svelte";
     import { createPageSwitch } from "$lib/shared/pageSwitch";
     import { showError } from "$lib/notify";
     import ButtonPopUp from "$lib/components/editor/ButtonPopUp.svelte";
@@ -244,7 +245,6 @@
                     <p>No Choices Added!</p>
                 {/if}
                 <ButtonPopUp text="Add Choice" onclick = {()=>{choiceData = {};choicePage.enablePage()}}/>
-
             </div>
         {:else}
             {#if matchPage.isPageEnabled}
@@ -278,11 +278,16 @@
             {/if}
             {#if choicePage.isPageEnabled}
                 <InputText id="choice-id" label="Id:" bind:value={choiceData.id} autocomplete='off' wrapDiv />
-            {:else}
+                <InputTextArea id="choice-text" label="Text:" bind:value={choiceData.text} wrapDiv required />
+                <InputText id="choice-next-node" label="Next node:" bind:value={choiceData.nextNodeId} autocomplete="off" wrapDiv />
+            {:else if switcher.data.in?.name != 'effect'}
                 <div class="form-group">
                     <h2>Conditions</h2>
                     <ListConditions bind:values={matchData.conditions} bind:switcher={switcher} onCancel={() => matchPage.enablePage()} onAfterSubmit={() => matchPage.enablePage()} />
                 </div>
+            {/if}
+            {#if (switcher.data.in && switcher.data.in.type === 'list' && switcher.data.in.name === 'effect') || choicePage.isPageEnabled}
+                <ListEffects bind:values={choiceData.effects} switcher={switcher} onCancel={() => choicePage.enablePage()} onAfterSubmit={() => choicePage.enablePage()} />
             {/if}
         {/if}
     </Form>
