@@ -125,6 +125,14 @@
             showError('Select the variable to modify');
             return;
         }
+        if (data.type === 'move' && (!data.moveId?.type || !data.toId?.type)) {
+            showError('Select the character and destination');
+            return;
+        }
+        if (data.type === 'start-dialogue' && !data.dialogueId?.trim() && !data.intent?.trim()) {
+            showError('Add a dialogue id or intent');
+            return;
+        }
         if (data.type === 'conditional') {
             data.conditions ??= [];
             data.onTrue ??= [];
@@ -199,15 +207,23 @@
 
 {#snippet inputs()}
     {#if nestedSwitcher.getActiveSwitch() === mainPage && activeNested === null}
-        <InputSelect
-            id="effect-type"
-            label="Effect type:"
-            wrapDiv
-            selected={selectedType}
-            onchange={(event) => changeType((event.currentTarget as HTMLSelectElement).value as EffectType)}
-            items={effectOptions}
-        />
+        <section class="effect-type-selector" aria-labelledby="effect-type-heading">
+            <h2 id="effect-type-heading">Choose an effect</h2>
+            <p>This choice determines which effect you are adding</p>
+            <InputSelect
+                id="effect-type"
+                label="Effect type:"
+                selected={selectedType}
+                onchange={(event) => changeType((event.currentTarget as HTMLSelectElement).value as EffectType)}
+                items={effectOptions}
+            />
+        </section>
 
+        <section class="effect-settings" aria-label="Effect settings">
+            <div class="effect-settings-heading">
+                <h3>Effect settings</h3>
+                <span>{effectOptions.find((option) => option.value === selectedType)?.title}</span>
+            </div>
         {#if selectedType === 'move'}
             <div class="form-group">
                 <button type="button" class="nested-button" onclick={() => openNested('moveId')}>Edit character to move</button>
@@ -235,28 +251,34 @@
             <InputTextArea id="effect-event-data" label="Event data (JSON):" bind:value={data._eventData} />
         {:else if selectedType === 'setter'}
             <div class="form-group">
+                <h3>With Variable:</h3>
                 <button type="button" class="nested-button" onclick={() => openNested('setterVar')}>Edit variable getter</button>
             </div>
-            <InputSelect id="effect-mode" label="Mode:" wrapDiv bind:selected={data.mode} items={[
-                { title: 'Set', value: 'set' },
-                { title: 'Increment', value: 'increment' },
-                { title: 'Decrement', value: 'decrement' },
-                { title: 'Multiply', value: 'multiply' },
-                { title: 'Divide', value: 'divide' }
-            ]} />
-            <InputSelect id="effect-value-kind" label="Value source:" wrapDiv bind:selected={data._valueKind} items={[
-                { title: 'Literal', value: 'literal' },
-                { title: 'Random', value: 'random' }
-            ]} />
-            {#if data._valueKind === 'random'}
-                <div class="form-group">
-                    <button type="button" class="nested-button" onclick={() => openNested('setterRandom')}>Edit random value</button>
+            <div class="form-group">
+                <div class="zone">
+                    <h3>Set the Value:</h3>
+                    <InputSelect id="effect-mode" label="Mode:" bind:selected={data.mode} items={[
+                        { title: 'Set', value: 'set' },
+                        { title: 'Increment', value: 'increment' },
+                        { title: 'Decrement', value: 'decrement' },
+                        { title: 'Multiply', value: 'multiply' },
+                        { title: 'Divide', value: 'divide' }
+                    ]} />
+                    <InputSelect id="effect-value-kind" label="Value source:" bind:selected={data._valueKind} items={[
+                        { title: 'Literal', value: 'literal' },
+                        { title: 'Random', value: 'random' }
+                    ]} />
+                    {#if data._valueKind === 'random'}
+                        <div class="form-group">
+                            <button type="button" class="nested-button" onclick={() => openNested('setterRandom')}>Edit random value</button>
+                        </div>
+                    {:else}
+                        <div class="form-group">
+                            <button type="button" class="nested-button" onclick={() => openNested('setterValue')}>Edit literal value</button>
+                        </div>
+                    {/if}
                 </div>
-            {:else}
-                <div class="form-group">
-                    <button type="button" class="nested-button" onclick={() => openNested('setterValue')}>Edit literal value</button>
-                </div>
-            {/if}
+            </div>
         {:else if selectedType === 'start-dialogue'}
             <InputText id="effect-dialogue-id" label="Dialogue id:" wrapDiv bind:value={data.dialogueId} autocomplete="off" />
             <InputText id="effect-intent" label="Intent:" wrapDiv bind:value={data.intent} autocomplete="off" />
@@ -270,6 +292,7 @@
                 <button type="button" class="nested-button" onclick={() => openNested('onFalse')}>Configure false effects ({data.onFalse?.length ?? 0})</button>
             </div>
         {/if}
+        </section>
     {:else if activeNested === 'moveId'}
         <FormGetter
             value={data.moveId}
@@ -340,6 +363,78 @@
 {/if}
 
 <style>
+    .effect-type-selector {
+        margin: 0.75rem 1rem 1rem;
+        padding: 1rem;
+        border: 1px solid var(--border-strong);
+        border-left: 4px solid var(--color-accent);
+        border-radius: 8px;
+        background: linear-gradient(115deg, rgba(215, 177, 115, 0.13), rgba(215, 177, 115, 0.035));
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.18);
+    }
+    .effect-type-selector h2 {
+        margin: 0;
+        color: var(--color-text-bright);
+        font-size: 1.1rem;
+    }
+    .effect-type-selector p {
+        margin: 0.35rem 0 0.75rem;
+        color: var(--color-text);
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+    .effect-type-selector :global(.def-label) {
+        font-size: 0.95rem;
+    }
+    .effect-type-selector :global(.def-select) {
+        min-height: 2.8rem;
+        padding: 0.65rem 2.5rem 0.65rem 0.8rem;
+        border: 1px solid var(--color-accent);
+        border-radius: 6px;
+        background-color: var(--bg-panel-solid);
+        box-shadow: 0 0 0 2px rgba(215, 177, 115, 0.12);
+        font-size: 1rem;
+        font-weight: 600;
+    }
+    .effect-type-selector :global(.def-select:focus-visible) {
+        outline: 2px solid var(--color-accent-light);
+        outline-offset: 2px;
+    }
+    .effect-settings {
+        margin: 0 1rem 1rem;
+        padding: 0.75rem;
+        border: 1px solid var(--border-subtle);
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.025);
+    }
+    .effect-settings-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        margin-bottom: 0.25rem;
+        padding: 0 0.25rem 0.65rem;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+    .effect-settings-heading h3 {
+        margin: 0;
+        color: var(--color-text);
+        font-size: 0.95rem;
+    }
+    .effect-settings-heading span {
+        padding: 0.2rem 0.55rem;
+        border: 1px solid var(--border-strong);
+        border-radius: 999px;
+        color: var(--color-text-bright);
+        background: rgba(215, 177, 115, 0.08);
+        font-size: 0.8rem;
+        font-weight: 600;
+    }
+    .zone{
+        border: 1px solid var(--border-subtle);
+        border-radius: 5px;
+        padding: 1px 5px 15px 5px;
+    }
     .nested-button {
         width: 100%;
         margin: 0.25rem 0;

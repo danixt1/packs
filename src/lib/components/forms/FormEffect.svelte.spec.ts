@@ -81,3 +81,13 @@ test('opens conditional effect editors from the main effect form', async () => {
     await expect.element(screen.getByRole('button', { name: 'Add Condition' })).toBeVisible();
     await expect.element(screen.getByRole('button', { name: /Configure true effects/ })).not.toBeInTheDocument();
 });
+for(const effectName of ['Move','Event','Conditional','Set variable','Start dialogue']){
+    test(`fail on not passed data on ${effectName}`,async ()=>{
+        const onAfterSubmit = vi.fn();
+        const screen = await render(FormEffect, {onAfterSubmit});
+        await screen.getByRole('combobox', { name: 'Effect type:' }).selectOptions(effectName);
+        await screen.getByRole('button', { name: 'Confirm' }).click();
+        await expect.poll(() => onAfterSubmit.mock.calls.length).toBe(0);
+    })
+
+}

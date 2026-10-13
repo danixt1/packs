@@ -66,7 +66,10 @@
         }
         onEdit?.(effect, index);
     }
-
+    function deleteEffect(effect: EffectFomAction, index: number){
+        items.splice(index,1);
+        values.splice(index,1);
+    }
     function label(effect: EffectFomAction): string {
         switch (effect.type) {
             case 'move':
@@ -104,11 +107,12 @@
         }}
     />
 {:else}
-    <div class="effect-list">
+    <div class="effect-list form-group">
         <OrderedList
             bind:values={items}
             getLabel={label}
             onEdit={editEffect}
+            onDelete={deleteEffect}
             emptyText="No effects yet. Add an effect to start."
         />
         <button type="button" class="add-button" onclick={addEffect}>Add Effect</button>
