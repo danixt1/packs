@@ -103,7 +103,7 @@ export function buildIndexes(world: any, state: RuntimeState): WorldIndexes {
 	}
 
 	const actions = new Map<string, any>();
-	for (const action of [...(world.characterActions ?? []), ...(world.autonomousActions ?? [])]) {
+	for (const action of world.actions ?? []) {
 		actions.set(action.name, action);
 	}
 
@@ -274,10 +274,9 @@ function renderTemplateText(state: RuntimeState, template: string, context: Reso
 }
 
 export function buildActionOptions(world: any, state: RuntimeState, actorId: string, audience: 'player' | 'autonomous' = 'player') {
-	const actions = audience === 'autonomous' ? [...(world.characterActions ?? []), ...(world.autonomousActions ?? [])] : world.characterActions ?? [];
 	const options: ActionOption[] = [];
 
-	for (const action of actions) {
+	for (const action of world.actions ?? []) {
 		const availableTo = action.availableTo ?? ['player'];
 		if (!availableTo.includes(audience)) continue;
 		if (audience === 'player' && !action.display) continue;
@@ -338,7 +337,7 @@ function actionDeclaration(world: any, name: string) {
 	if (name === '__wait') {
 		return { name: '__wait', executionTime: 10, targets: [{ type: 'collector', target: 'self' }], onActivate: [], onComplete: [], activationConditions: [] };
 	}
-	return [...(world.characterActions ?? []), ...(world.autonomousActions ?? [])].find((action: any) => action.name === name);
+	return (world.actions ?? []).find((action: any) => action.name === name);
 }
 
 function emitEvent(state: RuntimeState, event: string, context: RuntimeEvent['context'], data: RuntimeEvent['data'], actionInstanceId?: string) {
@@ -799,6 +798,7 @@ export function validateWorld(world: any) {
 	const errors: string[] = [];
 	const places = new Set<string>();
 	const characters = new Set<string>();
+	const actions = new Set<string>();
 	for (const place of world.places ?? []) {
 		if (places.has(place.id)) errors.push(`Duplicate place id: ${place.id}`);
 		places.add(place.id);
@@ -806,6 +806,10 @@ export function validateWorld(world: any) {
 	for (const character of world.characters ?? []) {
 		if (characters.has(character.id)) errors.push(`Duplicate character id: ${character.id}`);
 		characters.add(character.id);
+	}
+	for (const action of world.actions ?? []) {
+		if (actions.has(action.name)) errors.push(`Duplicate action name: ${action.name}`);
+		actions.add(action.name);
 	}
 	for (const place of world.places ?? []) {
 		for (const id of place.charactersId ?? []) if (!characters.has(id)) errors.push(`Place ${place.id} references missing character ${id}`);

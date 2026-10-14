@@ -18,7 +18,7 @@ export const world: World = {
             showIn:"statusBar",
             title:"Energy",
             priority:10
-        }
+        },
     ],
     places:[
         {
@@ -164,7 +164,7 @@ export const world: World = {
         }
     ],
     items:[],
-    characterActions:[
+    actions:[
         {
             name:'Move',
             categories:['movement'],
@@ -478,11 +478,9 @@ export const world: World = {
                     }
                 }
             ]
-        }
-    ],
-    autonomousActions:[
+        },
         {
-            name:'wait',
+            name:'autonomy-wait',
             description:'Skip the current autonomy cycle without changing the world state.',
             availableTo:['autonomous'],
             activationConditions:[],

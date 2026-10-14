@@ -3,7 +3,7 @@ import { WorldEditor, type LabelMapper } from './worldEditor';
 import type { World } from '$lib/types/data/declarative';
 function buildBlankWorld():World{
     return {
-        characterActions:[],
+        actions:[],
         characters:[],
         description:'',
         items:[],
@@ -49,7 +49,7 @@ it('Remove character and all links',()=>{
     expect(Object.values(characters).length == 0).toBeTruthy();
 
 })
-it('Add action(from characters)',()=>{
+it('Add action',()=>{
     const editor = new WorldEditor(buildBlankWorld());
     editor.addAction({
         name:'test',
@@ -70,6 +70,34 @@ it('Add action(from characters)',()=>{
         ]
     })
     let refs = (editor as any)['refsByOID'];
-    expect(refs['action-character:test']).toStrictEqual([{is:'var',prop:'ifLeft'}]);
+    expect(refs['action:test']).toStrictEqual([{is:'var',prop:'ifLeft'}]);
 
 })
+
+it('loads all actions from the unified world collection', () => {
+    const world = buildBlankWorld();
+    world.actions.push(
+        {
+            name:'player-action',
+            executionTime:1,
+            activationConditions:[],
+            onActivate:[],
+            onComplete:[],
+            targets:[]
+        },
+        {
+            name:'autonomous-action',
+            availableTo:['autonomous'],
+            executionTime:1,
+            activationConditions:[],
+            onActivate:[],
+            onComplete:[],
+            targets:[]
+        }
+    );
+
+    const editor = new WorldEditor(world);
+
+    expect(editor.getActions().map((action) => action.name)).toEqual(['player-action', 'autonomous-action']);
+    expect(editor.getActions().every((action) => action.oid.startsWith('action:'))).toBe(true);
+});

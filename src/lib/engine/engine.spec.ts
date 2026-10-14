@@ -10,7 +10,7 @@ import {
 import { resolveGetter } from './getters';
 import type { World } from '$lib/types/data/declarative';
 
-const byName = (worldUnderTest: any, name: string) => worldUnderTest.characterActions.find((action: any) => action.name === name);
+const byName = (worldUnderTest: any, name: string) => worldUnderTest.actions.find((action: any) => action.name === name);
 const numberVar = (vars: { name: string; value: unknown }[], name: string) => vars.find((item) => item.name === name)?.value as number;
 const actionNameCondition = (actionName: string, operator: '==' | '!=' = '==') => ({
 	type: 'condition-relational',
@@ -107,7 +107,7 @@ function engineTestWorld(actionOverrides: Record<string, any> = {}):World {
 			}
 		],
 		items: [],
-		characterActions: [
+		actions: [
 			{
 				name: 'Move',
 				display: {
@@ -377,7 +377,7 @@ function textTemplateOrderWorld():World {
 			}
 		],
 		items: [],
-		characterActions: [],
+		actions: [],
 		vars: [],
 		textTemplates: [
 			{
@@ -434,6 +434,13 @@ describe('runtime kernel', () => {
 
 		arthur!.vars.find((variable) => variable.name === 'health')!.value = 1;
 		expect(world.characters.find((character) => character.id === 'arthur')?.vars.find((variable) => variable.name === 'health')?.value).toBe(100);
+	});
+
+	it('validates duplicate action names in the unified collection', () => {
+		const world = engineTestWorld();
+		world.actions.push({ ...world.actions[0], name: world.actions[1].name });
+
+		expect(validateWorld(world)).toContain(`Duplicate action name: ${world.actions[1].name}`);
 	});
 
 	it('evaluates activation conditions and parenthesized OR target conditions', () => {

@@ -83,7 +83,7 @@ function autonomyTestWorld():World {
 			}
 		],
 		items: [],
-		characterActions: [
+		actions: [
 			{
 				name: 'attack',
 				availableTo: ['autonomous'],
@@ -177,5 +177,47 @@ describe('autonomy decisions', () => {
 		expect(troll.autonomyState.lastActionName).toBe('attack');
 		expect(troll.autonomyState.cooldowns['attack nearby threat']).toBe(1);
 		expect(state.debug.some((line) => line.includes('autonomy:troll') && line.includes('status=acted') && line.includes('rule=attack nearby threat'))).toBe(true);
+	});
+
+	it('uses the unified action collection for autonomous-only and shared actions', () => {
+		expect.assertions(4);
+		const world = autonomyTestWorld();
+		world.actions.push({
+			name: 'player-only',
+			display: { name: 'Player only', description: 'Player only', showAs: 'optionOfActionList' },
+			activationConditions: [],
+			targets: [{ type: 'collector', target: 'self' }],
+			onActivate: [],
+			onComplete: [],
+			executionTime: 1
+		});
+		world.actions.push({
+			name: 'shared',
+			availableTo: ['player', 'autonomous'],
+			display: { name: 'Shared', description: 'Shared', showAs: 'optionOfActionList' },
+			activationConditions: [],
+			targets: [{ type: 'collector', target: 'self' }],
+			onActivate: [],
+			onComplete: [],
+			executionTime: 1
+		});
+		world.actions.push({
+			name: 'autonomous-only',
+			availableTo: ['autonomous'],
+			activationConditions: [],
+			targets: [{ type: 'collector', target: 'self' }],
+			onActivate: [],
+			onComplete: [],
+			executionTime: 1
+		});
+		const state = createRuntimeState(world);
+
+		const playerOptions = buildActionOptions(world, state, 'arthur', 'player');
+		const autonomousOptions = buildActionOptions(world, state, 'troll', 'autonomous');
+
+		expect(playerOptions.some((option) => option.actionName === 'player-only')).toBe(true);
+		expect(playerOptions.some((option) => option.actionName === 'shared')).toBe(true);
+		expect(playerOptions.some((option) => option.actionName === 'autonomous-only')).toBe(false);
+		expect(autonomousOptions.map((option) => option.actionName)).toEqual(expect.arrayContaining(['shared', 'autonomous-only']));
 	});
 });

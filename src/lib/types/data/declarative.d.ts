@@ -308,7 +308,8 @@ interface ActionDeclaration {
     categories?: string[];
     /**
      * Defines who is allowed to execute the action.
-     * Defaults to `player` when omitted.
+     * Defaults to `['player']` when omitted.
+     * Use both audiences for an action shared by the player and autonomous characters.
      */
     availableTo?: ActionAudience[];
     /**
@@ -532,16 +533,14 @@ export interface World{
     characters: Character[];
     items: Item[];
     /**
-     * Actions that the player can execute.
-     * Self is always a character.
-     * Autonomous characters can also reference these actions by `actionName`
-     * when the action declares `availableTo: ['autonomous']` or includes both audiences.
+     * All action declarations in the world.
+     *
+     * `availableTo` controls whether each action can be selected by the player,
+     * autonomous characters, or both. An omitted `availableTo` defaults to
+     * `['player']`. Action names must be unique across this collection because
+     * autonomy rules and runtime action metadata resolve actions by name.
      */
-    characterActions: ActionDeclaration[];
-    /**
-     * Actions that should exist only for autonomous actors and never appear in the player UI.
-     */
-    autonomousActions?: ActionDeclaration[];
+    actions: ActionDeclaration[];
     vars: VariableDeclarator[];
     textTemplates: TextTemplate[];
     dialogues?: DialogueTree[];
