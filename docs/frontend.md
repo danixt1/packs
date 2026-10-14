@@ -100,6 +100,12 @@ interface InputSwitchProps extends BaseInput {
 
 `InputCard` calls `onChange` whenever an item is selected or unselected. The callback receives the item's `value` and a Boolean indicating whether the item is now selected.
 
+### Referring to inputs in tests
+
+Input components generate a stable `data-testid` automatically from their required `id` prop. The value is always `input-${id}`; no separate test ID prop is needed.
+
+For example, an input declared as `<InputText id="name" ... />` can be selected with `getByTestId('input-name')`. The same convention applies to `InputTextArea`, `InputNumber`, `InputSelect`, `InputSwitch`, and the `InputCard` group.
+
 ## Editor Components
 
 Editor Components are complexy objects who generally generate some structure declared in declarative.d.ts the editor route have the object to create/modify and view generated worlds.

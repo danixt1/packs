@@ -45,4 +45,5 @@ If the target element is "simple" (no `class` attribute or no reference in style
 
 ## Related Documentation
 
-- [frontend.md](../../docs/frontend.md) — Full frontend documentation
+- [frontend.md](../../../docs/frontend.md) — Full frontend documentation
+= [fromtend-editor.md](../../../docs/frontend-editor.md) Documentation about editor routes and some used components like: Form,Popup,ObjectTable
