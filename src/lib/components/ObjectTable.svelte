@@ -1,8 +1,8 @@
 <script lang="ts">
 
     interface Props{
-        onEdit: (item: Record<string, unknown>) => void;
-        onDelete: (item: Record<string, unknown>) => void;
+        onEdit?: (item: Record<string, unknown>) => void;
+        onDelete?: (item: Record<string, unknown>) => void;
         items: Record<string, unknown>[];
         /** Original Object, if passed is passed in `onEdit` and `onDelete`.
          * Attention: Ref needs to by in the same order of items
@@ -10,8 +10,10 @@
         ref?:any[];
         headers: string[];
         mappedHeaders?: Record<string, string>;
+        canEdit?: (item: Record<string, unknown>, index: number) => boolean;
+        canDelete?: (item: Record<string, unknown>, index: number) => boolean;
     }
-    let { onEdit: onSelect, onDelete, items = $bindable([]), headers, mappedHeaders,ref }: Props = $props();
+    let { onEdit: onSelect, onDelete, items = $bindable([]), headers, mappedHeaders,ref, canEdit, canDelete }: Props = $props();
 </script>
 
 <table>
@@ -30,8 +32,12 @@
                     <td data-header={header}>{mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}</td>
                 {/each}
                 <td class="actions-cell" data-header="Actions">
-                    <button type="button" onclick={() => onSelect(ref ? ref[index] : item)}>Edit</button>
-                    <button type="button" onclick={() => onDelete(ref ? ref[index] : item)}>Delete</button>
+                    {#if onSelect && (!canEdit || canEdit(ref ? ref[index] : item, index))}
+                        <button type="button" onclick={() => onSelect?.(ref ? ref[index] : item)}>Edit</button>
+                    {/if}
+                    {#if onDelete && (!canDelete || canDelete(ref ? ref[index] : item, index))}
+                        <button type="button" onclick={() => onDelete?.(ref ? ref[index] : item)}>Delete</button>
+                    {/if}
                 </td>
             </tr>
         {/each}

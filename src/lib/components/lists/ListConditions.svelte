@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { PageSwitch } from "$lib/shared/pageSwitch";
+    import type { PageSwitch, Switch } from "$lib/shared/pageSwitch";
     import { onDestroy } from "svelte";
     import { showError } from "$lib/notify";
     import FormCondition from "../forms/FormCondition.svelte";
@@ -15,6 +15,7 @@
     interface Props {
         values?: ConditionToken[];
         switcher?: PageSwitch;
+        page?: Switch;
         onEdit?: (value: ConditionToken, index: number) => void;
         onCancel?: () => void;
         onAfterSubmit?: (value: ConditionToken) => void;
@@ -24,6 +25,7 @@
     let {
         values = $bindable<ConditionToken[]>(),
         switcher = $bindable(),
+        page,
         onEdit,
         onCancel,
         onAfterSubmit,
@@ -32,11 +34,12 @@
 
     let formData = $state<Record<string, any>>({});
     let editing = $state<number | null>(null);
-    let pageSwitcher = $state(switcher ? switcher.createSwitch() : null);
+    const pageSwitcher = page ?? (switcher ? switcher.createSwitch() : null);
+    const ownsPageSwitcher = !page;
     let items = $state<ConditionToken[]>([]);
 
     onDestroy(() => {
-        pageSwitcher?.remove();
+        if (ownsPageSwitcher) pageSwitcher?.remove();
     });
 
     $effect(() => {
