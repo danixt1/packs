@@ -224,38 +224,13 @@ function saveDataKey(worldId: string, slotId: string) {
 	return `${SAVE_DATA_PREFIX}${worldId}-${slotId}`;
 }
 
-function migrateLegacyWorldMetadata(): StoredWorldMetadata[] {
-	const current = readWorldMetadata();
-	const knownIds = new Set(current.map((world) => world.id));
-	const legacy = readJson<unknown>('game-worlds');
-	if (!Array.isArray(legacy)) return current;
-
-	const migrated = [...current];
-	for (const item of legacy) {
-		if (!isRecord(item) || typeof item.name !== 'string') continue;
-		const id = item.name === bundledWorld.name ? MAIN_WORLD_ID : createWorldId(item.name, knownIds);
-		if (knownIds.has(id)) continue;
-		knownIds.add(id);
-		const metadata: StoredWorldMetadata = {
-			id,
-			name: item.name,
-			description: typeof item.description === 'string' ? item.description : '',
-			version: normalizeVersion(item.version),
-			createdAt: typeof item.createdAt === 'number' ? item.createdAt : now(),
-			updatedAt: typeof item.lastEdit === 'number' ? item.lastEdit : now(),
-			isBundled: id === MAIN_WORLD_ID
-		};
-		migrated.push(metadata);
-		const legacyData = readJson<World>(`${WORLD_DATA_PREFIX}${item.name}`);
-		if (legacyData && isRecord(legacyData)) writeJson(worldDataKey(id), legacyData);
-	}
-	if (migrated.length !== current.length) writeWorldMetadata(migrated);
-	return migrated;
-}
-
 export function listWorlds(): StoredWorldMetadata[] {
-	const metadata = migrateLegacyWorldMetadata();
-	const bundledMetadata = metadata.find((world) => world.id === MAIN_WORLD_ID) ?? metadataFromWorld(bundledWorld, MAIN_WORLD_ID);
+	const metadata = readWorldMetadata();
+	let bundledMetadata = metadata.find((world) => world.id === MAIN_WORLD_ID);
+	if (!bundledMetadata) {
+		bundledMetadata = metadataFromWorld(bundledWorld, MAIN_WORLD_ID);
+		writeWorldMetadata([...metadata, bundledMetadata]);
+	}
 	const custom = metadata.filter((world) => world.id !== MAIN_WORLD_ID);
 	return [bundledMetadata, ...custom].sort((left, right) => left.name.localeCompare(right.name));
 }

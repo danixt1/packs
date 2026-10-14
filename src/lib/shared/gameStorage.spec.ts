@@ -15,8 +15,10 @@ import {
 	parseSavedState,
 	renameSave,
 	resetMainWorld,
+	saveWorld,
 	serializeSaveExport,
-	updateSave
+	updateSave,
+	WORLD_INDEX_KEY
 } from './gameStorage';
 
 function useMemoryStorage() {
@@ -48,6 +50,17 @@ describe('game storage', () => {
 		expect(result.ok).toBe(true);
 		if (result.ok) expect(result.world.name).toBe(world.name);
 		expect(listWorlds().some((item) => item.id === 'main')).toBe(true);
+	});
+
+	it('does not create duplicate worlds when listing stored worlds', () => {
+		const customWorld = { ...world, name: 'Created World', description: 'A custom world' };
+		saveWorld('created-world', customWorld);
+
+		const firstList = listWorlds();
+		const secondList = listWorlds();
+
+		expect(secondList).toEqual(firstList);
+		expect(secondList.filter((item) => item.id !== 'main').map((item) => item.id)).toEqual(['created-world']);
 	});
 
 	it('persists and isolates saves by world and slot', () => {
