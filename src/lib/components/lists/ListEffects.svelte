@@ -28,6 +28,9 @@
         onCreatePressed
     }: Props = $props();
 
+    const FORM_DATA_KEY = 'effectFormData';
+    const EDITING_KEY = 'effectEditing';
+
     let formData = $state<EffectFomAction | undefined>();
     let editing = $state<number | null>(null);
     let pageSwitcher = $state<Switch | null>(null);
@@ -38,6 +41,8 @@
         if (!pageSwitcher && page) {
             pageSwitcher = page;
             ownsPageSwitcher = false;
+            formData = page.localData[FORM_DATA_KEY] as EffectFomAction | undefined;
+            editing = page.localData[EDITING_KEY] ?? null;
             return;
         }
         if (!pageSwitcher && switcher) {
@@ -69,8 +74,11 @@
 
     function addEffect() {
         if (pageSwitcher) {
+            const nextFormData: EffectFomAction = { type: 'event', event: '' };
+            pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
+            pageSwitcher.localData[EDITING_KEY] = null;
             editing = null;
-            formData = { type: 'event', event: '' };
+            formData = nextFormData;
             pageSwitcher.enablePage();
             return;
         }
@@ -79,8 +87,11 @@
 
     function editEffect(effect: EffectFomAction, index: number) {
         if (pageSwitcher) {
+            const nextFormData = $state.snapshot(effect);
+            pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
+            pageSwitcher.localData[EDITING_KEY] = index;
             editing = index;
-            formData = $state.snapshot(effect);
+            formData = nextFormData;
             pageSwitcher.enablePage();
             return;
         }
@@ -104,6 +115,13 @@
                 return `Start dialogue: ${effect.dialogueId ?? effect.intent ?? '(unspecified)'}`;
         }
     }
+
+    function clearPendingEdit() {
+        if (pageSwitcher) {
+            delete pageSwitcher.localData[FORM_DATA_KEY];
+            delete pageSwitcher.localData[EDITING_KEY];
+        }
+    }
 </script>
 
 {#if pageSwitcher && pageSwitcher.isPageEnabled}
@@ -111,7 +129,9 @@
         bind:value={formData}
         bind:writeFormPropsTo={pageSwitcher.localData.form}
         onCancel={() => {
+            clearPendingEdit();
             editing = null;
+            formData = undefined;
             onCancel?.();
         }}
         onAfterSubmit={(effect) => {
@@ -122,7 +142,9 @@
                 next[editing] = effect;
             }
             setItems(next);
+            clearPendingEdit();
             editing = null;
+            formData = undefined;
             onAfterSubmit?.(effect);
         }}
     />

@@ -87,18 +87,22 @@
         data = $state.snapshot(value ?? { type: 'event', event: '' });
         selectedType = data.type ?? 'event';
         targetIdMode = data.targetId && typeof data.targetId === 'object' ? 'getter' : 'value';
+
         literalValue = typeof data.value === 'object' ? '' : (data.value ?? '');
         randomValue = typeof data.value === 'object' && data.value.type ? $state.snapshot(data.value) : { type: 'random-value', values: [] };
         data._valueKind = typeof data.value === 'object' ? 'random' : 'literal';
+
         eventContextFields = Object.entries(data.context ?? {})
             .filter(([key]) => ['actorId', 'targetId', 'subjectId', 'placeId'].includes(key))
             .map(([name, fieldValue]) => ({ name, kind: typeof fieldValue === 'object' ? 'getter' : 'literal', valueType: 'string', value: fieldValue }));
+
         eventDataFields = Object.entries(data.data ?? {}).map(([name, fieldValue]) => ({
             name,
             kind: typeof fieldValue === 'object' ? 'getter' : 'literal',
             valueType: typeof fieldValue === 'number' ? 'number' : typeof fieldValue === 'boolean' ? 'boolean' : 'string',
             value: fieldValue
         }));
+        
         eventContextTags = [...(data.context?.tags ?? [])];
         lastValue = value;
         hasLoadedValue = true;
@@ -308,15 +312,6 @@
                 { title: 'Actor is non-player', value: 'actorIsNonPlayer' },
                 { title: 'Target is non-player', value: 'targetIsNonPlayer' }
             ]} />
-            <InputSelect id="effect-audience" label="Audience:" wrapDiv selected={data.context?.audience} onchange={(event) => {
-                data.context ??= {};
-                data.context.audience = (event.currentTarget as HTMLSelectElement).value || undefined;
-            }} items={[
-                { title: 'Global', value: 'global' },
-                { title: 'Actor', value: 'actor' },
-                { title: 'Target', value: 'target' },
-                { title: 'Place', value: 'place' }
-            ]} />
             <section class="event-fields" aria-label="Event context">
                 <div class="event-fields-heading">
                     <h4>Context</h4>
@@ -342,7 +337,7 @@
                         <button type="button" class="remove-field" aria-label={`Remove context field ${index + 1}`} onclick={() => eventContextFields = eventContextFields.filter((_, fieldIndex) => fieldIndex !== index)}>Remove</button>
                     </div>
                 {/each}
-                <InputSelect id="effect-audience" label="Audience:" wrapDiv selected={data.context?.audience ?? ''} onchange={(event) => {
+                <InputSelect id="event-context-audience" label="Audience:" wrapDiv selected={data.context?.audience ?? ''} onchange={(event) => {
                     data.context ??= {};
                     data.context.audience = (event.currentTarget as HTMLSelectElement).value || undefined;
                 }} items={[

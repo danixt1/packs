@@ -48,6 +48,13 @@ test('edits structured event context and payload fields', async () => {
     const onAfterSubmit = vi.fn();
     const screen = await render(FormEffect, { value: eventEffect, onAfterSubmit });
 
+    await expect.element(screen.getByTestId('input-effect-event')).toHaveValue('CHARACTER_ATTACKED');
+    await expect.element(screen.getByTestId('input-event-context-field-0')).toHaveValue('actorId');
+    await expect.element(screen.getByTestId('input-event-context-field-1')).toHaveValue('targetId');
+    await expect.element(screen.getByTestId('input-event-context-audience')).toHaveValue('place');
+    await expect.element(screen.getByTestId('input-event-context-tag-0')).toHaveValue('combat');
+    await expect.element(screen.getByTestId('input-event-data-name-0')).toHaveValue('damage');
+    await expect.element(screen.getByTestId('input-event-data-name-1')).toHaveValue('attackerName');
     await expect.element(screen.getByRole('button', { name: 'Edit getter' }).first()).toBeVisible();
     await expect.element(screen.getByTestId('input-effect-event-data')).not.toBeInTheDocument();
     await screen.getByRole('button', { name: 'Confirm' }).click();
