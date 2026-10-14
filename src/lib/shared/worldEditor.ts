@@ -1,5 +1,5 @@
 import type { ActionDeclaration, Character, Collector, ConditionalList, ConditionExists, ConditionIsValid, ConditionRelational, DialogueTree, Display, EffectFomAction, EffectInterrupt, Item, Place, TextTemplate, VariableDeclarator, VariableModify, VariableToGet, World } from "$lib/types/data/declarative";
-import { world as mainWorld } from '$lib/data/world';
+import { loadWorld as loadStoredWorld } from './gameStorage';
 import type { LabelInfo } from "$lib/types/data/editor";
 let currentEditor:null|WorldEditor = null;
 
@@ -42,15 +42,23 @@ export class WorldEditor {
     private textTemplates:Record<string,TextTemplateEditor> = {};
     private items:Record<string,ItemEditor> = {};
     private displays:Record<string,DisplayEditor> = {};
+    private worldVars:VariableDeclarator[] = [];
+    private worldVersion:number[] = [1,0,0];
+    private editorInfo:World['editor'];
+    public readonly worldId?:string;
 
-    constructor(world:World){
+    constructor(world:World, worldId?:string){
+        this.worldId = worldId;
         this.worldName = world.name;
         this.description = world.description;
+        this.worldVars = structuredClone(world.vars ?? []);
+        this.worldVersion = [...(world.version ?? [1,0,0])];
+        this.editorInfo = structuredClone(world.editor);
         const editorInfo = world.editor;
         if(editorInfo){
             Object.entries(editorInfo.labelsDescription ?? []).forEach(([k,v])=>this.addLabel(k,v));
         }
-        world.vars              .forEach( e => this.linkVariableDeclarator(e,'world'));
+        world.vars              .forEach( e => this.linkVariableDeclarator(e,'world:root'));
         world.characters        .forEach( e => this.addCharacter(e));
         world.places            .forEach( e => this.addPlace(e));
         world.actions          .forEach( e => this.addAction(e));
@@ -213,6 +221,33 @@ export class WorldEditor {
     }
     public getObject(oid:string){
         return this.objectsByOid[oid];
+    }
+
+    public toWorld(): World {
+        const labelsDescription = Object.fromEntries(
+            Object.values(this.labelslinks).map((label) => [label.name, {
+                title: label.title,
+                description: label.description
+            }])
+        );
+        const world: World = {
+            name: this.worldName,
+            description: this.description,
+            version: [...this.worldVersion],
+            vars: structuredClone(this.worldVars),
+            characters: this.getCharacters().map(({ oid: _oid, ...character }) => character),
+            places: this.getPlaces().map(({ oid: _oid, ...place }) => place),
+            items: this.getItems().map(({ oid: _oid, ...item }) => item),
+            actions: this.getActions().map(({ oid: _oid, ...action }) => action),
+            textTemplates: Object.values(this.textTemplates).map(({ oid: _oid, ...template }) => template),
+            dialogues: this.getDialogues().map(({ oid: _oid, ...dialogue }) => dialogue),
+            displays: Object.values(this.displays).map(({ oid: _oid, ...display }) => display),
+            editor: Object.keys(labelsDescription).length > 0
+                ? { ...this.editorInfo, labelsDescription }
+                : this.editorInfo
+        };
+
+        return world;
     }
 
     public updateObject(obj:itemWithOid){
@@ -399,8 +434,8 @@ export class WorldEditor {
         })
     }
     private linkVariableDeclarator(varData:VariableDeclarator,oid:string){
-        let referedType = getObjName(oid) as 'char'|'item'|'place';
-        if(!['char','item','place'].includes(referedType)){
+        let referedType = getObjName(oid) as 'char'|'item'|'place'|'world';
+        if(!['char','item','place','world'].includes(referedType)){
             throw new Error('Invalid object type');
         }
 
@@ -427,26 +462,21 @@ export function getCurrentWorldEditor(worldName?:string){
         if(!worldName){
             throw new Error('No World loaded, and no world passed to load');
         }
-        currentEditor = new WorldEditor(loadWorld(worldName));
+        currentEditor = new WorldEditor(loadWorld(worldName), worldName);
         return currentEditor;
     }
     if(!worldName){
         return currentEditor;
     }
-    if(worldName != currentEditor.worldName){
-        currentEditor = new WorldEditor(loadWorld(worldName));
+    if(worldName !== currentEditor.worldId){
+        currentEditor = new WorldEditor(loadWorld(worldName), worldName);
         return currentEditor;
     }
     return currentEditor;
 }
 
 function loadWorld(worldName:string){
-    let worldToLoad = localStorage.getItem('world-'+worldName);
-    if(!worldToLoad){
-        if(worldName == 'main'){
-            return mainWorld;
-        }
-        throw new Error('Failed loading world');
-    }
-    return JSON.parse(worldToLoad) as World;
+    const result = loadStoredWorld(worldName);
+    if (!result.ok) throw new Error(result.reason);
+    return result.world;
 }

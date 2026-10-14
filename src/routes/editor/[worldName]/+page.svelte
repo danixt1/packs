@@ -2,7 +2,23 @@
     import { goto } from "$app/navigation";
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { page } from '$app/state';
+    import { saveWorld } from '$lib/shared/gameStorage';
+    import { showError, showSucess } from '$lib/notify';
     let selectedWorld = getCurrentWorldEditor(page.params.worldName);
+
+    function saveCurrentWorld() {
+        const worldId = page.params.worldName;
+        if (!worldId) {
+            showError('Failed to save world', 'World id is missing');
+            return;
+        }
+        try {
+            saveWorld(worldId, selectedWorld.toWorld());
+            showSucess('World saved');
+        } catch (error) {
+            showError('Failed to save world', error instanceof Error ? error.message : 'Unknown storage error');
+        }
+    }
 </script>
 
 <div class="world-edit">
@@ -22,7 +38,7 @@
         </div>
     </div>
     <div class="options">
-        <button type="button" onclick={()=>{}}>Save</button>
+        <button type="button" onclick={saveCurrentWorld}>Save</button>
         <button type="button" onclick={()=>{goto('#/editor')}}>Back to Worlds</button>
     </div>
 </div>

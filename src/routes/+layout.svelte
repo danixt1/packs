@@ -2,9 +2,6 @@
 	import favicon from '$lib/assets/favicon.svg';
     import { type NotifyData, notificationsCallbacks } from '$lib/notify';
     import Notification from '$lib/components/Notification.svelte';
-	import { page } from '$app/state';
-    import TopBar from '$lib/components/TopBar.svelte';
-	let mainBarTitle = $derived(page.data.barTitle || 'Main');
 
 	let { children } = $props();
 	let notifications = $state<NotifyData[]>([]);
@@ -33,9 +30,6 @@
     {/each}
 </div>
 <div class="page-layout">
-	<TopBar
-		worldName={mainBarTitle}
-	/>
 	{@render children()}
 
 </div>
@@ -123,6 +117,8 @@
 	.page-layout {
 		display: flex;
 		flex-direction: column;
+		min-height: 100vh;
+		min-height: 100dvh;
 		overflow: hidden;
 		box-sizing: border-box;
 	}

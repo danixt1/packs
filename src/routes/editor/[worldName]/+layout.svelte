@@ -31,6 +31,13 @@
     let mobileMenuOpen = $state(false);
 </script>
 <div class="flex-contents">
+    <header class="editor-header">
+        <div>
+            <p class="eyebrow">World editor</p>
+            <h1>{page.params.worldName === 'main' ? 'Adventure World' : page.params.worldName}</h1>
+        </div>
+        <button type="button" class="main-menu-button" onclick={() => goto('#/')}>Main menu</button>
+    </header>
     {#if mobileMenuOpen}
         <button 
             class="mobile-menu-toggle" 
@@ -64,18 +71,54 @@
 <style>
     .flex-contents{
         display:flex;
-        flex-direction:row;
-        height:100%;
-        border-top: 1px solid var(--border-subtle);
+        flex-direction:column;
+        min-height:100%;
+        box-sizing:border-box;
+    }
+    .editor-header{
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:1rem;
+        padding:1rem clamp(1rem, 3vw, 2rem);
+        border-bottom:1px solid var(--border-subtle);
+    }
+    .editor-header h1,
+    .editor-header p{
+        margin:0;
+    }
+    .editor-header h1{
+        font-size:clamp(1rem, 2vw, 1.35rem);
+    }
+    .eyebrow{
+        margin-bottom:0.25rem !important;
+        color:var(--color-accent);
+        font-size:0.72rem;
+        font-weight:800;
+        letter-spacing:0.1em;
+        text-transform:uppercase;
+    }
+    .main-menu-button{
+        min-height:2.4rem;
+        border:1px solid var(--border-subtle);
+        border-radius:6px;
+        background:var(--bg-button);
+        color:var(--color-accent-light);
+        padding:0.5rem 0.8rem;
+        font:inherit;
+        cursor:pointer;
+    }
+    .main-menu-button:hover{
+        border-color:var(--border-strong);
+        background:var(--bg-card-hover);
     }
     .items-bar{
         display:flex;
-        flex-direction:column;
-        width:150px;
-        border-right: 1px solid var(--border-subtle);
-        padding-right: 5px;
-        padding: 8px 0;
-        gap: 2px;
+        flex-direction:row;
+        flex-wrap:wrap;
+        border-bottom:1px solid var(--border-subtle);
+        padding:8px;
+        gap:2px;
     }
     .mobile-menu-toggle{
         position:fixed;
@@ -119,6 +162,7 @@
         flex:1;
         width:100%;
         min-height:0;
+        overflow:auto;
     }
     
     .item-button{
@@ -173,6 +217,12 @@
         }
         main{
             padding-top:52px;
+        }
+        .editor-header{
+            padding-left:1rem;
+        }
+        .editor-header h1{
+            font-size:1rem;
         }
     }
 </style>
