@@ -3,7 +3,7 @@
     import { page } from '$app/state';
     import type { DialogueChoice, DialogueMatch, DialogueNode, DialogueTree } from "$lib/types/data/declarative";
 
-    import { InputCard, InputSelect, InputSwitch, InputText, InputTextArea } from "$lib/components/inputs";
+    import { InputCard, InputNumber, InputSelect, InputSwitch, InputText, InputTextArea } from "$lib/components/inputs";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
     import Form from "$lib/components/Form.svelte";
     import Popup from "$lib/components/Popup.svelte";
@@ -49,6 +49,7 @@
     async function startEdit(dialogue: Record<string, any>) {
         const originalOid = dialogue.oid as string;
         const initial = $state.snapshot(dialogue);
+        initial.priority ??= 0;
 
         const result = await stack.push<any, any>({
             title: `Edit ${initial.name || initial.id}`,
@@ -190,6 +191,7 @@
         <InputText id="dial-id" label="Id" bind:value={frame.draft.id} required wrapDiv autocomplete="off" />
         <InputText id="dial-name" label="Name" bind:value={frame.draft.name} required wrapDiv autocomplete="off" />
         <InputText id="dial-intent" label="Dialogue Purpose" bind:value={frame.draft.intent} required wrapDiv autocomplete="off" />
+        <InputNumber id="dial-priority" label="Priority" bind:value={frame.draft.priority} required wrapDiv />
         <InputText id="dial-start" label="Starts At" bind:value={frame.draft.startsAt} wrapDiv autocomplete="off" />
         <div class="form-group">
             <h2>Nodes</h2>
@@ -262,7 +264,7 @@
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
         <div class="form-group">
             <div class="info">
-                <p>Set a <b>priority</b> when configuring matching rules. It is also a good idea to create a fallback dialogue without matching rules.</p>
+                <p>Set the priority in the dialogue settings when multiple dialogues can match. It is also a good idea to create a fallback dialogue without matching rules.</p>
             </div>
             <InputCard items={itemChars} id="match-targets" label="Available only for these characters:" bind:selectedItems={frame.draft.targetCharacterIds} />
             <h2>Label rules</h2>
