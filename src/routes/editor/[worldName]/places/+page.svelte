@@ -13,11 +13,10 @@
     import Form from "$lib/components/Form.svelte";
     import ListVars from "$lib/components/lists/ListVars.svelte";
     import ContextHost from "$lib/components/ContextHost.svelte";
-    import { createContextStack } from "$lib/shared/contextStack.svelte";
+    import { createContextStack, type ContextFrame } from "$lib/shared/contextStack.svelte";
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let places = $state(editor.getPlaces());
-    const charactersInfo = editor.getCharacters().map((c) => ({ value: c.id, title: c.name }));
 
     const stack = createContextStack();
 
@@ -124,14 +123,22 @@
     }
 </script>
 
-{#snippet renderPlaceForm(frame: any)}
+{#snippet renderPlaceForm(frame: ContextFrame)}
+    {@const charactersInfo = editor.getCharacters()
+    .map((c) => {
+        const res =places.find(e =>e.id != frame.meta?.originalId && e.charactersId.includes(c.id))
+        return { 
+        value: c.id, 
+        title: c.name + (res ? ` (In: ${res.name})` : ''),
+        disabled:res != undefined }
+    })}
     <Form onSubmit={submitPlaceForm} onCancel={cancelPlaceForm}>
         <div class="form-group">
             <InputText id="place-id" label="Place ID" bind:value={frame.draft.id} required autocomplete='off'/>
             <InputText id="place-name" label="Place Name" bind:value={frame.draft.name} required autocomplete='off'/>
             <InputTextArea id="place-description" label="Description" bind:value={frame.draft.description} />
             <InputCard id="place-characters" label="Characters In Place" bind:selectedItems={frame.draft.charactersId} items={charactersInfo} />
-            <InputCard id="connected-places" label="Connected Places" bind:selectedItems={frame.draft.connectedPlaces} items={places.map((p) => ({ value: p.id, title: p.name }))} />
+            <InputCard id="connected-places" label="Connected Places" bind:selectedItems={frame.draft.connectedPlaces} items={places.filter(e =>e.id != frame.draft.id).map((p) => ({ value: p.id, title: p.name }))} />
             <ListVars {stack} bind:values={frame.draft.vars} />
         </div>
     </Form>
