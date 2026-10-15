@@ -10,7 +10,7 @@
     import ListConditions from "$lib/components/lists/ListConditions.svelte";
     import ListEffects from "$lib/components/lists/ListEffects.svelte";
     import ContextHost from "$lib/components/ContextHost.svelte";
-    import { createContextStack } from "$lib/shared/contextStack.svelte";
+    import { createContextStack,type ContextFrame } from "$lib/shared/contextStack.svelte";
     import { validateActionDraft } from "$lib/shared/actionValidation";
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { showError, showSucess } from "$lib/notify";
@@ -20,7 +20,7 @@
     let actions = $state(editor.getActions());
     const stack = createContextStack();
 
-    function emptyAction(): Record<string, any> {
+    function emptyAction(): ActionDeclaration  & {_categoriesText:string} {
         return {
             name: '',
             description: '',
@@ -76,16 +76,29 @@
             handleSaveAction(result, editingOid);
         }
     }
-
+    function onSubmit(frame:ContextFrame){
+        const editingOid = frame.meta?.editingOid;
+        const draft = $state.snapshot(frame.draft);
+        draft.categories = String(draft._categoriesText ?? '')
+            .split(',')
+            .map((category: string) => category.trim())
+            .filter(Boolean);
+        const result = validateActionDraft(draft, {
+            existingNames: actions.map((action) => action.name),
+            editingOid
+        });
+        if(!result.valid){
+            showError(result.reason ?? 'Invalid action');
+            return
+        }
+        frame.resolve(frame.draft);
+    }
     function handleSaveAction(data: Record<string, any>, editingOid: string | null) {
         const draft = $state.snapshot(data) as Record<string, any>;
         draft.categories = String(draft._categoriesText ?? '')
             .split(',')
             .map((category: string) => category.trim())
             .filter(Boolean);
-        delete draft._categoriesText;
-        delete draft.oid;
-
         const result = validateActionDraft(draft, {
             existingNames: actions.map((action) => action.name),
             editingOid
@@ -94,6 +107,9 @@
             showError(result.reason ?? 'Invalid action');
             return;
         }
+        delete draft._categoriesText;
+        delete draft.oid;
+
         const action = draft as ActionDeclaration;
         if (!action.categories?.length) delete action.categories;
         if (!action.attributes?.length) delete action.attributes;
@@ -172,10 +188,15 @@
     }
 </script>
 
-{#snippet renderActionForm(frame: any)}
-    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+{#snippet renderActionForm(frame: ContextFrame)}
+    <Form onSubmit={() => onSubmit(frame)} onCancel={() => frame.cancel()}>
         <InputText id="action-name" label="Id:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
         <InputTextArea id="action-description" label="Description:" bind:value={frame.draft.description} wrapDiv />
+        <div class="form-group b-line">
+            <h3>Collect Targets:</h3>
+            <ListCollectors {stack} bind:values={frame.draft.targets} />
+        </div>
+        {#if frame.draft.targets && frame.draft.targets.length > 0}
         <InputNumber id="action-time" label="Execution time:" bind:value={frame.draft.executionTime} required min={0} wrapDiv />
         <InputSelect id="action-build-mode" label="Execution mode:" bind:selected={frame.draft.buildMode} wrapDiv items={[
             { title: 'One action per target', value: 'oneActionPerTarget' },
@@ -194,6 +215,9 @@
         <InputText id="action-categories" label="Categories (comma separated):" bind:value={frame.draft._categoriesText} autocomplete="off" wrapDiv />
         <div class="form-group">
             <h3>Display</h3>
+            {#if frame.draft.availableTo.includes('player') && !frame.draft.display}
+            <p class="warn">Display not setted!. Player <b>can't</b> use this action without display.</p>
+            {/if}
             <button type="button" class="nested-button" onclick={() => openDisplay(frame)}>
                 {frame.draft.display ? 'Configure display' : 'Add display'}
             </button>
@@ -204,10 +228,6 @@
         <div class="form-group">
             <h3>Activation conditions</h3>
             <ListConditions {stack} bind:values={frame.draft.activationConditions} />
-        </div>
-        <div class="form-group">
-            <h3>Targets</h3>
-            <ListCollectors {stack} bind:values={frame.draft.targets} />
         </div>
         <div class="form-group">
             <h3>Effects on activate</h3>
@@ -230,10 +250,11 @@
             <h3>Effects on interrupt</h3>
             <ListEffects {stack} bind:values={frame.draft.onInterrupt} />
         </div>
+        {/if}
     </Form>
 {/snippet}
 
-{#snippet renderDisplayForm(frame: any)}
+{#snippet renderDisplayForm(frame: ContextFrame)}
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
         <InputText id="display-name" label="Display name:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
         <InputTextArea id="display-description" label="Display description:" bind:value={frame.draft.description} required wrapDiv />
@@ -267,11 +288,11 @@
         items={actions.map((action) => ({
             Id: action.name,
             Time: action.executionTime,
-            To: actionAudienceLabel(action.availableTo),
-            Conditions: action.activationConditions.length + ' conditions'
+            'Avaliable To:': actionAudienceLabel(action.availableTo),
+            Effects: `${action.onComplete.length} on Complete, ${action.onActivate.length} on Activation`
         }))}
         ref={actions}
-        headers={['Id', 'Time', 'To', 'Conditions']}
+        headers={['Id', 'Time', 'Avaliable To:', 'Effects']}
         onEdit={(action) => startEdit(action)}
         onDelete={(action) => deleteAction(action)}
     />
@@ -309,5 +330,14 @@
     }
     .secondary-button {
         opacity: 0.8;
+    }
+    .b-line{
+        border-bottom: 1px solid var(--border-default);
+    }
+    .warn{
+        color: var(--color-accent);
+        border-left: 3px solid var(--border-strong);
+        padding-left: 3px;
+        font-size: 14px;
     }
 </style>

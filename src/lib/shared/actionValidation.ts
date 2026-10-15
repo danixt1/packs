@@ -183,6 +183,9 @@ function validateInterruption(value: unknown): ActionValidationResult {
 
 export function validateActionDraft(draft: unknown, context: ActionValidationContext = {}): ActionValidationResult {
     if (!isRecord(draft)) return invalid('Action data is invalid');
+    if(draft.targets?.length == 0){
+        return invalid("Target collectors is obrigatory.\nIt's capture what should by included in the action.");
+    }
     if (typeof draft.name !== 'string' || !draft.name.trim()) return invalid('Action id is required');
     const existingNames = new Set(context.existingNames ?? []);
     const currentName = typeof context.editingOid === 'string' && context.editingOid.includes(':') ? context.editingOid.slice(context.editingOid.indexOf(':') + 1) : undefined;
