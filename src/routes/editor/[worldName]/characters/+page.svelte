@@ -15,6 +15,7 @@
     import Popup from "$lib/components/Popup.svelte";
     import ListVars from "$lib/components/lists/ListVars.svelte";
     import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
+    import FormAutonomy from "$lib/components/forms/FormAutonomy.svelte";
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
@@ -27,12 +28,16 @@
     let switcher = $state(createPageSwitch());
     let pageSwitcher = (()=>switcher.createSwitch({form:{onSubmit:()=>createCharacter(),onCancel:()=>openPopup = false}}))();
     let labelSwtcher = (()=>switcher.createSwitch({form:{onSubmit:()=>createLabel(),onCancel:()=>pageSwitcher.enablePage()}}))()
+    let autonomySwitcher = (()=>switcher.createSwitch({form:{onSubmit:()=>{},onCancel:()=>pageSwitcher.enablePage()}}, 'autonomy'))();
 
     let charsList = $derived(characters.map((character) => ({
             Id: character.id,
             Name: character.name,
             Labels: character.labels?.join(', ') ?? '',
-            Variables: character.vars.map((v) => `${v.name}`).join(', ')
+            Variables: character.vars.map((v) => `${v.name}`).join(', '),
+            Autonomy: character.autonomy
+                ? `${character.autonomy.enabled === false ? 'Disabled' : 'Enabled'} (${character.autonomy.rules?.length ?? 0} rules)`
+                : 'None'
     })));
 
     function createLabel(label: any = labelData) {
@@ -56,9 +61,12 @@
             id: character.id,
             name: character.name,
             labels: character.labels || [],
-            controlledByPlayer:character.controlledByPlayer,
+            controlledByPlayer: character.controlledByPlayer ?? false,
             vars: character.vars || []
         };
+        if (character.autonomy !== undefined) {
+            newCharacter.autonomy = character.autonomy;
+        }
         if(editor.getObject('char:'+newCharacter.id)){
             showError('Character already exists');
             return;
@@ -74,7 +82,7 @@
     </div>
     <ObjectTable
         bind:items={charsList}
-        headers={['Id','Name', 'Labels', 'Variables']}
+        headers={['Id','Name', 'Labels', 'Variables', 'Autonomy']}
         ref = {characters}
         onEdit={(character) => {
             data = $state.snapshot(character);
@@ -106,8 +114,30 @@
                 labelSwtcher.enablePage();
             }}>Create Label</button>
         </BaseInput>
+        <BaseInput id='edit-autonomy' wrapDiv>
+            <button type="button" onclick={()=>{
+                autonomySwitcher.enablePage();
+            }}>{data.autonomy ? 'Configure Autonomy' : 'Add Autonomy'}</button>
+            {#if data.autonomy}
+                <button type="button" onclick={()=>{
+                    delete data.autonomy;
+                }}>Remove Autonomy</button>
+            {/if}
+        </BaseInput>
     {/if}
-    {#if !labelSwtcher.isPageEnabled}
+    {#if autonomySwitcher.isPageEnabled}
+        <FormAutonomy
+            value={data.autonomy}
+            actions={editor.getActions()}
+            bind:writeFormPropsTo={autonomySwitcher.localData.form}
+            onCancel={() => pageSwitcher.enablePage()}
+            onAfterSubmit={(autonomy) => {
+                data.autonomy = autonomy;
+                pageSwitcher.enablePage();
+            }}
+        />
+    {/if}
+    {#if !labelSwtcher.isPageEnabled && !autonomySwitcher.isPageEnabled}
         <ListVars switcher={switcher} bind:values={data.vars}
         onCancel={()=>pageSwitcher.enablePage()}
         onAfterSubmit={()=>pageSwitcher.enablePage()} />
