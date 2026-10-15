@@ -12,10 +12,12 @@ import {
 	loadSave,
 	loadWorld,
 	parseSaveExport,
+	parseWorldExport,
 	parseSavedState,
 	renameSave,
 	resetMainWorld,
 	saveWorld,
+	serializeWorldExport,
 	serializeSaveExport,
 	updateSave,
 	WORLD_INDEX_KEY
@@ -117,6 +119,25 @@ describe('game storage', () => {
 		expect(parseSaveExport('{"format":"other-game"}')).toEqual({
 			ok: false,
 			reason: 'This file is not a supported Story Engine save.'
+		});
+	});
+
+	it('round-trips versioned JSON world exports', () => {
+		const exported = serializeWorldExport(world, 'main');
+		const imported = parseWorldExport(exported);
+
+		expect(imported.ok).toBe(true);
+		if (imported.ok) {
+			expect(imported.payload.worldId).toBe('main');
+			expect(imported.payload.worldName).toBe(world.name);
+			expect(imported.payload.world).toEqual(world);
+		}
+	});
+
+	it('rejects unsupported JSON world files', () => {
+		expect(parseWorldExport('{"format":"other-game"}')).toEqual({
+			ok: false,
+			reason: 'This file is not a supported Story Engine world.'
 		});
 	});
 });

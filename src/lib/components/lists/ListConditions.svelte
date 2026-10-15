@@ -23,7 +23,7 @@
     }
 
     let {
-        values = $bindable<ConditionToken[]>(),
+        values = $bindable<ConditionToken[]>([]),
         switcher = $bindable(),
         page,
         onEdit,
@@ -32,23 +32,16 @@
         onCreatePressed
     }: Props = $props();
 
-    let formData = $state<Record<string, any>>({});
-    let editing = $state<number | null>(null);
+    const FORM_DATA_KEY = 'conditionFormData';
+    const EDITING_KEY = 'conditionEditing';
     const pageSwitcher = page ?? (switcher ? switcher.createSwitch() : null);
     const ownsPageSwitcher = !page;
-    let items = $state<ConditionToken[]>([]);
+    let formData = $state<Record<string, any>>(pageSwitcher?.localData[FORM_DATA_KEY] ?? {});
+    let editing = $state<number | null>(pageSwitcher?.localData[EDITING_KEY] ?? null);
+    let activeForm = $state(Boolean(pageSwitcher?.localData[FORM_DATA_KEY]));
 
     onDestroy(() => {
         if (ownsPageSwitcher) pageSwitcher?.remove();
-    });
-
-    $effect(() => {
-        const incoming = values ?? [];
-        const current = items;
-        if (JSON.stringify($state.snapshot(current)) === JSON.stringify(incoming)) {
-            return;
-        }
-        items = incoming;
     });
 
     $effect(() => {
@@ -61,18 +54,21 @@
     });
 
     function tokens(): ConditionToken[] {
-        return items;
+        return values ?? [];
     }
 
     function setItems(next: ConditionToken[]) {
-        items = next;
         values = next;
     }
 
     function addCondition() {
         if (pageSwitcher) {
+            const nextFormData = { type: 'condition-relational', operator: '==' };
+            pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
+            pageSwitcher.localData[EDITING_KEY] = null;
             editing = null;
-            formData = { type: 'condition-relational', operator: '==' };
+            formData = nextFormData;
+            activeForm = true;
             pageSwitcher.enablePage();
             return;
         }
@@ -81,42 +77,58 @@
 
     function addToken(token: ConditionToken) {
         if (!canAppend(tokens(), token)) return;
-        setItems([...items, token]);
+        setItems([...tokens(), token]);
     }
 
     function editCondition(token: ConditionToken, index: number) {
         if (!isConditionObject(token)) return;
         if (pageSwitcher) {
+            const nextFormData = $state.snapshot(token);
+            pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
+            pageSwitcher.localData[EDITING_KEY] = index;
             editing = index;
-            formData = $state.snapshot(token);
+            formData = nextFormData;
+            activeForm = true;
             pageSwitcher.enablePage();
             return;
         }
         onEdit?.(token, index);
     }
 
+    function clearPendingEdit() {
+        if (!pageSwitcher) return;
+        delete pageSwitcher.localData[FORM_DATA_KEY];
+        delete pageSwitcher.localData[EDITING_KEY];
+    }
+
 </script>
 
-{#if pageSwitcher && pageSwitcher.isPageEnabled}
+{#if activeForm && pageSwitcher}
     <FormCondition
         bind:value={formData}
         bind:autoAttach={formData}
         attachTo="condition"
         bind:writeFormPropsTo={pageSwitcher.localData.form}
         onCancel={() => {
+            clearPendingEdit();
             editing = null;
+            formData = {};
+            activeForm = false;
             onCancel?.();
         }}
         onAfterSubmit={(condition) => {
             const index = editing;
-            const next = [...items];
+            const next = [...tokens()];
             if (typeof index === 'number') {
-                    next[index] = condition;
+                next[index] = condition;
             } else {
-                    next.push(condition);
+                next.push(condition);
             }
             setItems(next);
+            clearPendingEdit();
             editing = null;
+            formData = {};
+            activeForm = false;
             onAfterSubmit?.(condition);
         }}
     />
@@ -132,7 +144,7 @@
         </div>
 
         <OrderedList
-            bind:values={items}
+            bind:values={values}
             getLabel={describeToken}
             onEdit={editCondition}
             validateChange={(next) => validateConditionalList(next).valid}

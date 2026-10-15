@@ -24,6 +24,10 @@
             name:'dialogues'
         },
         {
+            display:'Templates',
+            name:'templates'
+        },
+        {
             display:'Actions',
             name:'actions'
         }

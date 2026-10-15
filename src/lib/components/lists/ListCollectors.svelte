@@ -23,10 +23,12 @@
         onCreatePressed
     }: Props = $props();
 
-    let formData = $state<CollectorToGet | undefined>();
-    let editing = $state<number | null>(null);
+    const FORM_DATA_KEY = 'collectorFormData';
+    const EDITING_KEY = 'collectorEditing';
     const pageSwitcher = page ?? (switcher ? switcher.createSwitch({ type: 'list', name: 'collector' }, 'collectors') : null);
     const ownsPageSwitcher = !page;
+    let formData = $state<CollectorToGet | undefined>(pageSwitcher?.localData[FORM_DATA_KEY]);
+    let editing = $state<number | null>(pageSwitcher?.localData[EDITING_KEY] ?? null);
 
     onDestroy(() => {
         if (ownsPageSwitcher) pageSwitcher?.remove();
@@ -38,10 +40,23 @@
         return `Collect ${value.target}`;
     }
 
+    function setPendingEdit(nextFormData: CollectorToGet, nextEditing: number | null) {
+        formData = nextFormData;
+        editing = nextEditing;
+        if (!pageSwitcher) return;
+        pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
+        pageSwitcher.localData[EDITING_KEY] = nextEditing;
+    }
+
+    function clearPendingEdit() {
+        if (!pageSwitcher) return;
+        delete pageSwitcher.localData[FORM_DATA_KEY];
+        delete pageSwitcher.localData[EDITING_KEY];
+    }
+
     function addCollector() {
         if (pageSwitcher) {
-            editing = null;
-            formData = { type: 'collector', target: 'character', collectIf: [] };
+            setPendingEdit({ type: 'collector', target: 'character', collectIf: [] }, null);
             pageSwitcher.enablePage();
             return;
         }
@@ -50,8 +65,7 @@
 
     function editCollector(value: CollectorToGet, index: number) {
         if (!pageSwitcher) return;
-        editing = index;
-        formData = $state.snapshot(value);
+        setPendingEdit($state.snapshot(value), index);
         pageSwitcher.enablePage();
     }
 
@@ -66,6 +80,7 @@
         bind:writeFormPropsTo={pageSwitcher.localData.form}
         onCancel={() => {
             editing = null;
+            clearPendingEdit();
             onCancel?.();
         }}
         onAfterSubmit={(collector) => {
@@ -74,6 +89,7 @@
             else next[editing] = collector;
             values = next;
             editing = null;
+            clearPendingEdit();
             onAfterSubmit?.(collector);
         }}
     />

@@ -41,6 +41,15 @@ export interface SaveExportPayload {
 	state: RuntimeState;
 }
 
+export interface WorldExportPayload {
+	format: 'story-engine-world';
+	formatVersion: 1;
+	worldId: string;
+	worldName: string;
+	exportedAt: number;
+	world: World;
+}
+
 export type WorldLoadResult =
 	| { ok: true; world: World; metadata: StoredWorldMetadata }
 	| { ok: false; reason: string };
@@ -63,6 +72,22 @@ function clone<T>(value: T): T {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isWorld(value: unknown): value is World {
+	if (!isRecord(value)
+		|| typeof value.name !== 'string'
+		|| typeof value.description !== 'string'
+		|| !Array.isArray(value.version)
+		|| !value.version.every((part) => typeof part === 'number' && Number.isFinite(part))) {
+		return false;
+	}
+
+	const requiredCollections = ['places', 'characters', 'items', 'actions', 'vars', 'textTemplates'] as const;
+	if (!requiredCollections.every((key) => Array.isArray(value[key]) && value[key].every(isRecord))) return false;
+	if (value.dialogues !== undefined && (!Array.isArray(value.dialogues) || !value.dialogues.every(isRecord))) return false;
+	if (value.displays !== undefined && (!Array.isArray(value.displays) || !value.displays.every(isRecord))) return false;
+	return value.editor === undefined || isRecord(value.editor);
 }
 
 function normalizeVersion(version: unknown): number[] {
@@ -421,6 +446,50 @@ export function parseSaveExport(serialized: string): SaveExportResult {
 				worldVersion: normalizeVersion(value.worldVersion),
 				exportedAt: typeof value.exportedAt === 'number' ? value.exportedAt : now(),
 				state
+			}
+		};
+	} catch {
+		return { ok: false, reason: 'The selected file is not valid JSON.' };
+	}
+}
+
+export function serializeWorldExport(world: World, worldId: string): string {
+	const payload: WorldExportPayload = {
+		format: 'story-engine-world',
+		formatVersion: 1,
+		worldId,
+		worldName: world.name,
+		exportedAt: now(),
+		world: clone(world)
+	};
+	return JSON.stringify(payload, null, 2);
+}
+
+export type WorldExportResult =
+	| { ok: true; payload: WorldExportPayload }
+	| { ok: false; reason: string };
+
+export function parseWorldExport(serialized: string): WorldExportResult {
+	try {
+		const value = JSON.parse(serialized) as unknown;
+		if (!isRecord(value)
+			|| value.format !== 'story-engine-world'
+			|| value.formatVersion !== 1
+			|| typeof value.worldId !== 'string'
+			|| typeof value.worldName !== 'string'
+			|| !('world' in value)
+			|| !isWorld(value.world)) {
+			return { ok: false, reason: 'This file is not a supported Story Engine world.' };
+		}
+		return {
+			ok: true,
+			payload: {
+				format: 'story-engine-world',
+				formatVersion: 1,
+				worldId: value.worldId,
+				worldName: value.worldName.trim() || value.world.name,
+				exportedAt: typeof value.exportedAt === 'number' ? value.exportedAt : now(),
+				world: clone(value.world)
 			}
 		};
 	} catch {

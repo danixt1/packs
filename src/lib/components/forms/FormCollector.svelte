@@ -38,6 +38,7 @@
     let mainPage = nestedSwitcher.createSwitch({}, 'collector');
     let conditionsPage = nestedSwitcher.createSwitch({ type: 'list', name: 'condition' }, 'conditions');
     let getterPage = nestedSwitcher.createSwitch({}, 'getter');
+    let activeNested = $state<'conditions' | 'getter' | null>(null);
 
     $effect(() => {
         if (!value) return;
@@ -61,6 +62,7 @@
             fromPlaceId = '';
             getterValue = {};
         }
+        activeNested = null;
         mainPage.enablePage();
     });
 
@@ -75,37 +77,25 @@
     }
 
     function openConditions() {
+        activeNested = 'conditions';
         conditionsPage.enablePage();
     }
 
     function openGetter() {
+        activeNested = 'getter';
         getterPage.enablePage();
     }
 
-    function submitNested() {
-        const active = nestedSwitcher.getActiveSwitch();
-        if (active === conditionsPage) {
-            conditionsPage.localData.form?.onSubmit?.();
-        } else if (active === getterPage) {
-            nestedFormProps.onSubmit?.();
-        }
+    function closeNested() {
+        activeNested = null;
+        mainPage.enablePage();
     }
 
     function cancelNested() {
-        const active = nestedSwitcher.getActiveSwitch();
-        if (active === conditionsPage) {
-            mainPage.enablePage();
-        } else if (active === getterPage) {
-            mainPage.enablePage();
-        } else {
-            onCancel?.();
-        }
+        closeNested();
     }
 
     function submitCollector() {
-        submitNested();
-        if (nestedSwitcher.getActiveSwitch() !== mainPage) return;
-
         let result: CollectorToGet;
         if (kind === 'self') {
             result = { type: 'collector', target: 'self' };
@@ -126,11 +116,11 @@
     }
 
     function submitActive() {
-        if (nestedSwitcher.getActiveSwitch() === conditionsPage) {
-            conditionsPage.localData.form?.onSubmit?.();
+        if (activeNested === 'conditions') {
+            nestedSwitcher.getActiveSwitch()?.localData.form?.onSubmit?.();
             return;
         }
-        if (nestedSwitcher.getActiveSwitch() === getterPage) {
+        if (activeNested === 'getter') {
             nestedFormProps.onSubmit?.();
             return;
         }
@@ -138,7 +128,7 @@
     }
 
     function cancelActive() {
-        if (nestedSwitcher.getActiveSwitch() !== mainPage) {
+        if (activeNested !== null) {
             cancelNested();
             return;
         }
@@ -153,7 +143,7 @@
 </script>
 
 {#snippet inputs()}
-    {#if nestedSwitcher.getActiveSwitch() === mainPage}
+    {#if activeNested === null}
         <InputSelect
             id="collector-type"
             label="Collector type:"
@@ -213,22 +203,22 @@
                 <InputText id="collector-source-id" label="Source place id:" wrapDiv bind:value={fromPlaceId} autocomplete="off" />
             {/if}
         {/if}
-    {:else if nestedSwitcher.getActiveSwitch() === conditionsPage}
+    {:else if activeNested === 'conditions'}
         <ListConditions
             bind:values={collectIf}
             switcher={nestedSwitcher}
-            onCancel={() => mainPage.enablePage()}
-            onAfterSubmit={() => mainPage.enablePage()}
+            onCancel={closeNested}
+            onAfterSubmit={closeNested}
         />
-    {:else if nestedSwitcher.getActiveSwitch() === getterPage}
+    {:else if activeNested === 'getter'}
         <FormGetter
             bind:value={getterValue}
             bind:writeFormPropsTo={nestedFormProps}
-            onCancel={() => mainPage.enablePage()}
+            onCancel={closeNested}
             onAfterSubmit={(next) => {
                 getterValue = next;
                 fromPlaceId = next;
-                mainPage.enablePage();
+                closeNested();
             }}
         />
     {/if}
