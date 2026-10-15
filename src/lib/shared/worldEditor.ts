@@ -191,6 +191,7 @@ export class WorldEditor {
             'place':this.places,
             'action':this.actions,
             'dialogue':this.dialogues,
+            'text-template':this.textTemplates,
             'display':this.displays
         }
         let selected = opts[objName];
@@ -218,6 +219,9 @@ export class WorldEditor {
     }
     public getDialogues():DialogueEditor[]{
         return Object.values(this.dialogues);
+    }
+    public getTextTemplates():TextTemplateEditor[]{
+        return Object.values(this.textTemplates);
     }
     public getObject(oid:string){
         return this.objectsByOid[oid];
@@ -472,6 +476,11 @@ export function getCurrentWorldEditor(worldName?:string){
         currentEditor = new WorldEditor(loadWorld(worldName), worldName);
         return currentEditor;
     }
+    return currentEditor;
+}
+
+export function replaceCurrentWorldEditor(worldName: string, world: World){
+    currentEditor = new WorldEditor(world, worldName);
     return currentEditor;
 }
 

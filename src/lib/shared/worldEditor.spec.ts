@@ -101,3 +101,35 @@ it('loads all actions from the unified world collection', () => {
     expect(editor.getActions().map((action) => action.name)).toEqual(['player-action', 'autonomous-action']);
     expect(editor.getActions().every((action) => action.oid.startsWith('action:'))).toBe(true);
 });
+
+it('loads, updates, deletes, and serializes text templates', () => {
+    const world = buildBlankWorld();
+    world.textTemplates.push({
+        type: 'text-template',
+        name: 'welcome',
+        template: 'Welcome!',
+        match: {
+            primaryRole: 'start',
+            roles: { start: { event: 'GAME_START' } }
+        }
+    });
+    const editor = new WorldEditor(world);
+
+    expect(editor.getTextTemplates()).toHaveLength(1);
+    expect(editor.getTextTemplates()[0].oid).toBe('text-template:welcome');
+
+    editor.updateObjectWithOid('text-template:welcome', {
+        type: 'text-template',
+        name: 'updated',
+        template: 'Updated!',
+        match: {
+            primaryRole: 'start',
+            roles: { start: { event: 'GAME_START' } }
+        }
+    });
+    expect(editor.getTextTemplates().map((template) => template.name)).toEqual(['updated']);
+
+    editor.deleteObject('text-template:updated');
+    expect(editor.getTextTemplates()).toHaveLength(0);
+    expect(editor.toWorld().textTemplates).toEqual([]);
+});
