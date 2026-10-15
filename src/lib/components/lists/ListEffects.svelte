@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { ContextStack } from "$lib/shared/contextStack.svelte";
     import type { PageSwitch, Switch } from "$lib/shared/pageSwitch";
     import { onDestroy } from "svelte";
     import type { EffectFomAction } from "$lib/types/data/declarative";
@@ -7,6 +8,7 @@
 
     interface Props {
         values?: EffectFomAction[];
+        stack?: ContextStack;
         switcher?: PageSwitch;
         page?: Switch;
         /** Non-serialized identity used when several effect lists share a PageSwitch. */
@@ -18,7 +20,8 @@
     }
 
     let {
-        values = $bindable<EffectFomAction[]>(),
+        values = $bindable<EffectFomAction[]>([]),
+        stack,
         switcher = $bindable(),
         page,
         scope,
@@ -72,7 +75,39 @@
         values = next;
     }
 
+    async function handleStackCreate() {
+        if (!stack) return;
+        const result = await stack.push<EffectFomAction, EffectFomAction>({
+            title: 'Add Effect',
+            data: { type: 'event', event: '' },
+            render: renderEffectForm
+        });
+        if (result) {
+            setItems([...items, result]);
+            onAfterSubmit?.(result);
+        }
+    }
+
+    async function handleStackEdit(effect: EffectFomAction, index: number) {
+        if (!stack) return;
+        const result = await stack.push<EffectFomAction, EffectFomAction>({
+            title: `Edit Effect (${label(effect)})`,
+            data: $state.snapshot(effect),
+            render: renderEffectForm
+        });
+        if (result) {
+            const next = [...items];
+            next[index] = result;
+            setItems(next);
+            onAfterSubmit?.(result);
+        }
+    }
+
     function addEffect() {
+        if (stack) {
+            handleStackCreate();
+            return;
+        }
         if (pageSwitcher) {
             const nextFormData: EffectFomAction = { type: 'event', event: '' };
             pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
@@ -86,6 +121,10 @@
     }
 
     function editEffect(effect: EffectFomAction, index: number) {
+        if (stack) {
+            handleStackEdit(effect, index);
+            return;
+        }
         if (pageSwitcher) {
             const nextFormData = $state.snapshot(effect);
             pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
@@ -97,10 +136,12 @@
         }
         onEdit?.(effect, index);
     }
+
     function deleteEffect(effect: EffectFomAction, index: number){
         items.splice(index,1);
         values.splice(index,1);
     }
+
     function label(effect: EffectFomAction): string {
         switch (effect.type) {
             case 'move':
@@ -115,36 +156,31 @@
                 return `Start dialogue: ${effect.dialogueId ?? effect.intent ?? '(unspecified)'}`;
         }
     }
-
-    function clearPendingEdit() {
-        if (pageSwitcher) {
-            delete pageSwitcher.localData[FORM_DATA_KEY];
-            delete pageSwitcher.localData[EDITING_KEY];
-        }
-    }
 </script>
+
+{#snippet renderEffectForm(frame: any)}
+    <FormEffect
+        {stack}
+        bind:value={frame.draft}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={(effect) => frame.resolve(effect)}
+    />
+{/snippet}
 
 {#if pageSwitcher && pageSwitcher.isPageEnabled}
     <FormEffect
         bind:value={formData}
         bind:writeFormPropsTo={pageSwitcher.localData.form}
         onCancel={() => {
-            clearPendingEdit();
             editing = null;
-            formData = undefined;
             onCancel?.();
         }}
         onAfterSubmit={(effect) => {
             const next = [...items];
-            if (editing === null) {
-                next.push(effect);
-            } else {
-                next[editing] = effect;
-            }
+            if (editing === null) next.push(effect);
+            else next[editing] = effect;
             setItems(next);
-            clearPendingEdit();
             editing = null;
-            formData = undefined;
             onAfterSubmit?.(effect);
         }}
     />

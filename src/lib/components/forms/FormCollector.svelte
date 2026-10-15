@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { ContextStack } from "$lib/shared/contextStack.svelte";
     import { createPageSwitch } from "$lib/shared/pageSwitch";
     import { showError } from "$lib/notify";
     import type { CollectorToGet } from "$lib/types/data/declarative";
@@ -12,6 +13,7 @@
 
     interface Props {
         value?: CollectorToGet;
+        stack?: ContextStack;
         onCancel?: () => void;
         onAfterSubmit?: (value: CollectorToGet) => void;
         autoAttach?: Record<string, any>;
@@ -21,6 +23,7 @@
 
     let {
         value = $bindable<CollectorToGet>(),
+        stack,
         onCancel,
         onAfterSubmit,
         autoAttach = $bindable(),
@@ -76,12 +79,42 @@
         }
     }
 
+    async function handleStackConditions() {
+        if (!stack) return;
+        await stack.push<any, any>({
+            title: 'Configure Conditions',
+            data: collectIf,
+            render: renderConditionsForm
+        });
+    }
+
+    async function handleStackGetter() {
+        if (!stack) return;
+        const result = await stack.push<any, any>({
+            title: 'Configure Source Getter',
+            data: typeof fromPlaceId === 'object' ? fromPlaceId : {},
+            render: renderGetterForm
+        });
+        if (result) {
+            fromPlaceId = result;
+            getterValue = result;
+        }
+    }
+
     function openConditions() {
+        if (stack) {
+            handleStackConditions();
+            return;
+        }
         activeNested = 'conditions';
         conditionsPage.enablePage();
     }
 
     function openGetter() {
+        if (stack) {
+            handleStackGetter();
+            return;
+        }
         activeNested = 'getter';
         getterPage.enablePage();
     }
@@ -141,6 +174,23 @@
         }
     });
 </script>
+
+{#snippet renderConditionsForm(frame: any)}
+    <ListConditions
+        bind:values={collectIf}
+        {stack}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={() => frame.resolve(collectIf)}
+    />
+{/snippet}
+
+{#snippet renderGetterForm(frame: any)}
+    <FormGetter
+        bind:value={frame.draft}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={(val) => frame.resolve(val)}
+    />
+{/snippet}
 
 {#snippet inputs()}
     {#if activeNested === null}

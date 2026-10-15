@@ -116,7 +116,7 @@
 	}
 	.tabs button,
 	.mobile-actions-button {
-		min-height: 2.5rem;
+		min-height: 2.0rem;
 		border: 1px solid rgba(236, 211, 167, 0.2);
 		border-radius: 6px;
 		background: rgba(255, 255, 255, 0.06);

@@ -11,210 +11,284 @@
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import ListConditions from "$lib/components/lists/ListConditions.svelte";
     import ListEffects from "$lib/components/lists/ListEffects.svelte";
-    import { createPageSwitch } from "$lib/shared/pageSwitch";
-    import { showError } from "$lib/notify";
+    import ContextHost from "$lib/components/ContextHost.svelte";
+    import { createContextStack } from "$lib/shared/contextStack.svelte";
+    import { showError, showSucess } from "$lib/notify";
     import ButtonPopUp from "$lib/components/editor/ButtonPopUp.svelte";
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let dialogues = $state(editor.getDialogues());
-    let openPopup = $state(false);
-    let data = $state<Record<string, any>>({});
-    let nodeData = $state<Record<string, any>>({});
-    let matchData = $state<Record<string, any>>({});
-    let choiceData = $state<Record<string,any>>({});
-
-    const nodeOnEnterScope = 'dialogue-node-on-enter-effects';
-    const choiceEffectsScope = 'dialogue-choice-effects';
-
-    let switcher = $state(createPageSwitch());
-    let dialoguePage = (() => switcher.createSwitch({
-        form: {
-            onSubmit: () => saveDialogue(),
-            onCancel: () => openPopup = false
-        }
-    }))();
-    let matchPage = (() => switcher.createSwitch({
-        form: {
-            onSubmit: () => saveMatch(),
-            onCancel: () => dialoguePage.enablePage()
-        }
-    }))();
-    let nodePage = (() => switcher.createSwitch({
-        form: {
-            onSubmit: () => saveNode(),
-            onCancel: () => dialoguePage.enablePage()
-        }
-    }))();
-    let choicePage = (()=>switcher.createSwitch({
-        form: {
-            onSubmit:saveChoice,
-            onCancel: ()=> nodePage.enablePage()
-        }
-    }))()
-    let nodeOnEnterPage = (() => switcher.createSwitch({
-        in: { type: 'list', name: 'effect', scope: nodeOnEnterScope },
-        form: {}
-    }, nodeOnEnterScope))();
-    let choiceEffectsPage = (() => switcher.createSwitch({
-        in: { type: 'list', name: 'effect', scope: choiceEffectsScope },
-        form: {}
-    }, choiceEffectsScope))();
+    const stack = createContextStack();
     let labelsInfo = $state(editor.getLabels());
-    let selectedLabelKey = $derived(
-        matchData._in && matchData._label
-            ? `${matchData._in}Labels${matchData._label}`
-            : ''
-    );
 
-    $effect(() => {
-        if (selectedLabelKey && !Array.isArray(matchData[selectedLabelKey])) {
-            matchData[selectedLabelKey] = [];
+    function emptyDialogue(): Record<string, any> {
+        return {
+            id: '',
+            name: '',
+            intent: '',
+            priority: 0,
+            startsAt: '',
+            categories: [],
+            nodes: []
+        };
+    }
+
+    async function startCreate() {
+        const result = await stack.push<any, any>({
+            title: 'Create Dialogue Tree',
+            data: emptyDialogue(),
+            render: renderDialogueForm,
+            meta: { mode: 'create' }
+        });
+
+        if (result) {
+            handleSaveDialogue(result, null);
         }
-    });
-
-    function startCreate() {
-        data = { nodes: [] };
-        openPopup = true;
-        dialoguePage.enablePage();
     }
 
-    function startEdit(dialogue: Record<string, any>) {
-        data = $state.snapshot(dialogue);
-        data._baseOID = dialogue.oid;
-        openPopup = true;
-        dialoguePage.enablePage();
+    async function startEdit(dialogue: Record<string, any>) {
+        const originalOid = dialogue.oid as string;
+        const initial = $state.snapshot(dialogue);
+
+        const result = await stack.push<any, any>({
+            title: `Edit ${initial.name || initial.id}`,
+            data: initial,
+            render: renderDialogueForm,
+            meta: { mode: 'edit', originalOid }
+        });
+
+        if (result) {
+            handleSaveDialogue(result, originalOid);
+        }
     }
 
-    function saveDialogue() {
+    function handleSaveDialogue(data: Record<string, any>, originalOid: string | null) {
         if (!data.id || !data.name || !data.intent) {
             showError('Id, name, and dialogue purpose are required');
             return;
         }
-        if (data._baseOID) {
-            if (data._baseOID !== `dialogue:${data.id}` && editor.getObject(`dialogue:${data.id}`)) {
-                showError('Dialogue id already exists');
-                return;
-            }
-            editor.updateObjectWithOid(data._baseOID, data);
+
+        const newOid = `dialogue:${data.id}`;
+        if ((!originalOid || originalOid !== newOid) && editor.getObject(newOid)) {
+            showError('Dialogue id already exists');
+            return;
+        }
+
+        if (originalOid) {
+            editor.updateObjectWithOid(originalOid, data);
+            showSucess('Dialogue updated');
         } else {
-            if (editor.getObject(`dialogue:${data.id}`)) {
-                showError('Dialogue id already exists');
-                return;
-            }
-            const dialogue: DialogueTree = {
+            const tree: DialogueTree = {
                 type: 'dialogue-tree',
                 id: data.id,
                 name: data.name,
                 intent: data.intent,
-                priority: data.priority,
+                priority: data.priority ?? 0,
                 categories: data.categories ?? [],
                 match: data.match,
                 startsAt: data.startsAt ?? data.nodes?.[0]?.id ?? '',
                 nodes: data.nodes ?? []
             };
-            editor.addDialogue(dialogue);
+            editor.addDialogue(tree);
+            showSucess('Dialogue created');
         }
         dialogues = editor.getDialogues();
-        openPopup = false;
     }
 
-    function saveMatch() {
-        const match: DialogueMatch = {
-            targetCharacterIds: matchData.targetCharacterIds ?? [],
-            targetLabelsAny: matchData.targetLabelsAny ?? [],
-            targetLabelsAll: matchData.targetLabelsAll ?? [],
-            targetLabelsNone: matchData.targetLabelsNone ?? [],
-            selfLabelsAny: matchData.selfLabelsAny ?? [],
-            selfLabelsAll: matchData.selfLabelsAll ?? [],
-            selfLabelsNone: matchData.selfLabelsNone ?? [],
-            conditions: matchData.conditions ?? []
-        };
-        data.match = match;
-        dialoguePage.enablePage();
-    }
+    async function openMatch(parentFrame: any) {
+        const initial = $state.snapshot(parentFrame.draft.match ?? {});
+        initial.targetCharacterIds ??= [];
+        initial.conditions ??= [];
 
-    function openMatch() {
-        matchData = $state.snapshot(data.match ?? {});
-        matchPage.enablePage();
-    }
+        const updated = await stack.push<any, any>({
+            title: 'Configure Matching Rules',
+            data: initial,
+            render: renderMatchForm
+        });
 
-    function saveNode() {
-        if (!nodeData.id || !nodeData.text || !nodeData.speaker) {
-            showError('Node id, text, and speaker are required');
-            return;
-        }
-        const node: DialogueNode = {
-            id: nodeData.id,
-            speaker: nodeData.speaker,
-            text: nodeData.text,
-            choices: nodeData.choices ?? [],
-            onEnter: nodeData.onEnter ?? []
-        };
-        const nodes = [...(data.nodes ?? [])] as DialogueNode[];
-        const index = nodes.findIndex((item) => item.id === node.id);
-        if (index >= 0) {
-            nodes[index] = node;
-        } else {
-            nodes.push(node);
-        }
-        data.nodes = nodes;
-        if (!data.startsAt) {
-            data.startsAt = node.id;
-        }
-        dialoguePage.enablePage();
-    }
-    function openNode(node?: DialogueNode) {
-        nodeData = node ? $state.snapshot(node) : {};
-        nodeData.onEnter ??= [];
-        
-        nodePage.enablePage();
-    }
-
-    function openChoice(choice?: DialogueChoice) {
-        choiceData = choice ? $state.snapshot(choice) : { conditions: [], effects: [] };
-        choiceData.conditions ??= [];
-        choiceData.effects ??= [];
-        choicePage.enablePage();
-    }
-
-    function saveChoice() {
-        if (!choiceData.id || !choiceData.text) {
-            showError('Choice id and text are required');
-            return;
-        }
-        const choice: DialogueChoice = {
-            id: choiceData.id,
-            text: choiceData.text,
-            conditions: choiceData.conditions ?? [],
-            effects: choiceData.effects ?? [],
-            nextNodeId: choiceData.nextNodeId || undefined,
-            endDialogue: choiceData.endDialogue === true
-        };
-        const choices = [...(nodeData.choices ?? [])] as DialogueChoice[];
-        const index = choices.findIndex((item) => item.id === choice.id);
-        if (index >= 0) {
-            choices[index] = choice;
-        } else {
-            choices.push(choice);
-        }
-        nodeData.choices = choices;
-        nodePage.enablePage();
-    }
-
-    function deleteNode(node: DialogueNode) {
-        data.nodes = (data.nodes ?? []).filter((item: DialogueNode) => item.id !== node.id);
-        if (data.startsAt === node.id) {
-            data.startsAt = data.nodes[0]?.id ?? '';
+        if (updated) {
+            delete updated._in;
+            delete updated._label;
+            parentFrame.draft.match = updated as DialogueMatch;
         }
     }
 
-    function updateMatchLabels(key: string, label: string, isChecked: boolean) {
-        const current = Array.isArray(matchData[key]) ? matchData[key] : [];
-        matchData[key] = isChecked
+    async function openNode(parentFrame: any, node?: DialogueNode) {
+        const initial = node ? $state.snapshot(node) : { id: '', text: '', speaker: 'target', onEnter: [], choices: [] };
+        initial.onEnter ??= [];
+        initial.choices ??= [];
+
+        const updated = await stack.push<any, any>({
+            title: node ? `Edit Node (${node.id})` : 'Add Node',
+            data: initial,
+            render: renderNodeForm
+        });
+
+        if (updated) {
+            if (!updated.id || !updated.text || !updated.speaker) {
+                showError('Node id, text, and speaker are required');
+                return;
+            }
+            const nodes = [...(parentFrame.draft.nodes ?? [])] as DialogueNode[];
+            const index = node ? nodes.findIndex((item) => item.id === node.id) : -1;
+            if (index >= 0) {
+                nodes[index] = updated;
+            } else {
+                nodes.push(updated);
+            }
+            parentFrame.draft.nodes = nodes;
+            if (!parentFrame.draft.startsAt) {
+                parentFrame.draft.startsAt = updated.id;
+            }
+        }
+    }
+
+    function deleteNode(parentFrame: any, node: DialogueNode) {
+        parentFrame.draft.nodes = (parentFrame.draft.nodes ?? []).filter((item: DialogueNode) => item.id !== node.id);
+        if (parentFrame.draft.startsAt === node.id) {
+            parentFrame.draft.startsAt = parentFrame.draft.nodes[0]?.id ?? '';
+        }
+    }
+
+    async function openChoice(nodeFrame: any, choice?: DialogueChoice) {
+        const initial = choice ? $state.snapshot(choice) : { id: '', text: '', conditions: [], effects: [], endDialogue: false };
+        initial.conditions ??= [];
+        initial.effects ??= [];
+
+        const updated = await stack.push<any, any>({
+            title: choice ? `Edit Choice (${choice.id})` : 'Add Choice',
+            data: initial,
+            render: renderChoiceForm
+        });
+
+        if (updated) {
+            if (!updated.id || !updated.text) {
+                showError('Choice id and text are required');
+                return;
+            }
+            const choices = [...(nodeFrame.draft.choices ?? [])] as DialogueChoice[];
+            const index = choice ? choices.findIndex((item) => item.id === choice.id) : -1;
+            if (index >= 0) {
+                choices[index] = updated;
+            } else {
+                choices.push(updated);
+            }
+            nodeFrame.draft.choices = choices;
+        }
+    }
+
+    function updateMatchLabels(matchDraft: any, key: string, label: string, isChecked: boolean) {
+        const current = Array.isArray(matchDraft[key]) ? matchDraft[key] : [];
+        matchDraft[key] = isChecked
             ? [...current, label]
             : current.filter((value: string) => value !== label);
     }
 </script>
+
+{#snippet renderDialogueForm(frame: any)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <InputText id="dial-id" label="Id" bind:value={frame.draft.id} required wrapDiv autocomplete="off" />
+        <InputText id="dial-name" label="Name" bind:value={frame.draft.name} required wrapDiv autocomplete="off" />
+        <InputText id="dial-intent" label="Dialogue Purpose" bind:value={frame.draft.intent} required wrapDiv autocomplete="off" />
+        <InputText id="dial-start" label="Starts At" bind:value={frame.draft.startsAt} wrapDiv autocomplete="off" />
+        <div class="form-group">
+            <h2>Nodes</h2>
+            <ObjectTable
+                items={(frame.draft.nodes ?? []).map((node: DialogueNode) => ({ Id: node.id, Text: node.text }))}
+                headers={['Id', 'Text']}
+                ref={frame.draft.nodes ?? []}
+                onEdit={(node) => openNode(frame, node as unknown as DialogueNode)}
+                onDelete={(node) => deleteNode(frame, node as unknown as DialogueNode)}
+            />
+            <button type="button" onclick={() => openNode(frame)}>Add Node</button>
+        </div>
+        <div class="form-group">
+            <ButtonPopUp text="Configure matching rules" onclick={() => openMatch(frame)}/>
+        </div>
+    </Form>
+{/snippet}
+
+{#snippet renderNodeForm(frame: any)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <div class="form-group">
+            <InputText id="node-id" label="Node Id" bind:value={frame.draft.id} required autocomplete="off" />
+            <InputTextArea id="node-text" label="Node Text" bind:value={frame.draft.text} required />
+            <InputSelect id="speaker-options" label="Speaker" bind:selected={frame.draft.speaker} items={[
+                { title: 'Target Character', value: 'target' },
+                { title: 'Self Character', value: 'self' },
+                { title: 'Narrator', value: 'narrator' },
+                ...editor.getCharacters().map((character) => ({ title: `char:${character.name} (${character.id})`, value: { type: 'character', id: character.id } }))
+            ]} />
+            <h2>On enter effects:</h2>
+            <ListEffects {stack} bind:values={frame.draft.onEnter} />
+            <h2>Choices:</h2>
+            {#if (frame.draft.choices || []).length > 0}
+                <ObjectTable
+                    items={(frame.draft.choices ?? []).map((e: any) => ({ Id: e.id, Text: e.text, Next: e.nextNodeId }))}
+                    headers={['Id','Text','Next']}
+                    ref={frame.draft.choices ?? []}
+                    onEdit={(e) => openChoice(frame, e as unknown as DialogueChoice)}
+                    onDelete={(e) => { frame.draft.choices = frame.draft.choices.filter((n: any) => e.id !== n.id); }}
+                />
+            {:else}
+                <p>No Choices Added!</p>
+            {/if}
+            <ButtonPopUp text="Add Choice" onclick={() => openChoice(frame)} />
+        </div>
+    </Form>
+{/snippet}
+
+{#snippet renderChoiceForm(frame: any)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <InputText id="choice-id" label="Id:" bind:value={frame.draft.id} autocomplete='off' wrapDiv />
+        <InputTextArea id="choice-text" label="Text:" bind:value={frame.draft.text} wrapDiv required />
+        <InputText id="choice-next-node" label="Next node:" bind:value={frame.draft.nextNodeId} autocomplete="off" wrapDiv />
+        <InputSwitch id="choice-end-dialogue" label="End dialogue" bind:value={frame.draft.endDialogue} wrapDiv />
+        <div class="form-group">
+            <h2>Conditions</h2>
+            <ListConditions {stack} bind:values={frame.draft.conditions} />
+        </div>
+        <div class="form-group">
+            <h2>Choice effects</h2>
+            <ListEffects {stack} bind:values={frame.draft.effects} />
+        </div>
+    </Form>
+{/snippet}
+
+{#snippet renderMatchForm(frame: any)}
+    {@const itemChars = editor.getCharacters().map((character) => ({ value: character.id, title: `${character.name} (${character.id})` }))}
+    {@const itemLabels = labelsInfo.map((label) => ({ value: label.name, title: label.title || label.name }))}
+    {@const selectedKey = frame.draft._in && frame.draft._label ? `${frame.draft._in}Labels${frame.draft._label}` : ''}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <div class="form-group">
+            <div class="info">
+                <p>Set a <b>priority</b> when configuring matching rules. It is also a good idea to create a fallback dialogue without matching rules.</p>
+            </div>
+            <InputCard items={itemChars} id="match-targets" label="Available only for these characters:" bind:selectedItems={frame.draft.targetCharacterIds} />
+            <h2>Label rules</h2>
+            <div class="info">
+                <p>Define which labels the target and speaking character must have for this dialogue tree to be available.</p>
+            </div>
+            <div class="in-label">
+                <InputSelect id="match-in" label="Apply labels to:" items={[{ title: 'Target', value: 'target' }, { title: 'Self', value: 'self' }]} bind:selected={frame.draft._in} />
+                <InputSelect id="match-label" label="Filter type:" items={[{ title: 'Any', value: 'Any' }, { title: 'All', value: 'All' }, { title: 'None', value: 'None' }]} bind:selected={frame.draft._label} />
+            </div>
+            {#if selectedKey}
+                {#key selectedKey}
+                    <InputCard
+                        items={itemLabels}
+                        id={`match-${selectedKey}`}
+                        label="Select labels:"
+                        selectedItems={frame.draft[selectedKey] ?? []}
+                        onChange={(label, isChecked) => updateMatchLabels(frame.draft, selectedKey, label, isChecked)}
+                    />
+                {/key}
+            {/if}
+            <h2>Conditions</h2>
+            <ListConditions {stack} bind:values={frame.draft.conditions} />
+        </div>
+    </Form>
+{/snippet}
 
 <EditorWrapper>
     <div>
@@ -242,123 +316,8 @@
     <ButtonEditorCreate text="Create Dialogue Tree" onClick={startCreate} />
 </EditorWrapper>
 
-<Popup open={openPopup} title="Dialogue">
-    <Form {...switcher.data.form}>
-        {#if dialoguePage.isPageEnabled}
-            <InputText id="dial-id" label="Id" bind:value={data.id} required wrapDiv autocomplete="off" />
-            <InputText id="dial-name" label="Name" bind:value={data.name} required wrapDiv autocomplete="off" />
-            <InputText id="dial-intent" label="Dialogue Purpose" bind:value={data.intent} required wrapDiv autocomplete="off" />
-            <InputText id="dial-start" label="Starts At" bind:value={data.startsAt} wrapDiv autocomplete="off" />
-            <div class="form-group">
-                <h2>Nodes</h2>
-                <ObjectTable
-                    items={(data.nodes ?? []).map((node: DialogueNode) => ({ Id: node.id, Text: node.text }))}
-                    headers={['Id', 'Text']}
-                    ref={data.nodes ?? []}
-                    onEdit={(node) => openNode(node as unknown as DialogueNode)}
-                    onDelete={(node) => deleteNode(node as unknown as DialogueNode)}
-                />
-                <button type="button" onclick={() => openNode()}>Add Node</button>
-            </div>
-            <div class="form-group">
-                <ButtonPopUp text="Configure matching rules" onclick={openMatch}/>
-            </div>
-        {:else if nodePage.isPageEnabled}
-            <div class="form-group">
-                <InputText id="node-id" label="Node Id" bind:value={nodeData.id} required autocomplete="off" />
-                <InputTextArea id="node-text" label="Node Text" bind:value={nodeData.text} required />
-                <InputSelect id="speaker-options" label="Speaker" bind:selected={nodeData.speaker} items={[
-                    { title: 'Target Character', value: 'target' },
-                    { title: 'Self Character', value: 'self' },
-                    { title: 'Narrator', value: 'narrator' },
-                    ...editor.getCharacters().map((character) => ({ title: `char:${character.name} (${character.id})`, value: { type: 'character', id: character.id } }))
-                ]} />
-                <h2>On enter effects:</h2>
-                <ButtonPopUp text={`Configure effects (${nodeData.onEnter?.length ?? 0})`} onclick={() => switcher.enableSwitchByName(nodeOnEnterScope)} />
-                <h2>Choices:</h2>
-                {#if (nodeData.choices || []).length > 0}
-                    <ObjectTable items = {(nodeData.choices ?? []).map((e:any)=>({Id:e.id,Text:e.text,Next:e.nextNodeId}))}
-                    headers={['Id','Text','Next']}
-                    ref={nodeData.choices ?? []}
-                    onEdit = {(e)=>openChoice(e as unknown as DialogueChoice)}
-                    onDelete = {(e)=>{nodeData.choices = nodeData.choices.filter((n:any)=> e.id != n.id)}}
-                    />
-                {:else}
-                    <p>No Choices Added!</p>
-                {/if}
-                <ButtonPopUp text="Add Choice" onclick={() => openChoice()} />
-            </div>
-        {:else if switcher.data.in?.type === 'list' && switcher.data.in?.scope === nodeOnEnterScope}
-            <div class="form-group">
-                <h2>Node entry effects</h2>
-                <ListEffects
-                    bind:values={nodeData.onEnter}
-                    page={nodeOnEnterPage}
-                    switcher={switcher}
-                    onCancel={() => nodePage.enablePage()}
-                    onAfterSubmit={() => nodePage.enablePage()}
-                />
-            </div>
-        {:else}
-            {#if matchPage.isPageEnabled}
-                {@const itemChars = editor.getCharacters().map((character) => ({ value: character.id, title: `${character.name} (${character.id})` }))}
-                {@const itemLabels = labelsInfo.map((label) => ({ value: label.name, title: label.title || label.name }))}
-                <div class="form-group">
-                    <div class="info">
-                        <p>Set a <b>priority</b> when configuring matching rules. It is also a good idea to create a fallback dialogue without matching rules.</p>
-                    </div>
-                    <InputCard items={itemChars} id="match-targets" label="Available only for these characters:" bind:selectedItems={matchData.targetCharacterIds} />
-                    <h2>Label rules</h2>
-                    <div class="info">
-                        <p>Define which labels the target and speaking character must have for this dialogue tree to be available.</p>
-                    </div>
-                    <div class="in-label">
-                        <InputSelect id="match-in" label="Apply labels to:" items={[{ title: 'Target', value: 'target' }, { title: 'Self', value: 'self' }]} bind:selected={matchData._in} />
-                        <InputSelect id="match-label" label="Filter type:" items={[{ title: 'Any', value: 'Any' }, { title: 'All', value: 'All' }, { title: 'None', value: 'None' }]} bind:selected={matchData._label} />
-                    </div>
-                    {#if selectedLabelKey}
-                        {#key selectedLabelKey}
-                            <InputCard
-                                items={itemLabels}
-                                id={`match-${selectedLabelKey}`}
-                                label="Select labels:"
-                                selectedItems={matchData[selectedLabelKey] ?? []}
-                                onChange={(label, isChecked) => updateMatchLabels(selectedLabelKey, label, isChecked)}
-                            />
-                        {/key}
-                    {/if}
-                </div>
-            {/if}
-            {#if choicePage.isPageEnabled}
-                <InputText id="choice-id" label="Id:" bind:value={choiceData.id} autocomplete='off' wrapDiv />
-                <InputTextArea id="choice-text" label="Text:" bind:value={choiceData.text} wrapDiv required />
-                <InputText id="choice-next-node" label="Next node:" bind:value={choiceData.nextNodeId} autocomplete="off" wrapDiv />
-                <InputSwitch id="choice-end-dialogue" label="End dialogue" bind:value={choiceData.endDialogue} wrapDiv />
-                <div class="form-group">
-                    <h2>Conditions</h2>
-                    <ListConditions bind:values={choiceData.conditions} bind:switcher={switcher} onCancel={() => choicePage.enablePage()} onAfterSubmit={() => choicePage.enablePage()} />
-                </div>
-                <ButtonPopUp text={`Configure effects (${choiceData.effects?.length ?? 0})`} onclick={() => switcher.enableSwitchByName(choiceEffectsScope)} />
-            {:else if switcher.data.in?.name != 'effect'}
-                <div class="form-group">
-                    <h2>Conditions</h2>
-                    <ListConditions bind:values={matchData.conditions} bind:switcher={switcher} onCancel={() => matchPage.enablePage()} onAfterSubmit={() => matchPage.enablePage()} />
-                </div>
-            {/if}
-            {#if switcher.data.in?.type === 'list' && switcher.data.in?.scope === choiceEffectsScope}
-                <div class="form-group">
-                    <h2>Choice effects</h2>
-                    <ListEffects
-                        bind:values={choiceData.effects}
-                        page={choiceEffectsPage}
-                        switcher={switcher}
-                        onCancel={() => choicePage.enablePage()}
-                        onAfterSubmit={() => choicePage.enablePage()}
-                    />
-                </div>
-            {/if}
-        {/if}
-    </Form>
+<Popup open={stack.depth > 0} title={stack.current?.title ?? 'Dialogue'} onClose={() => stack.reset()}>
+    <ContextHost {stack} />
 </Popup>
 
 <style>

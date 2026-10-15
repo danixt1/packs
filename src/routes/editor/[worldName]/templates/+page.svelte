@@ -8,7 +8,8 @@
     import ObjectTable from '$lib/components/ObjectTable.svelte';
     import Popup from '$lib/components/Popup.svelte';
     import { showError, showSucess } from '$lib/notify';
-    import { createPageSwitch, type Switch } from '$lib/shared/pageSwitch';
+    import ContextHost from '$lib/components/ContextHost.svelte';
+    import { createContextStack } from '$lib/shared/contextStack.svelte';
     import { getCurrentWorldEditor } from '$lib/shared/worldEditor';
     import type { EventConditions, TextTemplate, TextTemplateEventRoleMatch } from '$lib/types/data/declarative';
 
@@ -30,15 +31,7 @@
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let templates = $state(editor.getTextTemplates());
-    let openPopup = $state(false);
-    let data = $state<TemplateData>({});
-    let roleData = $state<TemplateData>({});
-    let editing = $state<string | null>(null);
-    let switcher = $state(createPageSwitch());
-
-    const templatePage = switcher.createSwitch({ form: { onSubmit: submitTemplate, onCancel: closePopup } }, 'template');
-    const rolePage = switcher.createSwitch({ form: { onSubmit: submitRole, onCancel: enableTemplatePage } }, 'role');
-    const roleConditionsPage = switcher.createSwitch({ type: 'list', name: 'condition', scope: 'template-role-conditions', form: {} }, 'template-role-conditions');
+    const stack = createContextStack();
 
     const eventConditions: { value: EventConditions; title: string }[] = [
         { value: 'FROM_THE_PLAYER', title: 'From the player' },
@@ -55,10 +48,6 @@
             priority: 0,
             categories: [],
             _categoriesText: '',
-            _sameActorAs: '',
-            _sameTargetAs: '',
-            _sameSubjectAs: '',
-            _samePlaceAs: '',
             match: {
                 primaryRole: '',
                 roles: {}
@@ -66,42 +55,40 @@
         };
     }
 
-    function enableTemplatePage() {
-        templatePage.enablePage();
+    async function startCreate() {
+        const result = await stack.push<TemplateData, TemplateData>({
+            title: 'New Text Template',
+            data: emptyTemplate(),
+            render: renderTemplateForm,
+            meta: { mode: 'create' }
+        });
+
+        if (result) {
+            handleSaveTemplate(result, null);
+        }
     }
 
-    function startCreate() {
-        editing = null;
-        data = emptyTemplate();
-        openPopup = true;
-        enableTemplatePage();
+    async function startEdit(template: Record<string, unknown>) {
+        const originalOid = template.oid as string;
+        const initial = $state.snapshot(template) as TemplateData;
+        initial.categories ??= [];
+        initial._categoriesText = initial.categories.join(', ');
+        initial.match ??= { primaryRole: '', roles: {} };
+        initial.match.roles ??= {};
+
+        const result = await stack.push<TemplateData, TemplateData>({
+            title: `Edit ${initial.name}`,
+            data: initial,
+            render: renderTemplateForm,
+            meta: { mode: 'edit', originalOid }
+        });
+
+        if (result) {
+            handleSaveTemplate(result, originalOid);
+        }
     }
 
-    function startEdit(template: Record<string, unknown>) {
-        editing = template.oid as string;
-        data = $state.snapshot(template) as TemplateData;
-        data.categories ??= [];
-        data._categoriesText = data.categories.join(', ');
-        data.match ??= { primaryRole: '', roles: {} };
-        data.match.roles ??= {};
-        openPopup = true;
-        enableTemplatePage();
-    }
-
-    function closePopup() {
-        openPopup = false;
-        editing = null;
-        enableTemplatePage();
-    }
-
-    function roles(): TemplateRole[] {
-        return Object.entries(data.match?.roles ?? {}).map(([name, role]) => ({
-            name,
-            ...(role as TextTemplateEventRoleMatch)
-        }));
-    }
-
-    function submitTemplate() {
+    function handleSaveTemplate(data: TemplateData, originalOid: string | null) {
         const name = String(data.name ?? '').trim();
         const templateText = String(data.template ?? '').trim();
         const match = data.match;
@@ -125,28 +112,25 @@
         delete draft._baseOID;
         delete draft._categoriesText;
 
-        const currentOid = editing;
         const newOid = `text-template:${draft.name}`;
-        if ((!currentOid || currentOid !== newOid) && editor.getObject(newOid)) {
+        if ((!originalOid || originalOid !== newOid) && editor.getObject(newOid)) {
             showError('Template name already exists');
             return;
         }
 
-        if (currentOid) {
-            if (!editor.getObject(currentOid)) {
+        if (originalOid) {
+            if (!editor.getObject(originalOid)) {
                 showError('The template being edited no longer exists');
-                closePopup();
                 templates = editor.getTextTemplates();
                 return;
             }
-            editor.updateObjectWithOid(currentOid, draft as TextTemplate);
+            editor.updateObjectWithOid(originalOid, draft as TextTemplate);
             showSucess('Template updated');
         } else {
             editor.addTextTemplate(draft as TextTemplate);
             showSucess('Template created');
         }
         templates = editor.getTextTemplates();
-        closePopup();
     }
 
     function deleteTemplate(template: Record<string, unknown>) {
@@ -157,12 +141,11 @@
         }
         editor.deleteObject(oid);
         templates = editor.getTextTemplates();
-        if (editing === oid) closePopup();
         showSucess('Template deleted');
     }
 
-    function openRole(role?: TemplateRole) {
-        roleData = role
+    async function openRole(parentFrame: any, role?: TemplateRole) {
+        const roleSnapshot = role
             ? $state.snapshot({
                 ...role,
                 _roleName: role.name,
@@ -174,57 +157,113 @@
                 _samePlaceAs: role.samePlaceAs ?? '',
                 _roleConditions: [...(role.conditions ?? [])]
             })
-            : { _roleFilters: [], _roleConditions: [], _sameActorAs: '', _sameTargetAs: '', _sameSubjectAs: '', _samePlaceAs: '' };
-        rolePage.enablePage();
+            : { _roleName: '', _roleEvent: '', _roleFilters: [], _roleConditions: [], _sameActorAs: '', _sameTargetAs: '', _sameSubjectAs: '', _samePlaceAs: '' };
+
+        const updatedRole = await stack.push<any, any>({
+            title: role ? `Edit Role (${role.name})` : 'Add Event Role',
+            data: roleSnapshot,
+            render: renderRoleForm
+        });
+
+        if (updatedRole) {
+            const roleName = String(updatedRole._roleName ?? '').trim();
+            const event = String(updatedRole._roleEvent ?? '').trim();
+            if (!roleName || !event) {
+                showError('Role name and event are required');
+                return;
+            }
+            const existingRoles = parentFrame.draft.match?.roles ?? {};
+            const currentName = role?.name;
+            if (roleName !== currentName && existingRoles[roleName]) {
+                showError('Role name already exists');
+                return;
+            }
+
+            const formattedRole: TextTemplateEventRoleMatch = { event };
+            if (updatedRole._roleFilters?.length) formattedRole.filters = [...updatedRole._roleFilters];
+            if (updatedRole._roleConditions?.length) formattedRole.conditions = [...updatedRole._roleConditions];
+            if (updatedRole._sameActorAs) formattedRole.sameActorAs = updatedRole._sameActorAs;
+            if (updatedRole._sameTargetAs) formattedRole.sameTargetAs = updatedRole._sameTargetAs;
+            if (updatedRole._sameSubjectAs) formattedRole.sameSubjectAs = updatedRole._sameSubjectAs;
+            if (updatedRole._samePlaceAs) formattedRole.samePlaceAs = updatedRole._samePlaceAs;
+
+            const rolesByName = { ...existingRoles };
+            if (currentName && currentName !== roleName) delete rolesByName[currentName];
+            rolesByName[roleName] = formattedRole;
+
+            parentFrame.draft.match = {
+                primaryRole: parentFrame.draft.match?.primaryRole === currentName ? roleName : (parentFrame.draft.match?.primaryRole ?? roleName),
+                roles: rolesByName
+            };
+        }
     }
 
-    function submitRole() {
-        const roleName = String(roleData._roleName ?? '').trim();
-        const event = String(roleData._roleEvent ?? '').trim();
-        if (!roleName || !event) {
-            showError('Role name and event are required');
-            return;
-        }
-        const existingRoles = data.match?.roles ?? {};
-        const currentName = roleData.name as string | undefined;
-        if (roleName !== currentName && existingRoles[roleName]) {
-            showError('Role name already exists');
-            return;
-        }
-
-        const role: TextTemplateEventRoleMatch = { event };
-        if (roleData._roleFilters?.length) role.filters = [...roleData._roleFilters];
-        if (roleData._roleConditions?.length) role.conditions = [...roleData._roleConditions];
-        if (roleData._sameActorAs) role.sameActorAs = roleData._sameActorAs;
-        if (roleData._sameTargetAs) role.sameTargetAs = roleData._sameTargetAs;
-        if (roleData._sameSubjectAs) role.sameSubjectAs = roleData._sameSubjectAs;
-        if (roleData._samePlaceAs) role.samePlaceAs = roleData._samePlaceAs;
-
-        const rolesByName = { ...existingRoles };
-        if (currentName && currentName !== roleName) delete rolesByName[currentName];
-        rolesByName[roleName] = role;
-        data.match = {
-            primaryRole: data.match?.primaryRole === currentName ? roleName : (data.match?.primaryRole ?? roleName),
-            roles: rolesByName
-        };
-        enableTemplatePage();
-    }
-
-    function deleteRole(role: TemplateRole) {
-        const rolesByName = { ...(data.match?.roles ?? {}) };
+    function deleteRole(parentFrame: any, role: TemplateRole) {
+        const rolesByName = { ...(parentFrame.draft.match?.roles ?? {}) };
         delete rolesByName[role.name];
-        const primaryRole = data.match?.primaryRole === role.name ? Object.keys(rolesByName)[0] ?? '' : data.match?.primaryRole ?? '';
-        data.match = { primaryRole, roles: rolesByName };
+        const primaryRole = parentFrame.draft.match?.primaryRole === role.name ? Object.keys(rolesByName)[0] ?? '' : parentFrame.draft.match?.primaryRole ?? '';
+        parentFrame.draft.match = { primaryRole, roles: rolesByName };
     }
 
-    function activeFormProps(): Record<string, any> {
-        return switcher.getActiveSwitch()?.localData.form ?? {};
-    }
-
-    function isPageEnabled(pageToCheck: Switch) {
-        return switcher.getActiveSwitch() === pageToCheck;
+    function getRolesFromDraft(draft: TemplateData): TemplateRole[] {
+        return Object.entries(draft.match?.roles ?? {}).map(([name, role]) => ({
+            name,
+            ...(role as TextTemplateEventRoleMatch)
+        }));
     }
 </script>
+
+{#snippet renderTemplateForm(frame: any)}
+    {@const roles = getRolesFromDraft(frame.draft)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <InputText id="template-name" label="Name:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
+        <InputTextArea id="template-text" label="Template text:" bind:value={frame.draft.template} required wrapDiv />
+        <InputNumber id="template-priority" label="Priority:" bind:value={frame.draft.priority} required wrapDiv />
+        <InputText id="template-categories" label="Categories (comma separated):" bind:value={frame.draft._categoriesText} autocomplete="off" wrapDiv />
+        <div class="form-group">
+            <h3>Event match</h3>
+            <InputSelect
+                id="template-primary-role"
+                label="Primary role:"
+                bind:selected={frame.draft.match.primaryRole}
+                items={[{ value: '', title: 'Select a role' }, ...roles.map((r) => ({ value: r.name, title: r.name }))]}
+            />
+            {#if roles.length === 0}
+                <p>No event roles configured.</p>
+            {:else}
+                <ObjectTable
+                    items={roles.map((role) => ({
+                        Role: role.name,
+                        Event: role.event,
+                        Filters: role.filters?.join(', ') ?? '',
+                        Conditions: role.conditions?.length ?? 0
+                    }))}
+                    headers={['Role', 'Event', 'Filters', 'Conditions']}
+                    ref={roles}
+                    onEdit={(role) => openRole(frame, role as unknown as TemplateRole)}
+                    onDelete={(role) => deleteRole(frame, role as unknown as TemplateRole)}
+                />
+            {/if}
+            <button type="button" class="nested-button" onclick={() => openRole(frame)}>Add event role</button>
+        </div>
+    </Form>
+{/snippet}
+
+{#snippet renderRoleForm(frame: any)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <InputText id="template-role-name" label="Role name:" bind:value={frame.draft._roleName} required autocomplete="off" wrapDiv />
+        <InputText id="template-role-event" label="Event name:" bind:value={frame.draft._roleEvent} required autocomplete="off" wrapDiv />
+        <InputCard id="template-role-filters" label="Event filters:" items={eventConditions} bind:selectedItems={frame.draft._roleFilters} wrapDiv />
+        <InputText id="template-role-same-actor" label="Same actor as role (optional):" bind:value={frame.draft._sameActorAs} autocomplete="off" wrapDiv />
+        <InputText id="template-role-same-target" label="Same target as role (optional):" bind:value={frame.draft._sameTargetAs} autocomplete="off" wrapDiv />
+        <InputText id="template-role-same-subject" label="Same subject as role (optional):" bind:value={frame.draft._sameSubjectAs} autocomplete="off" wrapDiv />
+        <InputText id="template-role-same-place" label="Same place as role (optional):" bind:value={frame.draft._samePlaceAs} autocomplete="off" wrapDiv />
+        <div class="form-group">
+            <h3>Role conditions</h3>
+            <ListConditions {stack} bind:values={frame.draft._roleConditions} />
+        </div>
+    </Form>
+{/snippet}
 
 <EditorWrapper>
     <div>
@@ -251,70 +290,8 @@
     <ButtonEditorCreate text="New Text Template" onClick={startCreate} />
 </EditorWrapper>
 
-<Popup open={openPopup} title="Text Template" onClose={closePopup}>
-    <Form
-        onSubmit={activeFormProps().onSubmit ?? submitTemplate}
-        onCancel={activeFormProps().onCancel ?? closePopup}
-    >
-        {#if isPageEnabled(templatePage)}
-            <InputText id="template-name" label="Name:" bind:value={data.name!} required autocomplete="off" wrapDiv />
-            <InputTextArea id="template-text" label="Template text:" bind:value={data.template!} required wrapDiv />
-            <InputNumber id="template-priority" label="Priority:" bind:value={data.priority!} required wrapDiv />
-            <InputText id="template-categories" label="Categories (comma separated):" bind:value={data._categoriesText!} autocomplete="off" wrapDiv />
-            <div class="form-group">
-                <h3>Event match</h3>
-                <InputSelect
-                    id="template-primary-role"
-                    label="Primary role:"
-                    bind:selected={data.match!.primaryRole}
-                    items={[{ value: '', title: 'Select a role' }, ...roles().map((role) => ({ value: role.name, title: role.name }))]}
-                />
-                {#if roles().length === 0}
-                    <p>No event roles configured.</p>
-                {:else}
-                    <ObjectTable
-                        items={roles().map((role) => ({
-                            Role: role.name,
-                            Event: role.event,
-                            Filters: role.filters?.join(', ') ?? '',
-                            Conditions: role.conditions?.length ?? 0
-                        }))}
-                        headers={['Role', 'Event', 'Filters', 'Conditions']}
-                        ref={roles()}
-                        onEdit={(role) => openRole(role as unknown as TemplateRole)}
-                        onDelete={(role) => deleteRole(role as unknown as TemplateRole)}
-                    />
-                {/if}
-                <button type="button" class="nested-button" onclick={() => openRole()}>Add event role</button>
-            </div>
-        {:else if isPageEnabled(rolePage)}
-            <InputText id="template-role-name" label="Role name:" bind:value={roleData._roleName!} required autocomplete="off" wrapDiv />
-            <InputText id="template-role-event" label="Event name:" bind:value={roleData._roleEvent!} required autocomplete="off" wrapDiv />
-            <InputCard id="template-role-filters" label="Event filters:" items={eventConditions} bind:selectedItems={roleData._roleFilters!} wrapDiv />
-            <InputText id="template-role-same-actor" label="Same actor as role (optional):" bind:value={roleData._sameActorAs!} autocomplete="off" wrapDiv />
-            <InputText id="template-role-same-target" label="Same target as role (optional):" bind:value={roleData._sameTargetAs!} autocomplete="off" wrapDiv />
-            <InputText id="template-role-same-subject" label="Same subject as role (optional):" bind:value={roleData._sameSubjectAs!} autocomplete="off" wrapDiv />
-            <InputText id="template-role-same-place" label="Same place as role (optional):" bind:value={roleData._samePlaceAs!} autocomplete="off" wrapDiv />
-            <div class="form-group">
-                <h3>Role conditions</h3>
-                <ListConditions
-                    bind:values={roleData._roleConditions}
-                    switcher={switcher}
-                    page={roleConditionsPage}
-                    onCancel={() => rolePage.enablePage()}
-                    onAfterSubmit={() => rolePage.enablePage()}
-                />
-            </div>
-        {:else if isPageEnabled(roleConditionsPage)}
-            <ListConditions
-                bind:values={roleData._roleConditions}
-                switcher={switcher}
-                page={roleConditionsPage}
-                onCancel={() => rolePage.enablePage()}
-                onAfterSubmit={() => rolePage.enablePage()}
-            />
-        {/if}
-    </Form>
+<Popup open={stack.depth > 0} title={stack.current?.title ?? 'Text Template'} onClose={() => stack.reset()}>
+    <ContextHost {stack} />
 </Popup>
 
 <style>

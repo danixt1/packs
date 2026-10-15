@@ -24,6 +24,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (data: EffectFomAction) => void;
         value?: EffectFomAction;
+        stack?: any;
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
@@ -33,6 +34,7 @@
         onCancel,
         onAfterSubmit,
         value = $bindable<EffectFomAction>(),
+        stack,
         autoAttach = $bindable(),
         attachTo,
         writeFormPropsTo = $bindable()

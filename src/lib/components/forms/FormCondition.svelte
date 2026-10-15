@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { ContextStack } from "$lib/shared/contextStack.svelte";
     import { InputSelect, InputText } from "$lib/components/inputs";
     import { showError } from "$lib/notify";
     import type { ConditionalList } from "$lib/types/data/declarative";
@@ -30,6 +31,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (data: ConditionalList) => void;
         value?: ConditionData;
+        stack?: ContextStack;
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
@@ -39,6 +41,7 @@
         onCancel,
         onAfterSubmit,
         value: data = $bindable<ConditionData>({}),
+        stack,
         autoAttach = $bindable(),
         attachTo,
         writeFormPropsTo = $bindable()
@@ -53,7 +56,28 @@
     let activeValue = $derived(activeOperand ? data[activeOperand] : undefined);
     let description = $state(data.description ?? '');
 
+    async function handleStackOperand(name: OperandName) {
+        if (!stack) return;
+        const currentVal = data[name];
+        const isGetter = currentVal && typeof currentVal === 'object' && currentVal.type === 'getter';
+        const initialMode: OperandMode = isGetter ? 'getter' : 'value';
+
+        const result = await stack.push<any, any>({
+            title: `Configure ${name}`,
+            data: { mode: initialMode, val: currentVal },
+            render: renderOperandForm
+        });
+
+        if (result) {
+            data[name] = result;
+        }
+    }
+
     function openOperand(name: OperandName) {
+        if (stack) {
+            handleStackOperand(name);
+            return;
+        }
         activeEditor = name;
         operandValue = data[name];
         operandMode = data[name] && typeof data[name] === 'object' && data[name].type === 'getter' ? 'getter' : 'value';
@@ -128,6 +152,35 @@
         }
     });
 </script>
+
+{#snippet renderOperandForm(frame: any)}
+    {@const currentVal = frame.draft.val}
+    <div class="operand-editor">
+        <InputSelect
+            id="operand-mode"
+            label="Value source:"
+            wrapDiv
+            bind:selected={frame.draft.mode}
+            items={[
+                { title: 'Getter', value: 'getter' },
+                { title: 'Literal value', value: 'value' }
+            ]}
+        />
+        {#if frame.draft.mode === 'getter'}
+            <FormGetter
+                value={typeof currentVal === 'object' && currentVal?.type === 'getter' ? currentVal : {}}
+                onAfterSubmit={(val) => frame.resolve(val)}
+                onCancel={() => frame.cancel()}
+            />
+        {:else}
+            <FormValue
+                value={typeof currentVal === 'object' ? '' : (currentVal ?? '')}
+                onAfterSubmit={(val) => frame.resolve(val)}
+                onCancel={() => frame.cancel()}
+            />
+        {/if}
+    </div>
+{/snippet}
 
 {#snippet inputs()}
     {#if activeEditor === 'condition'}

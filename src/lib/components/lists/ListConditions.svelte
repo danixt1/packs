@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { ContextStack } from "$lib/shared/contextStack.svelte";
     import type { PageSwitch, Switch } from "$lib/shared/pageSwitch";
     import { onDestroy } from "svelte";
     import { showError } from "$lib/notify";
@@ -14,6 +15,7 @@
 
     interface Props {
         values?: ConditionToken[];
+        stack?: ContextStack;
         switcher?: PageSwitch;
         page?: Switch;
         onEdit?: (value: ConditionToken, index: number) => void;
@@ -24,6 +26,7 @@
 
     let {
         values = $bindable<ConditionToken[]>([]),
+        stack,
         switcher = $bindable(),
         page,
         onEdit,
@@ -61,7 +64,39 @@
         values = next;
     }
 
+    async function handleStackCreate() {
+        if (!stack) return;
+        const condition = await stack.push<any, any>({
+            title: 'Add Condition',
+            data: { type: 'condition-relational', operator: '==' },
+            render: renderConditionForm
+        });
+        if (condition) {
+            setItems([...tokens(), condition]);
+            onAfterSubmit?.(condition);
+        }
+    }
+
+    async function handleStackEdit(token: ConditionToken, index: number) {
+        if (!stack || !isConditionObject(token)) return;
+        const condition = await stack.push<any, any>({
+            title: 'Edit Condition',
+            data: $state.snapshot(token),
+            render: renderConditionForm
+        });
+        if (condition) {
+            const next = [...tokens()];
+            next[index] = condition;
+            setItems(next);
+            onAfterSubmit?.(condition);
+        }
+    }
+
     function addCondition() {
+        if (stack) {
+            handleStackCreate();
+            return;
+        }
         if (pageSwitcher) {
             const nextFormData = { type: 'condition-relational', operator: '==' };
             pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
@@ -82,6 +117,10 @@
 
     function editCondition(token: ConditionToken, index: number) {
         if (!isConditionObject(token)) return;
+        if (stack) {
+            handleStackEdit(token, index);
+            return;
+        }
         if (pageSwitcher) {
             const nextFormData = $state.snapshot(token);
             pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
@@ -102,6 +141,14 @@
     }
 
 </script>
+
+{#snippet renderConditionForm(frame: any)}
+    <FormCondition
+        bind:value={frame.draft}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={(condition) => frame.resolve(condition)}
+    />
+{/snippet}
 
 {#if activeForm && pageSwitcher}
     <FormCondition

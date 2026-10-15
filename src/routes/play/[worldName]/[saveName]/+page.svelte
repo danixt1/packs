@@ -372,6 +372,7 @@
 		display: flex;
 		flex-direction: column;
 		max-height: 100%;
+		min-width: 100%;
 	}
 
 	.game-header {

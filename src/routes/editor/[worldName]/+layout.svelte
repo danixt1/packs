@@ -33,40 +33,50 @@
         }
     ];
     let mobileMenuOpen = $state(false);
+
+    function handleWindowKeydown(event: KeyboardEvent) {
+        if (event.key === 'Escape') mobileMenuOpen = false;
+    }
 </script>
+<svelte:window onkeydown={handleWindowKeydown} />
 <div class="flex-contents">
-    <header class="editor-header">
-        <div>
-            <p class="eyebrow">World editor</p>
-            <h1>{page.params.worldName === 'main' ? 'Adventure World' : page.params.worldName}</h1>
-        </div>
-        <button type="button" class="main-menu-button" onclick={() => goto('#/')}>Main menu</button>
-    </header>
-    {#if mobileMenuOpen}
-        <button 
-            class="mobile-menu-toggle" 
-            onclick={() => mobileMenuOpen = !mobileMenuOpen}
-            aria-label="Toggle menu"
-        >
-            ✕
-        </button>
-        <button aria-label="Close menu" class="mobile-menu-backdrop" onclick={() => mobileMenuOpen = false}></button>
-    {:else}
-        <button 
-            class="mobile-menu-toggle-collapsed" 
-            onclick={() => mobileMenuOpen = !mobileMenuOpen}
-            aria-label="Toggle menu"
-        >
-            ☰
-        </button>
-    {/if}
-    <nav class="items-bar" class:open={mobileMenuOpen}>
-        {#each menus as menu}
-            <button onclick={() => { goto("#/editor/"+page.params.worldName+"/"+menu.name); mobileMenuOpen = false; }} class="item-button">
-                {menu.display}
-            </button>
-        {/each}
-    </nav>
+    <div class="editor-chrome" class:menu-open={mobileMenuOpen}>
+        <header class="editor-header">
+            <div>
+                <p class="eyebrow">World editor</p>
+                <h1>{page.params.worldName === 'main' ? 'Adventure World' : page.params.worldName}</h1>
+            </div>
+            <div class="header-actions">
+                <button type="button" class="main-menu-button" onclick={() => goto('#/')}>Main menu</button>
+                <button
+                    type="button"
+                    class="mobile-menu-toggle"
+                    onclick={() => mobileMenuOpen = !mobileMenuOpen}
+                    aria-label="Toggle menu"
+                    aria-expanded={mobileMenuOpen}
+                    aria-controls="editor-navigation"
+                >
+                    {mobileMenuOpen ? '✕' : '☰'}
+                </button>
+            </div>
+        </header>
+        {#if mobileMenuOpen}
+            <button
+                type="button"
+                aria-label="Close menu"
+                tabindex="-1"
+                class="mobile-menu-backdrop"
+                onclick={() => mobileMenuOpen = false}
+            ></button>
+        {/if}
+        <nav id="editor-navigation" class="items-bar" class:open={mobileMenuOpen} aria-label="World editor sections">
+            {#each menus as menu}
+                <button onclick={() => { goto("#/editor/"+page.params.worldName+"/"+menu.name); mobileMenuOpen = false; }} class="item-button">
+                    {menu.display}
+                </button>
+            {/each}
+        </nav>
+    </div>
     <main>
         {@render children()}
     </main>
@@ -78,6 +88,12 @@
         flex-direction:column;
         min-height:100%;
         box-sizing:border-box;
+    }
+    .editor-chrome{
+        position:relative;
+    }
+    .editor-chrome.menu-open{
+        z-index:1001;
     }
     .editor-header{
         display:flex;
@@ -116,6 +132,12 @@
         border-color:var(--border-strong);
         background:var(--bg-card-hover);
     }
+    .header-actions{
+        display:flex;
+        align-items:center;
+        gap:0.5rem;
+        flex-shrink:0;
+    }
     .items-bar{
         display:flex;
         flex-direction:row;
@@ -125,12 +147,12 @@
         gap:2px;
     }
     .mobile-menu-toggle{
-        position:fixed;
-        top:8px;
-        left:8px;
-        z-index:1001;
-        width:44px;
-        height:44px;
+        display:none;
+        align-items:center;
+        justify-content:center;
+        width:2.4rem;
+        height:2.4rem;
+        padding:0;
         border:none;
         border-radius:8px;
         background:var(--bg-button);
@@ -139,21 +161,8 @@
         cursor:pointer;
         box-shadow: 0 2px 8px rgba(0,0,0,0.3);
     }
-    .mobile-menu-toggle-collapsed{
-        display:none;
-        position:fixed;
-        top:60px;
-        left:8px;
-        z-index:1001;
-        width:44px;
-        height:44px;
-        border:none;
-        border-radius:8px;
-        background:var(--bg-button);
-        color:var(--color-text);
-        font-size:20px;
-        cursor:pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    .mobile-menu-toggle:hover{
+        background:var(--bg-card-hover);
     }
     .mobile-menu-backdrop{
         display:none;
@@ -194,39 +203,63 @@
         background-color:var(--bg-button);
     }
     @media (max-width: 640px) {
-        .mobile-menu-toggle-collapsed{
+        .editor-chrome.menu-open .editor-header{
+            position:relative;
+            z-index:1003;
+            background:var(--bg-panel-solid);
+        }
+        .mobile-menu-toggle{
             display:flex;
-            align-items:center;
-            justify-content:center;
         }
         .mobile-menu-backdrop{
             display:block;
+            position:fixed;
+            inset:0;
+            z-index:1000;
+            border:0;
+            padding:0;
+            background:rgba(0,0,0,0.55);
+            cursor:default;
         }
         .items-bar{
-            position:fixed;
-            top:0;
-            left:0;
-            height:100%;
-            width:200px;
+            position:absolute;
+            top:100%;
+            right:clamp(1rem, 3vw, 2rem);
+            z-index:1002;
+            box-sizing:border-box;
+            width:min(18rem, calc(100vw - 2rem));
+            max-height:calc(100vh - 5rem);
+            max-height:calc(100dvh - 5rem);
+            flex-direction:column;
+            flex-wrap:nowrap;
             margin:0;
-            padding-top:52px;
-            background:var(--bg-base);
-            border-right:1px solid var(--border-subtle);
-            transform:translateX(-100%);
-            transition:transform 0.25s ease;
-            z-index:1000;
+            overflow-y:auto;
+            overscroll-behavior:contain;
+            padding:0.5rem;
+            border:1px solid var(--border-subtle);
+            border-radius:0.65rem;
+            background:var(--bg-panel-solid);
+            box-shadow:0 0.75rem 2rem rgba(0,0,0,0.35);
+            opacity:0;
+            visibility:hidden;
+            pointer-events:none;
+            transform:translateY(-0.5rem);
+            transition:opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
         }
         .items-bar.open{
-            transform:translateX(0);
-        }
-        main{
-            padding-top:52px;
-        }
-        .editor-header{
-            padding-left:1rem;
+            opacity:1;
+            visibility:visible;
+            pointer-events:auto;
+            transform:translateY(0);
         }
         .editor-header h1{
             font-size:1rem;
+        }
+        .item-button{
+            width:100%;
+            box-sizing:border-box;
+            margin:0;
+            border-radius:4px;
         }
     }
 </style>

@@ -11,16 +11,26 @@
     interface Props {
         onCancel?: () => void;
         onAfterSubmit?: (data:VariableDeclarator) => void;
-        value?:Record<string,any>;
+        value?: Record<string,any>;
         /** Index of the variable being edited, or null when creating one. */
         editing?: number | null;
+        /** Existing variable names to check for collisions against */
+        existingNames?: string[];
         /** Automatic modify the data in some object with properties `vars`, while respecting edit/add rules.*/
-        autoAttach?:Record<string,any>;
+        autoAttach?: Record<string,any>;
         /** Instead of making a Form pass the property who should by passed to Form*/
-        writeFormPropsTo?:Record<string,any>;
-        //onFinish?:()=>void
+        writeFormPropsTo?: Record<string,any>;
     }
-    let { onCancel, onAfterSubmit, value:data = $bindable({}), editing = null, autoAttach,writeFormPropsTo = $bindable()}: Props = $props();
+    let {
+        onCancel,
+        onAfterSubmit,
+        value: data = $bindable({}),
+        editing = null,
+        existingNames,
+        autoAttach,
+        writeFormPropsTo = $bindable()
+    }: Props = $props();
+
     $effect(()=>{
         if(!writeFormPropsTo){
             return;
@@ -37,10 +47,22 @@
         }
     })
     function onSubmit(){
-        if(data.name!.includes(' ')){
+        const trimmedName = String(data.name ?? '').trim();
+        if(!trimmedName){
+            showError('Variable name cannot be empty');
+            return;
+        }
+        if(trimmedName.includes(' ')){
             showError('Variable name cannot have spaces');
             return;
         }
+
+        // Direct collision check if existingNames is supplied (from ContextStack)
+        if (existingNames && existingNames.includes(trimmedName)) {
+            showError('Already exists another variable with this name!');
+            return;
+        }
+
         if(autoAttach){
             const finalData = $state.snapshot(data);
             let attachTo = autoAttach;
