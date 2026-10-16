@@ -1,13 +1,10 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
-    import { showError } from "$lib/notify";
     import FormCondition from "../forms/FormCondition.svelte";
     import OrderedList from "./OrderedList.svelte";
     import {
-        canAppend,
         describeToken,
         isConditionObject,
-        validateConditionalList,
         type ConditionToken
     } from "$lib/shared/conditionalList";
 
@@ -79,7 +76,6 @@
     }
 
     function addToken(token: ConditionToken) {
-        if (!canAppend(tokens(), token)) return;
         setItems([...tokens(), token]);
     }
 
@@ -104,20 +100,17 @@
 <div class="condition-list">
     <div class="toolbar">
         <button type="button" onclick={addCondition}>Add Condition</button>
-        <button type="button" disabled={!canAppend(tokens(), 'AND')} onclick={() => addToken('AND')}>AND</button>
-        <button type="button" disabled={!canAppend(tokens(), 'OR')} onclick={() => addToken('OR')}>OR</button>
-        <button type="button" disabled={!canAppend(tokens(), 'NOT')} onclick={() => addToken('NOT')}>NOT</button>
-        <button type="button" disabled={!canAppend(tokens(), '(')} onclick={() => addToken('(')}>(</button>
-        <button type="button" disabled={!canAppend(tokens(), ')')} onclick={() => addToken(')')}>)</button>
+        <button type="button" onclick={() => addToken('AND')}>AND</button>
+        <button type="button" onclick={() => addToken('OR')}>OR</button>
+        <button type="button" onclick={() => addToken('NOT')}>NOT</button>
+        <button type="button" onclick={() => addToken('(')}>(</button>
+        <button type="button" onclick={() => addToken(')')}>)</button>
     </div>
 
     <OrderedList
         bind:values={values}
         getLabel={describeToken}
         onEdit={stack || onEdit ? editCondition : undefined}
-        validateChange={(next) => validateConditionalList(next).valid}
-        onInvalidChange={showError}
-        invalidChangeMessage="That change would make the expression invalid."
         emptyText="No conditions yet. Add a condition to start."
     />
 </div>

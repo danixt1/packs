@@ -9,6 +9,7 @@
     import ListConditions from "../lists/ListConditions.svelte";
     import ListEffects from "../lists/ListEffects.svelte";
     import { InputNumber, InputSelect, InputSwitch, InputText } from "../inputs";
+    import { validateConditionalList, type ConditionToken } from "$lib/shared/conditionalList";
 
     type EffectType = EffectFomAction['type'];
     type PrimitiveValue = string | number | boolean;
@@ -126,6 +127,11 @@
         if (data.type === 'conditional') {
             data.conditions ??= [];
             data.onTrue ??= [];
+            const conditions = validateConditionalList(data.conditions as ConditionToken[]);
+            if (!conditions.valid) {
+                showError(`Conditional effect conditions are invalid: ${conditions.reason ?? 'invalid expression'}`);
+                return;
+            }
             if (!data.onTrue.length) {
                 showError('Add at least one effect to the true branch');
                 return;

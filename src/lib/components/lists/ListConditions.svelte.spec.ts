@@ -39,3 +39,14 @@ test('delegates create and edit actions when no ContextStack is supplied', async
     await screen.getByRole('button', { name: 'Add Condition' }).click();
     expect(onCreatePressed).toHaveBeenCalledOnce();
 });
+
+test('allows condition tokens in any order while editing', async () => {
+    const screen = await render(ListConditions, { values: [] });
+
+    const andButton = screen.getByRole('button', { name: 'AND' });
+    await expect.element(andButton).not.toBeDisabled();
+    await andButton.click();
+
+    await expect.element(screen.getByText('No conditions yet. Add a condition to start.')).not.toBeInTheDocument();
+    await expect.element(screen.getByRole('button', { name: 'OR' })).not.toBeDisabled();
+});

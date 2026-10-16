@@ -6,6 +6,7 @@
     import { InputSelect, InputText } from "../inputs";
     import FormGetter from "./FormGetter.svelte";
     import ListConditions from "../lists/ListConditions.svelte";
+    import { validateConditionalList, type ConditionToken } from "$lib/shared/conditionalList";
 
     type CollectorKind = 'character'|'place'| 'item' | 'self' | 'connectedPlaces';
     const ENTS = ['character','place','item'];
@@ -25,7 +26,7 @@
         onCancel,
         onAfterSubmit
     }: Props = $props();
-    let collectIf = $state<any[]>([]);
+    let collectIf = $state<ConditionToken[]>([]);
 
     let fromPlaceId = $state<string | Record<string, any>>('');
     let fromGetterPlace = $state<Record<string, any>>({});
@@ -81,6 +82,11 @@
             }
             result = { type: 'collector', target: 'connectedPlaces', fromPlaceId: source as any };
         } else {
+            const conditions = validateConditionalList(collectIf);
+            if (!conditions.valid) {
+                showError(`Collector conditions are invalid: ${conditions.reason ?? 'invalid expression'}`);
+                return;
+            }
             result = { type: 'collector', target:value.target, collectIf } as CollectorToGet;
         }
 
