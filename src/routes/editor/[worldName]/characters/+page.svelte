@@ -188,7 +188,7 @@
 
 {#snippet renderAutonomyForm(frame: any)}
     <FormAutonomy
-        value={frame.draft}
+        bind:value={frame.draft}
         {stack}
         actions={editor.getActions()}
         onCancel={() => frame.cancel()}
