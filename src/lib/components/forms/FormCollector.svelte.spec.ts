@@ -1,22 +1,20 @@
 import { expect, test } from 'vitest';
 import { render } from 'vitest-browser-svelte';
-import FormCollector from './FormCollector.svelte';
+import FormCollectorStackHarness from './__tests__/FormCollectorStackHarness.svelte';
 
 test('opens the conditions editor for an entity collector', async () => {
-    const screen = await render(FormCollector, {
-        value: { type: 'collector', target: 'character', collectIf: [] }
-    });
+    const screen = await render(FormCollectorStackHarness);
 
+    await screen.getByRole('button', { name: 'Open collector' }).click();
     await screen.getByRole('button', { name: /Configure conditions/ }).click();
 
     await expect.element(screen.getByRole('button', { name: 'Add Condition' })).toBeVisible();
 });
 
 test('opens the condition form after clicking Add Condition', async () => {
-    const screen = await render(FormCollector, {
-        value: { type: 'collector', target: 'character', collectIf: [] }
-    });
+    const screen = await render(FormCollectorStackHarness);
 
+    await screen.getByRole('button', { name: 'Open collector' }).click();
     await screen.getByRole('button', { name: /Configure conditions/ }).click();
     await screen.getByRole('button', { name: 'Add Condition' }).click();
 

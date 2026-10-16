@@ -1,8 +1,6 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
-    import type { PageSwitch } from "$lib/shared/pageSwitch";
     import type { VariableDeclarator } from "$lib/types/data/declarative";
-    import { onDestroy } from "svelte";
     import FormVar from "../forms/FormVar.svelte";
     import ObjectTable from "../ObjectTable.svelte";
 
@@ -10,48 +8,27 @@
         values: Record<string,any>[];
         /** ContextStack is preferred for isolated, recursive stack navigation */
         stack?: ContextStack;
-        /** Legacy switcher support for unmigrated routes */
-        switcher?: PageSwitch;
-        /** What happens when clicking edit, adding `switcher` or `stack` invalidates that */
+        /** What happens when clicking edit without a ContextStack */
         onEdit?: (v:Record<string,any>,index:number) => void;
-        /** Works only with `switcher` */
         onCancel?:() => void;
-        /** Works only with `switcher` */
         onAfterSubmit?:(data:Record<string,any>) => void;
         /** Insert the button create and call this variable when it's clicked */
         onCreatePressed?:() => void;
+        title?:string;
     }
     let {
         values = $bindable([]),
         stack,
-        switcher = $bindable(),
         onEdit,
         onCancel,
         onAfterSubmit,
-        onCreatePressed
+        onCreatePressed,
+        title = 'Variables'
     }: Props = $props();
-
-    let formData = $state<Record<string,any>>({});
-    let editing = $state<number | null>(null);
-    let obj = $derived({vars:values});
-    let pageSwitcher = $state(switcher ? switcher.createSwitch() : null);
-
-    onDestroy(()=>{
-        pageSwitcher?.remove();
-    });
 
     $effect(()=>{
         if(values === undefined){
             values = [];
-        }
-    });
-
-    $effect(()=>{
-        if(!pageSwitcher){
-            return;
-        }
-        if(!pageSwitcher.localData.form){
-            pageSwitcher.localData.form = {};
         }
     });
 
@@ -68,6 +45,9 @@
         });
         if (result) {
             values = [...values, result];
+            onAfterSubmit?.(result);
+        } else {
+            onCancel?.();
         }
     }
 
@@ -86,6 +66,9 @@
         });
         if (result) {
             values = values.map((item, i) => (i === index ? result : item));
+            onAfterSubmit?.(result);
+        } else {
+            onCancel?.();
         }
     }
 </script>
@@ -100,66 +83,41 @@
 {/snippet}
 
 <div class="form-group">
-    {#if pageSwitcher && pageSwitcher.isPageEnabled}
-        <FormVar 
-            bind:value={formData} 
-            editing={editing}
-            onCancel={()=>{editing = null; onCancel?.()}} 
-            bind:writeFormPropsTo={pageSwitcher.localData.form}
-            autoAttach={obj}
-            onAfterSubmit={(v)=>{
-                onAfterSubmit?.(v);
-                editing = null;
-                obj = {vars:values}
+    <h3>{title}</h3>
+    {#if !values || values.length === 0}
+        <p>No variables to show.</p>
+    {:else}
+        <ObjectTable
+            items={values.map((v) => {
+                return {
+                    Name: v.name,
+                    Type: v.type,
+                    Value: v.type == 'string' ? `"${v.value}"` : v.value
+                }
+            })}
+            headers={["Name", "Type", "Value"]}
+            ref={values}
+            onEdit={(v)=>{
+                const editPos = values.findIndex((e) => e.name === v.name);
+                if (stack && editPos >= 0) {
+                    handleStackEdit(editPos);
+                } else {
+                    onEdit?.(v,editPos);
+                }
+            }}
+            onDelete={(v)=>{
+                values = values.filter((e)=>e.name !=v.name);
             }}
         />
-    {:else}
-        <h3>Variables</h3>
-        {#if !values || values.length === 0}
-            <p>No variables to show.</p>
-        {:else}
-            <ObjectTable  
-                items={values.map((v) => {
-                    return {   
-                        Name: v.name,
-                        Type: v.type,
-                        Value: v.type == 'string' ? `"${v.value}"` : v.value
-                    }
-                })}
-                headers={["Name", "Type", "Value"]}
-                ref={values}
-                onEdit={(v)=>{
-                    const editPos = values.findIndex((e) => e.name === v.name);
-                    if (stack && editPos >= 0) {
-                        handleStackEdit(editPos);
-                    } else if (pageSwitcher && editPos >= 0) {
-                        editing = editPos;
-                        formData = $state.snapshot(v);
-                        pageSwitcher.enablePage();
-                    } else {
-                        onEdit?.(v,editPos);
-                    }
-                }}
-                onDelete={(v)=>{
-                    values = values.filter((e)=>e.name !=v.name);
-                }}
-            />
-        {/if}
-        {#if stack || pageSwitcher || onCreatePressed}
-            <button type="button" class="btn btn-primary" onclick={()=>{
-                if (stack) {
-                    handleStackCreate();
-                    return;
-                }
-                if(pageSwitcher){
-                    editing = null;
-                    formData = {};
-                    pageSwitcher.enablePage();
-                    return;
-                }
-                if(onCreatePressed)onCreatePressed();
-            }}>New Variable</button>
-        {/if}
+    {/if}
+    {#if stack || onCreatePressed}
+        <button type="button" class="btn btn-primary" onclick={()=>{
+            if (stack) {
+                handleStackCreate();
+                return;
+            }
+            onCreatePressed?.();
+        }}>New Variable</button>
     {/if}
 </div>
 <style>

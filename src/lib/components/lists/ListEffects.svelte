@@ -1,7 +1,5 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
-    import type { PageSwitch, Switch } from "$lib/shared/pageSwitch";
-    import { onDestroy } from "svelte";
     import type { EffectFomAction } from "$lib/types/data/declarative";
     import FormEffect from "../forms/FormEffect.svelte";
     import OrderedList from "./OrderedList.svelte";
@@ -9,10 +7,6 @@
     interface Props {
         values?: EffectFomAction[];
         stack?: ContextStack;
-        switcher?: PageSwitch;
-        page?: Switch;
-        /** Non-serialized identity used when several effect lists share a PageSwitch. */
-        scope?: string;
         onEdit?: (value: EffectFomAction, index: number) => void;
         onCancel?: () => void;
         onAfterSubmit?: (value: EffectFomAction) => void;
@@ -22,45 +16,13 @@
     let {
         values = $bindable<EffectFomAction[]>([]),
         stack,
-        switcher = $bindable(),
-        page,
-        scope,
         onEdit,
         onCancel,
         onAfterSubmit,
         onCreatePressed
     }: Props = $props();
 
-    const FORM_DATA_KEY = 'effectFormData';
-    const EDITING_KEY = 'effectEditing';
-
-    let formData = $state<EffectFomAction | undefined>();
-    let editing = $state<number | null>(null);
-    let pageSwitcher = $state<Switch | null>(null);
     let items = $state<EffectFomAction[]>([]);
-    let ownsPageSwitcher = $state(false);
-
-    $effect(() => {
-        if (!pageSwitcher && page) {
-            pageSwitcher = page;
-            ownsPageSwitcher = false;
-            formData = page.localData[FORM_DATA_KEY] as EffectFomAction | undefined;
-            editing = page.localData[EDITING_KEY] ?? null;
-            return;
-        }
-        if (!pageSwitcher && switcher) {
-            pageSwitcher = switcher.createSwitch({
-                in:{type:'list',name:'effect', scope}, form:{}
-            }, scope);
-            ownsPageSwitcher = true;
-        }
-    });
-
-    onDestroy(() => {
-        if (ownsPageSwitcher) {
-            pageSwitcher?.remove();
-        }
-    });
 
     $effect(() => {
         const incoming = values ?? [];
@@ -85,6 +47,8 @@
         if (result) {
             setItems([...items, result]);
             onAfterSubmit?.(result);
+        } else {
+            onCancel?.();
         }
     }
 
@@ -100,21 +64,14 @@
             next[index] = result;
             setItems(next);
             onAfterSubmit?.(result);
+        } else {
+            onCancel?.();
         }
     }
 
     function addEffect() {
         if (stack) {
             handleStackCreate();
-            return;
-        }
-        if (pageSwitcher) {
-            const nextFormData: EffectFomAction = { type: 'event', event: '' };
-            pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
-            pageSwitcher.localData[EDITING_KEY] = null;
-            editing = null;
-            formData = nextFormData;
-            pageSwitcher.enablePage();
             return;
         }
         onCreatePressed?.();
@@ -125,21 +82,11 @@
             handleStackEdit(effect, index);
             return;
         }
-        if (pageSwitcher) {
-            const nextFormData = $state.snapshot(effect);
-            pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
-            pageSwitcher.localData[EDITING_KEY] = index;
-            editing = index;
-            formData = nextFormData;
-            pageSwitcher.enablePage();
-            return;
-        }
         onEdit?.(effect, index);
     }
 
-    function deleteEffect(effect: EffectFomAction, index: number){
-        items.splice(index,1);
-        values.splice(index,1);
+    function deleteEffect(_: EffectFomAction, index: number) {
+        setItems(items.filter((__, itemIndex) => itemIndex !== index));
     }
 
     function label(effect: EffectFomAction): string {
@@ -167,35 +114,16 @@
     />
 {/snippet}
 
-{#if pageSwitcher && pageSwitcher.isPageEnabled}
-    <FormEffect
-        bind:value={formData}
-        bind:writeFormPropsTo={pageSwitcher.localData.form}
-        onCancel={() => {
-            editing = null;
-            onCancel?.();
-        }}
-        onAfterSubmit={(effect) => {
-            const next = [...items];
-            if (editing === null) next.push(effect);
-            else next[editing] = effect;
-            setItems(next);
-            editing = null;
-            onAfterSubmit?.(effect);
-        }}
+<div class="effect-list form-group">
+    <OrderedList
+        bind:values={items}
+        getLabel={label}
+        onEdit={stack || onEdit ? editEffect : undefined}
+        onDelete={deleteEffect}
+        emptyText="No effects yet. Add an effect to start."
     />
-{:else}
-    <div class="effect-list form-group">
-        <OrderedList
-            bind:values={items}
-            getLabel={label}
-            onEdit={editEffect}
-            onDelete={deleteEffect}
-            emptyText="No effects yet. Add an effect to start."
-        />
-        <button type="button" class="add-button" onclick={addEffect}>Add Effect</button>
-    </div>
-{/if}
+    <button type="button" class="add-button" onclick={addEffect}>Add Effect</button>
+</div>
 
 <style>
     .effect-list {

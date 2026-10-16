@@ -81,11 +81,12 @@
 
     async function handleStackConditions() {
         if (!stack) return;
-        await stack.push<any, any>({
+        const result = await stack.push<any, any>({
             title: 'Configure Conditions',
             data: collectIf,
             render: renderConditionsForm
         });
+        if (result) collectIf = result;
     }
 
     async function handleStackGetter() {
@@ -176,12 +177,9 @@
 </script>
 
 {#snippet renderConditionsForm(frame: any)}
-    <ListConditions
-        bind:values={collectIf}
-        {stack}
-        onCancel={() => frame.cancel()}
-        onAfterSubmit={() => frame.resolve(collectIf)}
-    />
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <ListConditions bind:values={frame.draft} {stack} />
+    </Form>
 {/snippet}
 
 {#snippet renderGetterForm(frame: any)}
@@ -256,7 +254,7 @@
     {:else if activeNested === 'conditions'}
         <ListConditions
             bind:values={collectIf}
-            switcher={nestedSwitcher}
+            {stack}
             onCancel={closeNested}
             onAfterSubmit={closeNested}
         />

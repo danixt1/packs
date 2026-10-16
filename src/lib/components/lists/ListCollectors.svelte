@@ -1,7 +1,5 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
-    import type { PageSwitch, Switch } from "$lib/shared/pageSwitch";
-    import { onDestroy } from "svelte";
     import type { CollectorToGet } from "$lib/types/data/declarative";
     import FormCollector from "../forms/FormCollector.svelte";
     import OrderedList from "./OrderedList.svelte";
@@ -9,8 +7,7 @@
     interface Props {
         values?: CollectorToGet[];
         stack?: ContextStack;
-        switcher?: PageSwitch;
-        page?: Switch;
+        onEdit?: (value: CollectorToGet, index: number) => void;
         onCancel?: () => void;
         onAfterSubmit?: (value: CollectorToGet) => void;
         onCreatePressed?: () => void;
@@ -19,42 +16,16 @@
     let {
         values = $bindable<CollectorToGet[]>([]),
         stack,
-        switcher = $bindable(),
-        page,
+        onEdit,
         onCancel,
         onAfterSubmit,
         onCreatePressed
     }: Props = $props();
 
-    const FORM_DATA_KEY = 'collectorFormData';
-    const EDITING_KEY = 'collectorEditing';
-    const pageSwitcher = page ?? (switcher ? switcher.createSwitch({ type: 'list', name: 'collector' }, 'collectors') : null);
-    const ownsPageSwitcher = !page;
-    let formData = $state<CollectorToGet | undefined>(pageSwitcher?.localData[FORM_DATA_KEY]);
-    let editing = $state<number | null>(pageSwitcher?.localData[EDITING_KEY] ?? null);
-
-    onDestroy(() => {
-        if (ownsPageSwitcher) pageSwitcher?.remove();
-    });
-
     function describeCollector(value: CollectorToGet): string {
         if (value.target === 'self') return 'Self';
         if (value.target === 'connectedPlaces') return 'Connected places';
         return `Collect ${value.target}`;
-    }
-
-    function setPendingEdit(nextFormData: CollectorToGet, nextEditing: number | null) {
-        formData = nextFormData;
-        editing = nextEditing;
-        if (!pageSwitcher) return;
-        pageSwitcher.localData[FORM_DATA_KEY] = nextFormData;
-        pageSwitcher.localData[EDITING_KEY] = nextEditing;
-    }
-
-    function clearPendingEdit() {
-        if (!pageSwitcher) return;
-        delete pageSwitcher.localData[FORM_DATA_KEY];
-        delete pageSwitcher.localData[EDITING_KEY];
     }
 
     async function handleStackCreate() {
@@ -67,6 +38,8 @@
         if (result) {
             values = [...values, result];
             onAfterSubmit?.(result);
+        } else {
+            onCancel?.();
         }
     }
 
@@ -82,17 +55,14 @@
             next[index] = result;
             values = next;
             onAfterSubmit?.(result);
+        } else {
+            onCancel?.();
         }
     }
 
     function addCollector() {
         if (stack) {
             handleStackCreate();
-            return;
-        }
-        if (pageSwitcher) {
-            setPendingEdit({ type: 'collector', target: 'character', collectIf: [] }, null);
-            pageSwitcher.enablePage();
             return;
         }
         onCreatePressed?.();
@@ -103,9 +73,7 @@
             handleStackEdit(value, index);
             return;
         }
-        if (!pageSwitcher) return;
-        setPendingEdit($state.snapshot(value), index);
-        pageSwitcher.enablePage();
+        onEdit?.(value, index);
     }
 
     function deleteCollector(_: CollectorToGet, index: number) {
@@ -122,37 +90,16 @@
     />
 {/snippet}
 
-{#if pageSwitcher && pageSwitcher.isPageEnabled}
-    <FormCollector
-        bind:value={formData}
-        bind:writeFormPropsTo={pageSwitcher.localData.form}
-        onCancel={() => {
-            editing = null;
-            clearPendingEdit();
-            onCancel?.();
-        }}
-        onAfterSubmit={(collector) => {
-            const next = [...values];
-            if (editing === null) next.push(collector);
-            else next[editing] = collector;
-            values = next;
-            editing = null;
-            clearPendingEdit();
-            onAfterSubmit?.(collector);
-        }}
+<div class="collector-list">
+    <OrderedList
+        bind:values={values}
+        getLabel={describeCollector}
+        onEdit={stack || onEdit ? editCollector : undefined}
+        onDelete={deleteCollector}
+        emptyText="No collectors yet. Add a target collector to start."
     />
-{:else}
-    <div class="collector-list">
-        <OrderedList
-            bind:values={values}
-            getLabel={describeCollector}
-            onEdit={editCollector}
-            onDelete={deleteCollector}
-            emptyText="No collectors yet. Add a target collector to start."
-        />
-        <button type="button" class="add-button" onclick={addCollector}>Add Collector</button>
-    </div>
-{/if}
+    <button type="button" class="add-button" onclick={addCollector}>Add Collector</button>
+</div>
 
 <style>
     .collector-list {

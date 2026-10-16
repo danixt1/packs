@@ -10,6 +10,7 @@
     import ListConditions from "../lists/ListConditions.svelte";
     import ListEffects from "../lists/ListEffects.svelte";
     import { InputNumber, InputSelect, InputSwitch, InputText } from "../inputs";
+    import type { ContextStack } from "$lib/shared/contextStack.svelte";
 
     type EffectType = EffectFomAction['type'];
     type PrimitiveValue = string | number | boolean;
@@ -24,7 +25,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (data: EffectFomAction) => void;
         value?: EffectFomAction;
-        stack?: any;
+        stack?: ContextStack;
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
@@ -497,11 +498,11 @@
             onAfterSubmit={closeNested}
         />
     {:else if activeNested === 'conditions'}
-        <ListConditions bind:values={data.conditions} switcher={nestedSwitcher} onCancel={closeNested} onAfterSubmit={closeNested} />
+        <ListConditions bind:values={data.conditions} {stack} onCancel={closeNested} onAfterSubmit={closeNested} />
     {:else if activeNested === 'onTrue'}
-        <ListEffects bind:values={data.onTrue} switcher={nestedSwitcher} onCancel={closeNested} onAfterSubmit={closeNested} />
+        <ListEffects bind:values={data.onTrue} {stack} onCancel={closeNested} onAfterSubmit={closeNested} />
     {:else if activeNested === 'onFalse'}
-        <ListEffects bind:values={data.onFalse} switcher={nestedSwitcher} onCancel={closeNested} onAfterSubmit={closeNested} />
+        <ListEffects bind:values={data.onFalse} {stack} onCancel={closeNested} onAfterSubmit={closeNested} />
     {/if}
 {/snippet}
 
