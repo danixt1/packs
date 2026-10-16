@@ -32,15 +32,9 @@
             name:'actions'
         }
     ];
-    let mobileMenuOpen = $state(false);
-
-    function handleWindowKeydown(event: KeyboardEvent) {
-        if (event.key === 'Escape') mobileMenuOpen = false;
-    }
 </script>
-<svelte:window onkeydown={handleWindowKeydown} />
 <div class="flex-contents">
-    <div class="editor-chrome" class:menu-open={mobileMenuOpen}>
+    <div class="editor-chrome">
         <header class="editor-header">
             <div>
                 <p class="eyebrow">World editor</p>
@@ -48,30 +42,11 @@
             </div>
             <div class="header-actions">
                 <button type="button" class="main-menu-button" onclick={() => goto('#/')}>Main menu</button>
-                <button
-                    type="button"
-                    class="mobile-menu-toggle"
-                    onclick={() => mobileMenuOpen = !mobileMenuOpen}
-                    aria-label="Toggle menu"
-                    aria-expanded={mobileMenuOpen}
-                    aria-controls="editor-navigation"
-                >
-                    {mobileMenuOpen ? '✕' : '☰'}
-                </button>
             </div>
         </header>
-        {#if mobileMenuOpen}
-            <button
-                type="button"
-                aria-label="Close menu"
-                tabindex="-1"
-                class="mobile-menu-backdrop"
-                onclick={() => mobileMenuOpen = false}
-            ></button>
-        {/if}
-        <nav id="editor-navigation" class="items-bar" class:open={mobileMenuOpen} aria-label="World editor sections">
+        <nav id="editor-navigation" class="items-bar" aria-label="World editor sections">
             {#each menus as menu}
-                <button onclick={() => { goto("#/editor/"+page.params.worldName+"/"+menu.name); mobileMenuOpen = false; }} class="item-button">
+                <button onclick={() => goto("#/editor/"+page.params.worldName+"/"+menu.name)} class="item-button">
                     {menu.display}
                 </button>
             {/each}
@@ -91,9 +66,6 @@
     }
     .editor-chrome{
         position:relative;
-    }
-    .editor-chrome.menu-open{
-        z-index:1001;
     }
     .editor-header{
         display:flex;
@@ -146,35 +118,11 @@
         padding:8px;
         gap:2px;
     }
-    .mobile-menu-toggle{
-        display:none;
-        align-items:center;
-        justify-content:center;
-        width:2.4rem;
-        height:2.4rem;
-        padding:0;
-        border:none;
-        border-radius:8px;
-        background:var(--bg-button);
-        color:var(--color-text);
-        font-size:20px;
-        cursor:pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .mobile-menu-toggle:hover{
-        background:var(--bg-card-hover);
-    }
-    .mobile-menu-backdrop{
-        display:none;
-        position:fixed;
-        inset:0;
-        background:rgba(0,0,0,0.5);
-        z-index:999;
-    }
     main{
         flex:1;
         width:100%;
         min-height:0;
+        box-sizing:border-box;
         overflow:auto;
     }
     
@@ -203,54 +151,25 @@
         background-color:var(--bg-button);
     }
     @media (max-width: 640px) {
-        .editor-chrome.menu-open .editor-header{
-            position:relative;
-            z-index:1003;
-            background:var(--bg-panel-solid);
-        }
-        .mobile-menu-toggle{
-            display:flex;
-        }
-        .mobile-menu-backdrop{
-            display:block;
-            position:fixed;
-            inset:0;
-            z-index:1000;
-            border:0;
-            padding:0;
-            background:rgba(0,0,0,0.55);
-            cursor:default;
+        main{
+            padding-bottom:calc(6.5rem + env(safe-area-inset-bottom));
+            scroll-padding-bottom:calc(6.5rem + env(safe-area-inset-bottom));
         }
         .items-bar{
-            position:absolute;
-            top:100%;
-            right:clamp(1rem, 3vw, 2rem);
-            z-index:1002;
+            position:fixed;
+            z-index:1000;
+            right:0;
+            bottom:0;
+            left:0;
             box-sizing:border-box;
-            width:min(18rem, calc(100vw - 2rem));
-            max-height:calc(100vh - 5rem);
-            max-height:calc(100dvh - 5rem);
-            flex-direction:column;
-            flex-wrap:nowrap;
+            display:grid;
+            grid-template-columns:repeat(7, minmax(0, 1fr));
+            gap:0.25rem;
             margin:0;
-            overflow-y:auto;
-            overscroll-behavior:contain;
-            padding:0.5rem;
-            border:1px solid var(--border-subtle);
-            border-radius:0.65rem;
+            padding:0.5rem clamp(0.5rem, 2vw, 1rem) calc(0.5rem + env(safe-area-inset-bottom));
+            border-top:1px solid var(--border-subtle);
             background:var(--bg-panel-solid);
-            box-shadow:0 0.75rem 2rem rgba(0,0,0,0.35);
-            opacity:0;
-            visibility:hidden;
-            pointer-events:none;
-            transform:translateY(-0.5rem);
-            transition:opacity 0.2s ease, transform 0.2s ease, visibility 0.2s;
-        }
-        .items-bar.open{
-            opacity:1;
-            visibility:visible;
-            pointer-events:auto;
-            transform:translateY(0);
+            box-shadow:0 -0.5rem 1.5rem rgba(0,0,0,0.25);
         }
         .editor-header h1{
             font-size:1rem;
@@ -258,8 +177,22 @@
         .item-button{
             width:100%;
             box-sizing:border-box;
+            min-width:0;
+            min-height:2.75rem;
+            align-items:center;
+            justify-content:center;
             margin:0;
             border-radius:4px;
+            border-left:0;
+            border-top:3px solid transparent;
+            padding:0.4rem 0.15rem;
+            text-align:center;
+            font-size:0.75rem;
+            line-height:1.15;
+        }
+        .item-button:hover{
+            border-left-color:transparent;
+            border-top-color:var(--color-accent);
         }
     }
 </style>
