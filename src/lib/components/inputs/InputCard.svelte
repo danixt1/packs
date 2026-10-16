@@ -5,7 +5,7 @@
         id: string;
         label: string;
         wrapDiv?: boolean;
-        items: {value:string,title:string}[];
+        items: {value:string,title:string,disabled?:boolean}[];
         selectedItems: string[];
         onChange?:(prop:string,isChecked:boolean)=>void
     }
@@ -29,10 +29,14 @@
         <legend class="def-label">{label}</legend>
         <div class="list">
             {#each items as item (item.value)}
-                <label class:selected={selectedItems.includes(item.value)} class="card-label">
-                    <input type="checkbox" id={item.value} class="card-checkbox" checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
-                    {item.title}
-                </label>
+                {#if item.disabled}
+                    <span class="card-label disabled">{item.title}</span>
+                {:else}
+                    <label class:selected={selectedItems.includes(item.value)} class="card-label">
+                        <input type="checkbox" id={item.value} class="card-checkbox" checked={selectedItems.includes(item.value)} onchange={()=>updateChecked(item.value)} />
+                        {item.title}
+                    </label>
+                {/if}
             {/each}
         </div>
     </fieldset>
@@ -70,11 +74,14 @@
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
         padding: 6px 10px;
     }
+    .disabled{
+        color: var(--color-accent-dim);
+    }
         .card-label.selected {
       background-color: var(--bg-card-hover);
     }
 
-        .card-label.selected {
+    .card-label.selected {
         color: var(--color-text)
     }
 </style>
