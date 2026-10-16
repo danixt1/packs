@@ -4,19 +4,24 @@ import ListCollectorsTestHarness from './__tests__/ListCollectorsTestHarness.sve
 
 test('edits the current collector and keeps its added condition after remounting', async () => {
     const screen = await render(ListCollectorsTestHarness);
-
+    //Collector
     await screen.getByRole('button', { name: 'Edit', exact: true }).first().click();
-    await screen.getByRole('button', { name: /Configure conditions/ }).click();
+    //Collector > Condition
     await screen.getByRole('button', { name: 'Add Condition' }).click();
+    //Collector > Condition > operator left
+    await screen.getByTestId('input-condition-type').selectOptions('condition-relational');
     await screen.getByRole('button', { name: 'left' }).click();
     await screen.getByTestId('input-operand-mode').selectOptions('value');
     await screen.getByTestId('input-value-string').fill('door');
     await screen.getByRole('button', { name: 'Confirm' }).click();
+
+    // Collector > Condition > operator right
+    await screen.getByTestId('input-condition-type').selectOptions('condition-relational');
     await screen.getByRole('button', { name: 'right' }).click();
     await screen.getByTestId('input-operand-mode').selectOptions('value');
     await screen.getByTestId('input-value-string').fill('open');
     await screen.getByRole('button', { name: 'Confirm' }).click();
-    await screen.getByRole('button', { name: 'Confirm' }).click();
+
     await screen.getByRole('button', { name: 'Confirm' }).click();
     await screen.getByRole('button', { name: 'Confirm' }).click();
 
@@ -24,8 +29,9 @@ test('edits the current collector and keeps its added condition after remounting
     await expect.element(screen.getByTestId('condition-count')).toHaveTextContent('1');
     await expect.element(screen.getByText('Collect place')).toBeVisible();
 
+    //Click again in the first element to edit
     await screen.getByRole('button', { name: 'Edit', exact: true }).first().click();
-    await screen.getByRole('button', { name: /Configure conditions \(1\)/ }).click();
+    //Click Edit from the condition
     await screen.getByRole('button', { name: 'Edit', exact: true }).last().click();
     await expect.element(screen.getByRole('button', { name: '"door"' }).first()).toBeVisible();
 

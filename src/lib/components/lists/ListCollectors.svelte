@@ -6,7 +6,7 @@
 
     interface Props {
         values?: CollectorToGet[];
-        stack?: ContextStack;
+        stack: ContextStack;
         onEdit?: (value: CollectorToGet, index: number) => void;
         onCancel?: () => void;
         onAfterSubmit?: (value: CollectorToGet) => void;
