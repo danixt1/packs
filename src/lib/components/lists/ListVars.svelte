@@ -15,6 +15,7 @@
         /** Insert the button create and call this variable when it's clicked */
         onCreatePressed?:() => void;
         title?:string;
+        suggestions?:string[];
     }
     let {
         values = $bindable([]),
@@ -23,7 +24,8 @@
         onCancel,
         onAfterSubmit,
         onCreatePressed,
-        title = 'Variables'
+        title = 'Variables',
+        suggestions
     }: Props = $props();
 
     $effect(()=>{
@@ -75,6 +77,7 @@
 
 {#snippet renderVarForm(frame: any)}
     <FormVar
+        nameSuggestions={suggestions}
         bind:value={frame.draft}
         existingNames={frame.meta?.existingIds}
         onCancel={() => frame.cancel()}

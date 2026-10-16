@@ -20,6 +20,7 @@
         autoAttach?: Record<string,any>;
         /** Instead of making a Form pass the property who should by passed to Form*/
         writeFormPropsTo?: Record<string,any>;
+        nameSuggestions?:string[];
     }
     let {
         onCancel,
@@ -28,7 +29,8 @@
         editing = null,
         existingNames,
         autoAttach,
-        writeFormPropsTo = $bindable()
+        writeFormPropsTo = $bindable(),
+        nameSuggestions
     }: Props = $props();
 
     $effect(()=>{
@@ -92,7 +94,7 @@
 </script>
 {#snippet inputs()}
     <div class="form-group">
-        <InputText id="varName" label="Name" bind:value={data.name} required autocomplete="off" />
+        <InputText id="varName" label="Name" bind:value={data.name} required autocomplete="off" suggestions={nameSuggestions}/>
         <InputSelect id="varType" label="Type" items={[
             {value:'string',title:'String'},
             {value:'number',title:'Number'},

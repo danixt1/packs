@@ -302,7 +302,9 @@ export class WorldEditor {
         switch(effect.type){
             case 'move':
                 this.analyzeGetter(effect.moveId,originOid,sublocation+'-action(move)');
-                this.analyzeGetter(effect.toId,originOid,sublocation+'-action(move)');
+                if(typeof effect.toId !== 'string'){
+                    this.analyzeGetter(effect.toId,originOid,sublocation+'-action(move)');
+                }
                 break;
             case 'conditional':
                 effect.conditions.forEach(e =>typeof e === 'object' ? this.analyzeCondition(e,originOid,sublocation+'-action:condition') : undefined )

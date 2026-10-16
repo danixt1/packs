@@ -21,7 +21,7 @@
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
     let characters = $state(editor.getCharacters());
-
+    let knowVars = $derived(Array.from(new Set(characters.map(e =>e.vars.map(a =>a.name)).flat())))
     const stack = createContextStack();
 
     let charsList = $derived(characters.map((character) => ({
@@ -156,7 +156,7 @@
 
 {#snippet renderCharacterForm(frame: any)}
     <Form onSubmit={submitCharacterForm} onCancel={cancelCharacterForm}>
-        <InputText id="charId" label="ID" bind:value={frame.draft.id} wrapDiv required autocomplete="off" />
+        <InputText id="charId" label="ID" bind:value={frame.draft.id} wrapDiv required autocomplete="off"/>
         <InputText id="charName" label="Name" bind:value={frame.draft.name} wrapDiv required autocomplete="off" />
         <InputSwitch id='controlledByPlayer' label="Controlled by player?" wrapDiv bind:value={frame.draft.controlledByPlayer} />
         <InputCard id="charLabels" label="Labels" items={labelsInfo.map((label) => ({
@@ -174,7 +174,7 @@
                 <button type="button" onclick={() => { delete frame.draft.autonomy; }}>Remove Autonomy</button>
             {/if}
         </BaseInput>
-        <ListVars {stack} bind:values={frame.draft.vars} />
+        <ListVars {stack} bind:values={frame.draft.vars} suggestions={knowVars}/>
     </Form>
 {/snippet}
 

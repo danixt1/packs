@@ -54,6 +54,7 @@ interface InputTextProps extends BaseInput {
     minlength?: number;
     maxlength?: number;
     autocomplete?: FullAutoFill;
+    suggestions?: string[];      // Optional context values filtered as the user types.
 }
 
 // InputTextArea.svelte: multi-line text input.
@@ -99,6 +100,8 @@ interface InputSwitchProps extends BaseInput {
 ```
 
 `InputCard` calls `onChange` whenever an item is selected or unselected. The callback receives the item's `value` and a Boolean indicating whether the item is now selected.
+
+`InputText` can receive an optional `suggestions` array. The input remains editable; the component filters the supplied values by a case-insensitive prefix match, and choosing a suggestion fills the input. The list supports keyboard navigation and touch selection. Pass values from the relevant editor context, for example `<InputText id="place" label="Place" bind:value={placeId} suggestions={availablePlaceIds} />`.
 
 ### Referring to inputs in tests
 
