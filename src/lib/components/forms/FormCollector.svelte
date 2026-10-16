@@ -8,7 +8,6 @@
     import ListConditions from "../lists/ListConditions.svelte";
 
     type CollectorKind = 'character'|'place'| 'item' | 'self' | 'connectedPlaces';
-    type EntityTarget = 'character' | 'place' | 'item';
     const ENTS = ['character','place','item'];
     interface Props {
         value?: CollectorToGet;
@@ -108,10 +107,13 @@
         label="Target:"
         wrapDiv
         bind:selected={value.target}
+        onchange={()=>updateTargetDependency(value.target)}
         items={[
+            { title: 'Self', value: 'self'},
             { title: 'Character', value: 'character' },
             { title: 'Place', value: 'place' },
-            { title: 'Item', value: 'item' }
+            { title: 'Item', value: 'item' },
+            { title: 'Connect Places', value:'connectedPlaces'}
         ]}
     />
     {#if ['character','place','item'].includes(value.target)}
