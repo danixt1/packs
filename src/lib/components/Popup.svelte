@@ -12,11 +12,12 @@
     function dismiss() {
         onClose?.();
     }
+    let isSmarthphone = (()=>typeof navigator.maxTouchPoints === 'number' ? navigator.maxTouchPoints > 0 : false)()
 </script>
 <svelte:window onkeydown={(event) => { if (open && event.key === 'Escape') dismiss(); }} />
 
 {#if open}
-    <div class="popup-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) dismiss(); }}>
+    <div class="popup-backdrop" role="presentation" onclick={(event) => {if(isSmarthphone)return; if (event.target === event.currentTarget) dismiss(); }}>
         <dialog open class="popup" aria-labelledby="object-editor-title">
             <h2 id="object-editor-title">{title ?? 'Create Object'}</h2>
             {@render children()}
