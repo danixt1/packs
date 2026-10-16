@@ -1,8 +1,10 @@
 import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import FormEffect from './FormEffect.svelte';
+import FormEffectStackHarness from './__tests__/FormEffectStackHarness.svelte';
 import type { EffectFomAction } from '$lib/types/data/declarative';
 import { createContextStack } from '$lib/shared/contextStack.svelte';
+import { fillGetter } from './__tests__/testUtils';
 
 const setterEffect: EffectFomAction = {
     type: 'setter',
@@ -16,7 +18,35 @@ const moveEffect: EffectFomAction = {
     moveId: { type: 'getter', in: 'self-variable', variable: 'id' },
     toId: { type: 'getter', in: 'target:place-metadata', variable: 'id' }
 };
+test('add move event using literal toId',async ()=>{
+    const onAfterSubmit = vi.fn();
+    const screen = await render(FormEffectStackHarness, { onAfterSubmit });
 
+    await screen.getByRole('button', { name: 'Open effect' }).click();
+    await screen.getByTestId('input-effect-type').selectOptions('Move');
+    await screen.getByTestId('button-move-moveId').click();
+    //Getter page
+    await fillGetter(screen,'Target','Character','Variable','test');
+
+    await screen.getByTestId('input-effect-move-toId-type').selectOptions('Literal');
+    await screen.getByRole('button',{name:'Edit literal value'}).click();
+
+    await screen.getByTestId('input-value-type').selectOptions('String');
+    await screen.getByTestId('input-value-string').fill('test');
+    await screen.getByRole('button', { name: 'Confirm' }).click();
+
+    await screen.getByRole('button', { name: 'Confirm' }).click();
+    await expect.poll(() => onAfterSubmit.mock.calls.length).toBe(1);
+    expect(onAfterSubmit).toHaveBeenCalledWith({
+        type:'move',
+        moveId:{
+            type:'getter',
+            in:'target:character-variable',
+            variable:'test'
+        },
+        toId:'test'
+    })
+})
 test('adds an event effect from the standalone form', async () => {
     const onAfterSubmit = vi.fn();
     const screen = await render(FormEffect, { stack: createContextStack(), onAfterSubmit });

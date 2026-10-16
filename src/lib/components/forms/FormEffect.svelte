@@ -37,7 +37,7 @@
     let data = $state<Record<string, any>>({});
     let selectedType = $state<EffectType>('event');
     let targetIdMode = $state<'getter' | 'value'>('getter');
-    let literalValue = $state<PrimitiveValue>('');
+    let propLiteralValue = $state<PrimitiveValue>('');
     let randomValue = $state<{ type: 'random-interval' | 'random-value'; min?: number; max?: number; values?: (string | number)[]; tempVarName?: string }>({ type: 'random-value', values: [] });
     let eventContextFields = $state<EventField[]>([]);
     let eventDataFields = $state<EventField[]>([]);
@@ -60,10 +60,11 @@
         selectedType = data.type ?? 'event';
         targetIdMode = data.targetId && typeof data.targetId === 'object' ? 'getter' : 'value';
 
-        const valueIsGetter = data.value?.type === 'getter';
-        const valueIsRandom = ['random-interval', 'random-value'].includes(data.value?.type);
-        literalValue = typeof data.value === 'object' ? '' : (data.value ?? '');
-        randomValue = valueIsRandom ? $state.snapshot(data.value) : { type: 'random-value', values: [] };
+        const configuredValue = data.type === 'move' ? data.toId : data.value;
+        const valueIsGetter = configuredValue?.type === 'getter';
+        const valueIsRandom = ['random-interval', 'random-value'].includes(configuredValue?.type);
+        propLiteralValue = typeof data.value === 'object' ? '' : (data.value ?? '');
+        randomValue = valueIsRandom ? $state.snapshot(configuredValue) : { type: 'random-value', values: [] };
         data._valueKind = valueIsGetter ? 'getter' : valueIsRandom ? 'random' : 'literal';
 
         eventContextFields = Object.entries(data.context ?? {})
@@ -96,7 +97,7 @@
         if (type !== data.type) {
             data = createDefaults(type);
             targetIdMode = 'getter';
-            literalValue = '';
+            propLiteralValue = '';
             randomValue = { type: 'random-value', values: [] };
             data._valueKind = 'literal';
         }
@@ -116,7 +117,8 @@
             showError('Select the variable to modify');
             return;
         }
-        if (data.type === 'move' && (!data.moveId?.type || !data.toId?.type)) {
+        const hasDestination = typeof data.toId === 'string' ? data.toId.trim().length > 0 : data.toId?.type === 'getter';
+        if (data.type === 'move' && (!data.moveId?.type || !hasDestination)) {
             showError('Select the character and destination');
             return;
         }
@@ -192,15 +194,17 @@
         if (result) field.value = result;
     }
 
-    async function handleStackValue() {
+    async function handleStackValue(property:string) {
         const result = await stack.push<PrimitiveValue, PrimitiveValue>({
             title: 'Configure Literal Value',
-            data: typeof data.value === 'object' ? '' : (data.value ?? ''),
+            data: typeof data[property] === 'object' ? '' : (data[property] ?? ''),
             render: renderValueForm
         });
         if (result !== null) {
-            literalValue = result;
-            data.value = result;
+            if(property == 'value'){
+                propLiteralValue = result;
+            }
+            data[property] = result;
         }
     }
 
@@ -246,7 +250,7 @@
 
     $effect(() => {
         if (selectedType === 'setter' && typeof data.value !== 'object') {
-            literalValue = data.value ?? '';
+            propLiteralValue = data.value ?? '';
         }
     });
 </script>
@@ -271,8 +275,18 @@
         </div>
         {#if selectedType === 'move'}
             <div class="form-group">
-                <button type="button" class="nested-button" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>Edit character to move</button>
-                <button type="button" class="nested-button" onclick={() => handleStackGetter('toId', 'Configure Destination')}>Edit destination</button>
+                <button type="button" class="nested-button" data-testid="button-move-moveId" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>Edit character to move</button>
+                <InputSelect id='effect-move-toId-type'
+                bind:selected={data._valueKind} label="Type:"
+                items={[
+                    {title:'Literal',value:'literal'},
+                    {title:'Getter',value:'getter'}
+                ]}/>
+                {#if data._valueKind == 'getter'}
+                    <button type="button" class="nested-button" onclick={()=>handleStackGetter('toId', 'Configure Destination')}>Edit destination</button>
+                {:else}
+                    <button type="button" class="nested-button" onclick={()=>handleStackValue('toId')}>Edit literal value</button>
+                {/if}
             </div>
         {:else if selectedType === 'event'}
             <InputText id="effect-event" label="Event:" wrapDiv bind:value={data.event} autocomplete="off" />
@@ -392,7 +406,7 @@
                         </div>
                     {:else}
                         <div class="form-group">
-                            <button type="button" class="nested-button" onclick={handleStackValue}>Edit literal value</button>
+                            <button type="button" class="nested-button" onclick={()=>handleStackValue('value')}>Edit literal value</button>
                         </div>
                     {/if}
                 </div>

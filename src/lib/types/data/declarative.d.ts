@@ -167,7 +167,7 @@ interface MoveEffect{
     /** Character id to move. Usually `self-metadata:id`. */
     moveId: Getters.Self<Getters.CharacterMetadata>;
     /** Destination id. Character targets resolve to their current place. */
-    toId:Getters.TargetCharacter | Getters.TargetPlace;
+    toId:Getters.TargetCharacter | Getters.TargetPlace | string;
 }
 interface EventContext{
     /**

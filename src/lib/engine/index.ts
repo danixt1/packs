@@ -303,7 +303,7 @@ export function buildActionOptions(world: any, state: RuntimeState, actorId: str
 			options.push({
 				id: [actorId, action.name, buildMode, suffix].join(optionSeparator),
 				name: renderTemplateText(state, action.display?.name ?? action.name, context),
-				description: renderTemplateText(state,action.display?.description ?? action.description,context),
+				description: renderTemplateText(state, action.display?.description ?? action.description ?? '', context),
 				locked: !activationPassed,
 				actionName: action.name,
 				actorId,
