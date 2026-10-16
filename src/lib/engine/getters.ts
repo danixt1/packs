@@ -48,7 +48,9 @@ function getSelf(state: RuntimeState, context: ResolveContext): RuntimeCharacter
 	if (typeof context.self === 'string') return state.characters.find((c) => c.id === context.self);
 	return context.self;
 }
-
+/**
+ * Searchs for target with the passed information.
+ */
 function targetEntity<T extends RuntimeCharacter | RuntimePlace | RuntimeItem>(
 	state: RuntimeState,
 	context: ResolveContext,

@@ -303,7 +303,7 @@ export function buildActionOptions(world: any, state: RuntimeState, actorId: str
 			options.push({
 				id: [actorId, action.name, buildMode, suffix].join(optionSeparator),
 				name: renderTemplateText(state, action.display?.name ?? action.name, context),
-				description: action.display?.description ?? action.description,
+				description: renderTemplateText(state,action.display?.description ?? action.description,context),
 				locked: !activationPassed,
 				actionName: action.name,
 				actorId,
@@ -671,10 +671,11 @@ export function getDialogueView(world: any, state: RuntimeState): DialogueView |
 	const target = state.characters.find((character) => character.id === active.targetId);
 	const self = state.characters.find((character) => character.id === active.selfId);
 	const speaker = node.speaker === 'self' ? self?.name : node.speaker === 'target' ? target?.name : 'Narrator';
+	const ctx = { self: active.selfId, target: { type: 'character', id: active.targetId } as RuntimeTarget }
 	const choices = (node.choices ?? [])
-		.filter((choice: any) => evaluateConditions(state, choice.conditions ?? [], { self: active.selfId, target: { type: 'character', id: active.targetId } }))
+		.filter((choice: any) => evaluateConditions(state, choice.conditions ?? [], ctx))
 		.map((choice: any) => ({ id: choice.id, text: choice.text }));
-	return { id: active.id, speaker: speaker ?? 'Narrator', text: node.text, choices };
+	return { id: active.id, speaker: speaker ?? 'Narrator', text: renderTemplateText(state,node.text,ctx), choices };
 }
 
 function chooseDialogue(world: any, state: RuntimeState, choiceId: string) {
