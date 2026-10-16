@@ -27,14 +27,15 @@
             {title:'Character',value:'character'},
             {title:'Character > Place',value:'character/place'},
             {title:'Place',value:'place'},
-            {title:'Item',value:'item'},
-            {title:'Autonomy',value:'autonomy'}
+            {title:'Item',value:'item'}
         ],
         runtime:[
             {title:'Event',value:'event'},
-            {title:'Action',value:'action'}
+            {title:'Action',value:'action'},
+            {title:'Autonomy',value:'autonomy'}
         ]
     }
+    const NO_TARGET_STRUCTURES = ['world','temp','self']
     const METADATA_OPTS = {
         character:[
             {title:'Id Place',value:'idPlace'},
@@ -175,13 +176,14 @@
             {title:'Self',value:'self'},
             {title:'Target',value:'target'},
             {title:'Runtime',value:'runtime'},
-            {title:'Temporary Slot',value:'temp'}
+            {title:'Temporary Slot',value:'temp'},
+            {title:'World',value:'world'}
         ]} />
-        {#if data._in !== 'temp' && data._in !== 'self'}
+        {#if !NO_TARGET_STRUCTURES.includes(data._in)}
             <InputSelect id={'getter-target'} label={'Object:'} bind:selected={data._target}
             items={objectsOptions}/>
         {/if}
-        {#if data._in != 'temp'}
+        {#if data._in != 'temp' && data._in != 'world'}
             <InputSelect id={'getter-get'} label={'Get:'} bind:selected={data._get}
             items={[
                 {title:'Variable',value:'variable'},
