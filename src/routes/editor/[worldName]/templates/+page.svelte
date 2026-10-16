@@ -252,7 +252,7 @@
 {#snippet renderRoleForm(frame: any)}
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
         <InputText id="template-role-name" label="Role name:" bind:value={frame.draft._roleName} required autocomplete="off" wrapDiv />
-        <InputText id="template-role-event" label="Event name:" bind:value={frame.draft._roleEvent} required autocomplete="off" wrapDiv />
+        <InputText id="template-role-event" label="Event name:" bind:value={frame.draft._roleEvent} required autocomplete="off" wrapDiv suggestions={editor.getListEvents()} />
         <InputCard id="template-role-filters" label="Event filters:" items={eventConditions} bind:selectedItems={frame.draft._roleFilters} wrapDiv />
         <InputText id="template-role-same-actor" label="Same actor as role (optional):" bind:value={frame.draft._sameActorAs} autocomplete="off" wrapDiv />
         <InputText id="template-role-same-target" label="Same target as role (optional):" bind:value={frame.draft._sameTargetAs} autocomplete="off" wrapDiv />

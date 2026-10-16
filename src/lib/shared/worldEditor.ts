@@ -28,6 +28,8 @@ export interface ItemEditor extends Item, itemWithOid{}
 export interface DisplayEditor extends Display, itemWithOid{}
 export interface ActionEditor extends ActionDeclaration, itemWithOid{}
 export class WorldEditor {
+    private listEvents:Set<string> =new Set();
+
     private relationVars:Record<string,VarRelation[]> = {};
     private labelslinks:Record<string,LabelMapper> = {};
     private refsByOID:Record<string,{is:'label'|'var',prop:string}[]> = {};
@@ -276,6 +278,9 @@ export class WorldEditor {
         this.deleteObject(oid);
         selected.call(this,obj);
     }
+    public getListEvents(){
+        return Array.from(this.listEvents);
+    }
     private extractVariablesRefInText(text:string){
         let matchs =text.match(/([^\\]|^)(\$([^$]+)[^\\]\$)/g);
         if(!matchs){
@@ -312,6 +317,7 @@ export class WorldEditor {
                 effect.onTrue.forEach(e => this.analyzeEffect(e,originOid,sublocation + '-action:effect(onTrue)'));
                 break;
             case 'event':
+                this.listEvents.add(effect.event);
                 if(effect.data){
                     for(const value of Object.values(effect.data)){
                         if(typeof value === 'object'){
