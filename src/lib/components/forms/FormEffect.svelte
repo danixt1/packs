@@ -1,8 +1,7 @@
 <script lang="ts">
-    import { createPageSwitch } from "$lib/shared/pageSwitch";
-    import { onDestroy } from "svelte";
     import { showError } from "$lib/notify";
     import type { EffectFomAction } from "$lib/types/data/declarative";
+    import type { ContextFrame, ContextStack } from "$lib/shared/contextStack.svelte";
     import Form from "../Form.svelte";
     import FormGetter from "./FormGetter.svelte";
     import FormRandomValue from "./FormRandomValue.svelte";
@@ -10,7 +9,6 @@
     import ListConditions from "../lists/ListConditions.svelte";
     import ListEffects from "../lists/ListEffects.svelte";
     import { InputNumber, InputSelect, InputSwitch, InputText } from "../inputs";
-    import type { ContextStack } from "$lib/shared/contextStack.svelte";
 
     type EffectType = EffectFomAction['type'];
     type PrimitiveValue = string | number | boolean;
@@ -25,20 +23,14 @@
         onCancel?: () => void;
         onAfterSubmit?: (data: EffectFomAction) => void;
         value?: EffectFomAction;
-        stack?: ContextStack;
-        autoAttach?: Record<string, any>;
-        attachTo?: string;
-        writeFormPropsTo?: Record<string, any>;
+        stack: ContextStack;
     }
 
     let {
         onCancel,
         onAfterSubmit,
         value = $bindable<EffectFomAction>(),
-        stack,
-        autoAttach = $bindable(),
-        attachTo,
-        writeFormPropsTo = $bindable()
+        stack
     }: Props = $props();
 
     let data = $state<Record<string, any>>({});
@@ -46,36 +38,12 @@
     let targetIdMode = $state<'getter' | 'value'>('getter');
     let literalValue = $state<PrimitiveValue>('');
     let randomValue = $state<{ type: 'random-interval' | 'random-value'; min?: number; max?: number; values?: (string | number)[]; tempVarName?: string }>({ type: 'random-value', values: [] });
-    let nestedGetterProps = $state<Record<string, any>>({});
-    let nestedValueProps = $state<Record<string, any>>({});
-    let nestedRandomProps = $state<Record<string, any>>({});
-    let eventFieldGetterProps = $state<Record<string, any>>({});
-    let nestedSwitcher = createPageSwitch();
-    let mainPage = nestedSwitcher.createSwitch({}, 'effect');
-    type NestedEditor =
-        | 'conditions'
-        | 'onTrue'
-        | 'onFalse'
-        | 'moveId'
-        | 'toId'
-        | 'setterVar'
-        | 'setterValue'
-        | 'setterRandom'
-        | 'targetId'
-        | 'eventFieldGetter';
-    let activeNested = $state<NestedEditor | null>(null);
-        
     let eventContextFields = $state<EventField[]>([]);
     let eventDataFields = $state<EventField[]>([]);
     let eventContextTags = $state<string[]>([]);
-    let eventFieldTarget = $state<EventField | null>(null);
 
     let lastValue: EffectFomAction | undefined;
     let hasLoadedValue = false;
-
-    onDestroy(() => {
-        nestedSwitcher.switches.forEach((child) => child.remove());
-    });
 
     const effectOptions = [
         { title: 'Move', value: 'move' },
@@ -91,9 +59,11 @@
         selectedType = data.type ?? 'event';
         targetIdMode = data.targetId && typeof data.targetId === 'object' ? 'getter' : 'value';
 
+        const valueIsGetter = data.value?.type === 'getter';
+        const valueIsRandom = ['random-interval', 'random-value'].includes(data.value?.type);
         literalValue = typeof data.value === 'object' ? '' : (data.value ?? '');
-        randomValue = typeof data.value === 'object' && data.value.type ? $state.snapshot(data.value) : { type: 'random-value', values: [] };
-        data._valueKind = typeof data.value === 'object' ? 'random' : 'literal';
+        randomValue = valueIsRandom ? $state.snapshot(data.value) : { type: 'random-value', values: [] };
+        data._valueKind = valueIsGetter ? 'getter' : valueIsRandom ? 'random' : 'literal';
 
         eventContextFields = Object.entries(data.context ?? {})
             .filter(([key]) => ['actorId', 'targetId', 'subjectId', 'placeId'].includes(key))
@@ -132,18 +102,7 @@
         selectedType = type;
     }
 
-    function submitNestedEditors() {
-        if (activeNested === 'moveId' || activeNested === 'toId' || activeNested === 'setterVar' || activeNested === 'targetId' || activeNested === 'eventFieldGetter') {
-            nestedGetterProps.onSubmit?.();
-        } else if (activeNested === 'setterValue') {
-            nestedValueProps.onSubmit?.();
-        } else if (activeNested === 'setterRandom') {
-            nestedRandomProps.onSubmit?.();
-        }
-    }
-
     function onSubmit() {
-        submitNestedEditors();
         if (!data.type) {
             showError('Select an effect type');
             return;
@@ -205,52 +164,68 @@
         }
         const result = $state.snapshot(data) as Record<string, any>;
         delete result._valueKind;
-        if (autoAttach && attachTo) autoAttach[attachTo] = result;
         value = result as EffectFomAction;
         onAfterSubmit?.(result as EffectFomAction);
     }
 
-    function submitActive() {
-        if (activeNested) {
-            if (activeNested === 'conditions' || activeNested === 'onTrue' || activeNested === 'onFalse') {
-                nestedSwitcher.getActiveSwitch()?.localData.form?.onSubmit?.();
-                return;
-            }
-            submitNestedEditors();
-            return;
-        }
-        const active = nestedSwitcher.getActiveSwitch();
-        if (active && active !== mainPage) {
-            active.localData.form?.onSubmit?.();
-            return;
-        }
-        onSubmit();
+    async function handleStackGetter(property: string, title: string) {
+        const result = await stack.push<Record<string, any>, Record<string, any>>({
+            title,
+            data: data[property]?.type === 'getter' ? data[property] : {},
+            render: renderGetterForm
+        });
+        if (result) data[property] = result;
     }
 
-    function cancelActive() {
-        if (activeNested === 'conditions' || activeNested === 'onTrue' || activeNested === 'onFalse') {
-            nestedSwitcher.getActiveSwitch()?.localData.form?.onCancel?.();
-            return;
-        }
-        if (activeNested) {
-            closeNested();
-            return;
-        }
-        const active = nestedSwitcher.getActiveSwitch();
-        if (active && active !== mainPage) {
-            active.localData.form?.onCancel?.();
-            return;
-        }
-        onCancel?.();
+    async function handleStackEventFieldGetter(field: EventField) {
+        const result = await stack.push<Record<string, any>, Record<string, any>>({
+            title: `Configure ${field.name || 'event'} getter`,
+            data: field.value?.type === 'getter' ? field.value : {},
+            render: renderGetterForm
+        });
+        if (result) field.value = result;
     }
 
-    function openNested(name: NestedEditor) {
-        activeNested = name;
+    async function handleStackValue() {
+        const result = await stack.push<PrimitiveValue, PrimitiveValue>({
+            title: 'Configure Literal Value',
+            data: typeof data.value === 'object' ? '' : (data.value ?? ''),
+            render: renderValueForm
+        });
+        if (result !== null) {
+            literalValue = result;
+            data.value = result;
+        }
     }
 
-    function editEventFieldGetter(field: EventField) {
-        eventFieldTarget = field;
-        activeNested = 'eventFieldGetter';
+    async function handleStackRandomValue() {
+        const result = await stack.push<typeof randomValue, typeof randomValue>({
+            title: 'Configure Random Value',
+            data: ['random-interval', 'random-value'].includes(data.value?.type) ? data.value : randomValue,
+            render: renderRandomValueForm
+        });
+        if (result) {
+            randomValue = result;
+            data.value = result;
+        }
+    }
+
+    async function handleStackConditions() {
+        const result = await stack.push<any[], any[]>({
+            title: 'Configure Conditions',
+            data: data.conditions ?? [],
+            render: renderConditionsForm
+        });
+        if (result) data.conditions = result;
+    }
+
+    async function handleStackEffectBranch(branch: 'onTrue' | 'onFalse') {
+        const result = await stack.push<EffectFomAction[], EffectFomAction[]>({
+            title: `Configure ${branch === 'onTrue' ? 'True' : 'False'} Effects`,
+            data: data[branch] ?? [],
+            render: branch === 'onTrue' ? renderTrueEffectsForm : renderFalseEffectsForm
+        });
+        if (result) data[branch] = result;
     }
 
     function addContextField() {
@@ -263,17 +238,6 @@
         eventDataFields = [...eventDataFields, { name: '', kind: 'literal', valueType: 'string', value: '' }];
     }
 
-    function closeNested() {
-        activeNested = null;
-        mainPage.enablePage();
-    }
-
-    $effect(() => {
-        if (writeFormPropsTo && (writeFormPropsTo.onSubmit !== submitActive || writeFormPropsTo.onCancel !== cancelActive)) {
-            writeFormPropsTo = { ...writeFormPropsTo, onSubmit: submitActive, onCancel: cancelActive };
-        }
-    });
-
     $effect(() => {
         if (selectedType === 'setter' && typeof data.value !== 'object') {
             literalValue = data.value ?? '';
@@ -282,28 +246,27 @@
 </script>
 
 {#snippet inputs()}
-    {#if nestedSwitcher.getActiveSwitch() === mainPage && activeNested === null}
-        <section class="effect-type-selector" aria-labelledby="effect-type-heading">
-            <h2 id="effect-type-heading">Choose an effect</h2>
-            <p>This choice determines which effect you are adding</p>
-            <InputSelect
-                id="effect-type"
-                label="Effect type:"
-                selected={selectedType}
-                onchange={(event) => changeType((event.currentTarget as HTMLSelectElement).value as EffectType)}
-                items={effectOptions}
-            />
-        </section>
+    <section class="effect-type-selector" aria-labelledby="effect-type-heading">
+        <h2 id="effect-type-heading">Choose an effect</h2>
+        <p>This choice determines which effect you are adding</p>
+        <InputSelect
+            id="effect-type"
+            label="Effect type:"
+            selected={selectedType}
+            onchange={(event) => changeType((event.currentTarget as HTMLSelectElement).value as EffectType)}
+            items={effectOptions}
+        />
+    </section>
 
-        <section class="effect-settings" aria-label="Effect settings">
-            <div class="effect-settings-heading">
-                <h3>Effect settings</h3>
-                <span>{effectOptions.find((option) => option.value === selectedType)?.title}</span>
-            </div>
+    <section class="effect-settings" aria-label="Effect settings">
+        <div class="effect-settings-heading">
+            <h3>Effect settings</h3>
+            <span>{effectOptions.find((option) => option.value === selectedType)?.title}</span>
+        </div>
         {#if selectedType === 'move'}
             <div class="form-group">
-                <button type="button" class="nested-button" onclick={() => openNested('moveId')}>Edit character to move</button>
-                <button type="button" class="nested-button" onclick={() => openNested('toId')}>Edit destination</button>
+                <button type="button" class="nested-button" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>Edit character to move</button>
+                <button type="button" class="nested-button" onclick={() => handleStackGetter('toId', 'Configure Destination')}>Edit destination</button>
             </div>
         {:else if selectedType === 'event'}
             <InputText id="effect-event" label="Event:" wrapDiv bind:value={data.event} autocomplete="off" />
@@ -333,7 +296,7 @@
                             { title: 'Getter', value: 'getter' }
                         ]} />
                         {#if field.kind === 'getter'}
-                            <button type="button" class="nested-button" onclick={() => editEventFieldGetter(field)}>Edit getter</button>
+                            <button type="button" class="nested-button" onclick={() => handleStackEventFieldGetter(field)}>Edit getter</button>
                         {:else}
                             <InputText id={`event-context-value-${index}`} label="Value:" bind:value={field.value} autocomplete="off" />
                         {/if}
@@ -374,7 +337,7 @@
                             { title: 'Getter', value: 'getter' }
                         ]} />
                         {#if field.kind === 'getter'}
-                            <button type="button" class="nested-button" onclick={() => editEventFieldGetter(field)}>Edit getter</button>
+                            <button type="button" class="nested-button" onclick={() => handleStackEventFieldGetter(field)}>Edit getter</button>
                         {:else}
                             <InputSelect id={`event-data-type-${index}`} label="Value type:" bind:selected={field.valueType} items={[
                                 { title: 'Text', value: 'string' },
@@ -396,7 +359,7 @@
         {:else if selectedType === 'setter'}
             <div class="form-group">
                 <h3>With Variable:</h3>
-                <button type="button" class="nested-button" onclick={() => openNested('setterVar')}>Edit variable getter</button>
+                <button type="button" class="nested-button" onclick={() => handleStackGetter('var', 'Configure Variable Getter')}>Edit variable getter</button>
             </div>
             <div class="form-group">
                 <div class="zone">
@@ -410,15 +373,20 @@
                     ]} />
                     <InputSelect id="effect-value-kind" label="Value source:" bind:selected={data._valueKind} items={[
                         { title: 'Literal', value: 'literal' },
-                        { title: 'Random', value: 'random' }
+                        { title: 'Random', value: 'random' },
+                        { title: 'Getter', value:'getter'}
                     ]} />
                     {#if data._valueKind === 'random'}
                         <div class="form-group">
-                            <button type="button" class="nested-button" onclick={() => openNested('setterRandom')}>Edit random value</button>
+                            <button type="button" class="nested-button" onclick={handleStackRandomValue}>Edit random value</button>
+                        </div>
+                    {:else if data._valueKind === 'getter'}
+                        <div class="form-group">
+                            <button type="button" class="nested-button" onclick={() => handleStackGetter('value', 'Configure Value Getter')}>Edit value getter</button>
                         </div>
                     {:else}
                         <div class="form-group">
-                            <button type="button" class="nested-button" onclick={() => openNested('setterValue')}>Edit literal value</button>
+                            <button type="button" class="nested-button" onclick={handleStackValue}>Edit literal value</button>
                         </div>
                     {/if}
                 </div>
@@ -427,92 +395,63 @@
             <InputText id="effect-dialogue-id" label="Dialogue id:" wrapDiv bind:value={data.dialogueId} autocomplete="off" />
             <InputText id="effect-intent" label="Intent:" wrapDiv bind:value={data.intent} autocomplete="off" />
             <div class="form-group">
-                <button type="button" class="nested-button" onclick={() => openNested('targetId')}>Edit target getter</button>
+                <button type="button" class="nested-button" onclick={() => handleStackGetter('targetId', 'Configure Target Getter')}>Edit target getter</button>
             </div>
         {:else if selectedType === 'conditional'}
             <div class="form-group">
-                <button type="button" class="nested-button" onclick={() => openNested('conditions')}>Configure conditions ({data.conditions?.length ?? 0})</button>
-                <button type="button" class="nested-button" onclick={() => openNested('onTrue')}>Configure true effects ({data.onTrue?.length ?? 0})</button>
-                <button type="button" class="nested-button" onclick={() => openNested('onFalse')}>Configure false effects ({data.onFalse?.length ?? 0})</button>
+                <button type="button" class="nested-button" onclick={handleStackConditions}>Configure conditions ({data.conditions?.length ?? 0})</button>
+                <button type="button" class="nested-button" onclick={() => handleStackEffectBranch('onTrue')}>Configure true effects ({data.onTrue?.length ?? 0})</button>
+                <button type="button" class="nested-button" onclick={() => handleStackEffectBranch('onFalse')}>Configure false effects ({data.onFalse?.length ?? 0})</button>
             </div>
         {/if}
-        </section>
-    {:else if activeNested === 'moveId'}
-        <FormGetter
-            value={data.moveId}
-            bind:autoAttach={data}
-            attachTo="moveId"
-            bind:writeFormPropsTo={nestedGetterProps}
-            onAfterSubmit={closeNested}
-        />
-    {:else if activeNested === 'toId'}
-        <FormGetter
-            value={data.toId}
-            bind:autoAttach={data}
-            attachTo="toId"
-            bind:writeFormPropsTo={nestedGetterProps}
-            onAfterSubmit={closeNested}
-        />
-    {:else if activeNested === 'setterVar'}
-        <FormGetter
-            value={data.var}
-            bind:autoAttach={data}
-            attachTo="var"
-            bind:writeFormPropsTo={nestedGetterProps}
-            onAfterSubmit={closeNested}
-        />
-    {:else if activeNested === 'setterValue'}
-        <FormValue
-            value={literalValue}
-            bind:autoAttach={data}
-            attachTo="value"
-            bind:writeFormPropsTo={nestedValueProps}
-            onAfterSubmit={(next) => {
-                literalValue = next;
-                closeNested();
-            }}
-            onCancel={closeNested}
-        />
-    {:else if activeNested === 'setterRandom'}
-        <FormRandomValue
-            value={randomValue}
-            bind:autoAttach={data}
-            attachTo="value"
-            bind:writeFormPropsTo={nestedRandomProps}
-            onAfterSubmit={closeNested}
-        />
-    {:else if activeNested === 'targetId'}
-        <FormGetter
-            value={data.targetId}
-            bind:autoAttach={data}
-            attachTo="targetId"
-            bind:writeFormPropsTo={nestedGetterProps}
-            onAfterSubmit={closeNested}
-        />
-    {:else if activeNested === 'eventFieldGetter' && eventFieldTarget}
-        <FormGetter
-            value={eventFieldTarget.value}
-            bind:autoAttach={eventFieldTarget}
-            attachTo="value"
-            bind:writeFormPropsTo={eventFieldGetterProps}
-            onAfterSubmit={closeNested}
-        />
-    {:else if activeNested === 'conditions'}
-        <ListConditions bind:values={data.conditions} {stack} onCancel={closeNested} onAfterSubmit={closeNested} />
-    {:else if activeNested === 'onTrue'}
-        <ListEffects bind:values={data.onTrue} {stack} onCancel={closeNested} onAfterSubmit={closeNested} />
-    {:else if activeNested === 'onFalse'}
-        <ListEffects bind:values={data.onFalse} {stack} onCancel={closeNested} onAfterSubmit={closeNested} />
-    {/if}
+    </section>
 {/snippet}
 
-{#if writeFormPropsTo}
-    {@render inputs()}
-{:else}
-    <Form onSubmit={submitActive} onCancel={cancelActive}>
-        {@render inputs()}
+{#snippet renderGetterForm(frame: ContextFrame<Record<string, any>, Record<string, any>>)}
+    <FormGetter
+        bind:value={frame.draft}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={(getter) => frame.resolve(getter)}
+    />
+{/snippet}
+
+{#snippet renderValueForm(frame: ContextFrame<PrimitiveValue, PrimitiveValue>)}
+    <FormValue
+        bind:value={frame.draft}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={(next) => frame.resolve(next)}
+    />
+{/snippet}
+
+{#snippet renderRandomValueForm(frame: ContextFrame<typeof randomValue, typeof randomValue>)}
+    <FormRandomValue
+        bind:value={frame.draft}
+        onCancel={() => frame.cancel()}
+        onAfterSubmit={(next) => frame.resolve(next)}
+    />
+{/snippet}
+
+{#snippet renderConditionsForm(frame: ContextFrame<any[], any[]>)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <ListConditions bind:values={frame.draft} {stack} />
     </Form>
-{/if}
+{/snippet}
+
+{#snippet renderTrueEffectsForm(frame: ContextFrame<EffectFomAction[], EffectFomAction[]>)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <ListEffects bind:values={frame.draft} {stack} />
+    </Form>
+{/snippet}
+
+{#snippet renderFalseEffectsForm(frame: ContextFrame<EffectFomAction[], EffectFomAction[]>)}
+    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
+        <ListEffects bind:values={frame.draft} {stack} />
+    </Form>
+{/snippet}
+
+<Form onSubmit={onSubmit} onCancel={onCancel}>
+    {@render inputs()}
+</Form>
 
 <style>
     .effect-type-selector {

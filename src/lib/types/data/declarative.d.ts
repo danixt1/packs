@@ -112,7 +112,7 @@ interface VariableModify<T extends VariableToGet = VariableToGet>{
     var :T;
     /** Arithmetic modes expect number-compatible current and incoming values. */
     mode: 'set' | 'increment' | 'decrement'| 'multiply' | 'divide';
-    value: string | number | ModificatorRandomInterval | ModificatorRandomValue;
+    value: string | number | ModificatorRandomInterval | ModificatorRandomValue | T;
 }
 /**
  * Compares two literal values, getter results, or a mix of both.

@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { render } from 'vitest-browser-svelte';
 import FormEffect from './FormEffect.svelte';
 import type { EffectFomAction } from '$lib/types/data/declarative';
+import { createContextStack } from '$lib/shared/contextStack.svelte';
 
 const setterEffect: EffectFomAction = {
     type: 'setter',
@@ -18,7 +19,7 @@ const moveEffect: EffectFomAction = {
 
 test('adds an event effect from the standalone form', async () => {
     const onAfterSubmit = vi.fn();
-    const screen = await render(FormEffect, { onAfterSubmit });
+    const screen = await render(FormEffect, { stack: createContextStack(), onAfterSubmit });
 
     await screen.getByTestId('input-effect-event').fill('DOOR_OPENED');
     await screen.getByRole('button', { name: 'Confirm' }).click();
@@ -46,7 +47,7 @@ test('edits structured event context and payload fields', async () => {
         }
     };
     const onAfterSubmit = vi.fn();
-    const screen = await render(FormEffect, { value: eventEffect, onAfterSubmit });
+    const screen = await render(FormEffect, { stack: createContextStack(), value: eventEffect, onAfterSubmit });
 
     await expect.element(screen.getByTestId('input-effect-event')).toHaveValue('CHARACTER_ATTACKED');
     await expect.element(screen.getByTestId('input-event-context-field-0')).toHaveValue('actorId');
@@ -65,7 +66,7 @@ test('edits structured event context and payload fields', async () => {
 
 test('adds event payload values with structured controls', async () => {
     const onAfterSubmit = vi.fn();
-    const screen = await render(FormEffect, { onAfterSubmit });
+    const screen = await render(FormEffect, { stack: createContextStack(), onAfterSubmit });
 
     await screen.getByTestId('input-effect-event').fill('PLACE_DISCOVERED');
     await screen.getByRole('button', { name: 'Add data field' }).click();
@@ -82,40 +83,57 @@ test('adds event payload values with structured controls', async () => {
 });
 
 test('edits a setter effect and loads its getter fields', async () => {
-    const screen = await render(FormEffect, { value: setterEffect });
+    const stack = createContextStack();
+    const screen = await render(FormEffect, { stack, value: setterEffect });
 
     await expect.element(screen.getByTestId('input-effect-type')).toHaveValue('setter');
 
     await screen.getByRole('button', { name: 'Edit variable getter' }).click();
 
-    await expect.element(screen.getByTestId('input-getter-location')).toHaveValue('self');
-    await expect.element(screen.getByTestId('input-getter-get')).toHaveValue('variable');
-    await expect.element(screen.getByTestId('input-getter-variable')).toHaveValue('health');
+    expect(stack.current?.title).toBe('Configure Variable Getter');
+    expect(stack.current?.draft).toEqual(setterEffect.var);
 });
 
 test('edits the literal value of a setter effect', async () => {
-    const screen = await render(FormEffect, { value: setterEffect });
+    const stack = createContextStack();
+    const screen = await render(FormEffect, { stack, value: setterEffect });
 
     await screen.getByRole('button', { name: 'Edit literal value' }).click();
 
-    await expect.element(screen.getByTestId('input-value-type')).toHaveValue('number');
-    await expect.element(screen.getByTestId('input-value-number')).toHaveValue(20);
+    expect(stack.current?.title).toBe('Configure Literal Value');
+    expect(stack.current?.draft).toBe(20);
+});
+
+test('edits a getter value for a setter effect', async () => {
+    const stack = createContextStack();
+    const valueGetter = { type: 'getter', in: 'temp-variable', variable: 'damage' } as const;
+    const screen = await render(FormEffect, {
+        stack,
+        value: { ...setterEffect, value: valueGetter }
+    });
+
+    await expect.element(screen.getByTestId('input-effect-value-kind')).toHaveValue('getter');
+    await screen.getByRole('button', { name: 'Edit value getter' }).click();
+
+    expect(stack.current?.title).toBe('Configure Value Getter');
+    expect(stack.current?.draft).toEqual(valueGetter);
 });
 
 test('renders only one getter editor at a time for move effects', async () => {
-    const screen = await render(FormEffect, { value: moveEffect });
+    const stack = createContextStack();
+    const screen = await render(FormEffect, { stack, value: moveEffect });
 
     await expect.element(screen.getByRole('button', { name: 'Edit character to move' })).toBeVisible();
     await expect.element(screen.getByRole('button', { name: 'Edit destination' })).toBeVisible();
 
     await screen.getByRole('button', { name: 'Edit character to move' }).click();
-    await expect.element(screen.getByTestId('input-getter-variable')).toHaveValue('id');
-    await expect.element(screen.getByRole('button', { name: 'Edit destination' })).not.toBeInTheDocument();
+    expect(stack.current?.title).toBe('Configure Character to Move');
+    expect(stack.current?.draft).toEqual(moveEffect.moveId);
 
-    await screen.getByRole('button', { name: 'Cancel' }).click();
+    stack.current?.cancel();
     await screen.getByRole('button', { name: 'Edit destination' }).click();
-    await expect.element(screen.getByTestId('input-getter-location')).toHaveValue('target');
-    await expect.element(screen.getByTestId('input-getter-target')).toHaveValue('place');
+    expect(stack.current?.title).toBe('Configure Destination');
+    expect(stack.current?.draft).toEqual(moveEffect.toId);
 });
 
 test('opens conditional effect editors from the main effect form', async () => {
@@ -125,17 +143,18 @@ test('opens conditional effect editors from the main effect form', async () => {
         onTrue: [],
         onFalse: []
     };
-    const screen = await render(FormEffect, { value: conditionalEffect });
+    const stack = createContextStack();
+    const screen = await render(FormEffect, { stack, value: conditionalEffect });
 
     await screen.getByRole('button', { name: /Configure conditions/ }).click();
 
-    await expect.element(screen.getByRole('button', { name: 'Add Condition' })).toBeVisible();
-    await expect.element(screen.getByRole('button', { name: /Configure true effects/ })).not.toBeInTheDocument();
+    expect(stack.current?.title).toBe('Configure Conditions');
+    expect(stack.current?.draft).toEqual([]);
 });
 for(const effectName of ['Move','Event','Conditional','Set variable','Start dialogue']){
     test(`fail on not passed data on ${effectName}`,async ()=>{
         const onAfterSubmit = vi.fn();
-        const screen = await render(FormEffect, {onAfterSubmit});
+        const screen = await render(FormEffect, {stack: createContextStack(), onAfterSubmit});
         await screen.getByTestId('input-effect-type').selectOptions(effectName);
         await screen.getByRole('button', { name: 'Confirm' }).click();
         await expect.poll(() => onAfterSubmit.mock.calls.length).toBe(0);

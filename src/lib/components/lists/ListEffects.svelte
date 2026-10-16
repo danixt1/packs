@@ -107,7 +107,7 @@
 
 {#snippet renderEffectForm(frame: any)}
     <FormEffect
-        {stack}
+        stack={stack!}
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(effect) => frame.resolve(effect)}
