@@ -7,16 +7,11 @@
     import Form from "../Form.svelte";
     import FormGetter from "./FormGetter.svelte";
     import FormValue from "./FormValue.svelte";
+    import type { GettersType } from "$lib/types/data/getters";
 
     type OperandName = 'left' | 'right' | 'variableToCheck';
     type OperandMode = 'getter' | 'value';
     type PrimitiveValue = string | number | boolean;
-    type GetterValue = {
-        type: 'getter';
-        in: string;
-        variable: string;
-        fallback?: string | number | boolean;
-    };
 
     interface ConditionData {
         type?: 'condition-relational' | 'condition-exists' | 'condition-is-valid';
@@ -35,6 +30,7 @@
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
+        allowedGetters?:GettersType[];
     }
 
     let {
@@ -44,7 +40,8 @@
         stack,
         autoAttach = $bindable(),
         attachTo,
-        writeFormPropsTo = $bindable()
+        writeFormPropsTo = $bindable(),
+        allowedGetters
     }: Props = $props();
 
     let activeEditor = $state<'condition' | OperandName>('condition');
@@ -171,6 +168,7 @@
                 value={typeof currentVal === 'object' && currentVal?.type === 'getter' ? currentVal : {}}
                 onAfterSubmit={(val) => frame.resolve(val)}
                 onCancel={() => frame.cancel()}
+                {allowedGetters}
             />
         {:else}
             <FormValue
@@ -244,6 +242,7 @@
                         bind:writeFormPropsTo={nestedFormProps}
                         onAfterSubmit={returnToCondition}
                         onCancel={returnToCondition}
+                        {allowedGetters}
                     />
                 {:else}
                     <FormValue

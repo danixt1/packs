@@ -7,7 +7,7 @@ export type CharacterMetadata = 'idPlace'|'isPlayer'|'isObserved'|'name'|'id';
 export type PlaceMetadata = 'name'|'description'|'id';
 export type ActionRuntimeMetadata = `hasCategory:${string}`|'actionName'|'executionTime'|'isFromPlayer';
 export type AutonomyRuntimeMetadata = 'currentGoal'|'lastActionName'|'cycle';
-
+export type GettersType = 'self'|'target'|'runtime'|'temp'|'world';
 interface BaseGetter{
     type:'getter';
     /** Value used when the resolved variable/metadata is missing. */

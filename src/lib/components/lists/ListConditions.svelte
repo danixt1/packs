@@ -7,6 +7,7 @@
         isConditionObject,
         type ConditionToken
     } from "$lib/shared/conditionalList";
+    import type { GettersType } from "$lib/types/data/getters";
 
     interface Props {
         values?: ConditionToken[];
@@ -15,6 +16,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (value: ConditionToken) => void;
         onCreatePressed?: () => void;
+        allowedGetters?:GettersType[]
     }
 
     let {
@@ -23,7 +25,8 @@
         onEdit,
         onCancel,
         onAfterSubmit,
-        onCreatePressed
+        onCreatePressed,
+        allowedGetters
     }: Props = $props();
 
     function tokens(): ConditionToken[] {
@@ -94,6 +97,7 @@
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(condition) => frame.resolve(condition)}
+        {allowedGetters}
     />
 {/snippet}
 

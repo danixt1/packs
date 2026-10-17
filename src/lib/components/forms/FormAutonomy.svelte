@@ -125,7 +125,7 @@
                 {title:'Action',value:'action-rule'}
             ]} />
             <h3>When:</h3>
-            <ListConditions {stack} bind:values={frame.draft.when} />
+            <ListConditions {stack} bind:values={frame.draft.when} allowedGetters={['self','runtime','world']} />
             <InputText id='autonomy-rule-action' label='Action:' bind:value={frame.draft.actionName} autocomplete='off' required/>
             {#if frame.draft.actionName && actions && !actions.some(e => e.name === frame.draft.actionName) }
                 <p class="warn">

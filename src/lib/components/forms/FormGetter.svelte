@@ -1,6 +1,7 @@
 <script lang="ts">
     import {InputSelect,InputText} from "$lib/components/inputs";
     import { showError } from "$lib/notify";
+    import type { GettersType } from "$lib/types/data/getters";
     import Form from "../Form.svelte";
 
     interface GetterDeclarator {
@@ -19,8 +20,10 @@
         /** Property in `autoAttach` that receives the generated getter. */
         attachTo?: string;
         writeFormPropsTo?:Record<string,any>;
+        allowedGetters?: GettersType[]
     }
-    let { onCancel, onAfterSubmit, value = $bindable(), autoAttach = $bindable(), attachTo, writeFormPropsTo = $bindable() }: Props = $props();
+    let { onCancel, onAfterSubmit, value = $bindable(),
+        autoAttach = $bindable(), attachTo, writeFormPropsTo = $bindable(),allowedGetters }: Props = $props();
     let data = $state<Record<string, any>>({});
     const OBJECTS_OPTS = {
         general:[
@@ -35,6 +38,16 @@
             {title:'Autonomy',value:'autonomy'}
         ]
     }
+    let allowedTypes = $derived.by(()=>{
+        const allEments = [
+            {title:'Self',value:'self'},
+            {title:'Target',value:'target'},
+            {title:'Runtime',value:'runtime'},
+            {title:'Temporary Slot',value:'temp'},
+            {title:'World',value:'world'}
+        ];
+        return allEments.filter((a)=> allowedGetters ? allowedGetters.includes(a.value as any) : true );
+    })
     const NO_TARGET_STRUCTURES = ['world','temp','self']
     const METADATA_OPTS = {
         character:[
@@ -142,13 +155,12 @@
             showError('Select where to get the value');
             return;
         }
-        if(inProperty === 'self'){
-            inProperty = `self-${data._get}`;
-        }else if(inProperty !== 'temp'){
-            inProperty += `:${data._target}-${data._get}`;
+        if(NO_TARGET_STRUCTURES.includes(inProperty)){
+            inProperty += inProperty === 'self' ? `-${data._get}` : '-variable';
         }else{
-            inProperty += ':variable';
+            inProperty += `:${data._target}-${data._get}`;
         }
+        
         if(!data.variable){
             showError('Add the variable to get the value');
             return;
@@ -172,13 +184,7 @@
 {#snippet inputs()}
     <div class="form-group base-data">
         <InputSelect id={'getter-location'} label={'In:'} bind:selected={data._in}
-        items={[
-            {title:'Self',value:'self'},
-            {title:'Target',value:'target'},
-            {title:'Runtime',value:'runtime'},
-            {title:'Temporary Slot',value:'temp'},
-            {title:'World',value:'world'}
-        ]} />
+        items={allowedTypes} />
         {#if !NO_TARGET_STRUCTURES.includes(data._in)}
             <InputSelect id={'getter-target'} label={'Object:'} bind:selected={data._target}
             items={objectsOptions}/>
