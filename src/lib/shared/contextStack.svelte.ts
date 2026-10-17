@@ -17,6 +17,7 @@ export interface ContextFrame<TIn = any, TOut = any> {
     readonly initialData: TIn;
     /** Mutable working draft inside this frame */
     draft: TIn;
+    savedScrollPos?:number;
     /** Metadata such as edit mode, collision lists, custom validators */
     meta?: ContextFrameMeta;
     /** The Svelte snippet that knows how to render this frame */
@@ -45,6 +46,8 @@ export interface ContextStack {
     readonly current: ContextFrame | null;
     readonly depth: number;
     readonly breadcrumbs: BreadcrumbItem[];
+    beforePush(callback:(newFrame:ContextFrame)=>void):void
+    afterPop(callback:(newFrame:ContextFrame)=>void):void
     push: <TIn = any, TOut = any>(options: PushOptions<TIn, TOut>) => Promise<TOut | null>;
     pop: () => void;
     jumpTo: (frameId: string) => void;
@@ -72,9 +75,11 @@ export function deepSnapshot<T>(value: T): T {
 export function createContextStack(): ContextStack {
     let frameSequence = 0;
     let frames = $state<ContextFrame[]>([]);
-
+    let bFn:(frame:ContextFrame)=>void = ()=>{};
+    let aFn:(frame:ContextFrame)=>void = ()=>{};
     function popFrame(targetId?: string) {
         if (!frames.length) return;
+        let lastValidCtx = frames[frames.length - 1];
         if (!targetId || frames[frames.length - 1].id === targetId) {
             frames = frames.slice(0, -1);
         } else {
@@ -84,13 +89,13 @@ export function createContextStack(): ContextStack {
                 frames = frames.slice(0, index + 1);
             }
         }
+        aFn(lastValidCtx);
     }
 
     function push<TIn = any, TOut = any>(options: PushOptions<TIn, TOut>): Promise<TOut | null> {
         frameSequence++;
         const frameId = `frame_${frameSequence}`;
         const isolatedInput = deepSnapshot(options.data);
-
         return new Promise<TOut | null>((resolvePromise) => {
             let settled = false;
 
@@ -115,7 +120,7 @@ export function createContextStack(): ContextStack {
                     resolvePromise(null);
                 }
             };
-
+            bFn(frame);
             frames = [...frames, frame];
         });
     }
@@ -160,6 +165,12 @@ export function createContextStack(): ContextStack {
                 frames[frames.length - 1].cancel();
             }
         },
-        reset
+        reset,
+        beforePush(callback) {
+            bFn = callback;
+        },
+        afterPop(callback) {
+            aFn = callback;
+        },
     };
 }

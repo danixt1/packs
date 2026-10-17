@@ -1,6 +1,6 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
-    import type { Snippet } from "svelte";
+    import { onMount, tick, type Snippet } from "svelte";
 
     interface Props {
         stack: ContextStack;
@@ -9,7 +9,7 @@
     }
 
     let { stack, children, onBreadcrumbClick }: Props = $props();
-
+    let viewPortElement:HTMLDivElement;
     function handleBreadcrumbClick(frameId: string) {
         if (onBreadcrumbClick) {
             onBreadcrumbClick(frameId);
@@ -17,6 +17,20 @@
             stack.jumpTo(frameId);
         }
     }
+    $effect(()=>{
+        stack.beforePush((newFrame)=>{
+            let scrollTop = document.querySelector('.popup')?.scrollTop;
+
+            newFrame.savedScrollPos = scrollTop;
+        })
+        stack.afterPop(async (oldFrame)=>{
+            await tick();
+            let ele = document.querySelector('.popup');
+            if(ele){
+                ele.scrollTop = oldFrame.savedScrollPos || 0;
+            }
+        })
+    })
 </script>
 
 <div class="context-host" data-testid="context-host">
@@ -46,6 +60,7 @@
     {/if}
 
     <div
+        bind:this={viewPortElement}
         class="context-frame-viewport"
         data-testid="context-frame-viewport"
         data-frame-id={stack.current?.id}
