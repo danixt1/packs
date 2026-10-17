@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { onDestroy } from "svelte";
+
 
     interface Props{
         onEdit?: (item: Record<string, unknown>) => void;
@@ -10,33 +12,93 @@
         ref?:any[];
         headers: string[];
         mappedHeaders?: Record<string, string>;
+        sortBy?:string;
         canEdit?: (item: Record<string, unknown>, index: number) => boolean;
         canDelete?: (item: Record<string, unknown>, index: number) => boolean;
     }
+    function sort(a:unknown,b:unknown,invert = false){
+        if(typeof a  === 'string' && typeof b === 'string'){
+            return invertIfsetted(a.localeCompare(b));
+        }
+        if(typeof a === 'boolean' && typeof b === 'boolean'){
+            return invertIfsetted(a ? 1 :0);
+        }
+        if(typeof a === 'number' && typeof b === 'number'){
+            return invertIfsetted(a - b);
+        }
+        return 0;
+        function invertIfsetted(n:number){
+            return invert ? n * -1 : n;
+        }
+    }
+    function onClickSort(header:string){
+        if(sortBy == header){ 
+            isInverted = !isInverted;
+            
+            return
+        };
+        sortBy = header;
+        isInverted = false;
+    }
+    let toDelete = $state(new Set<number>());
+    let itemsToDelete =$state([] as {id:number,timeLeft:number}[]);
+    let interval = setInterval(()=>{
+        for(const item of itemsToDelete){
+            item.timeLeft -= 100;
+            if(item.timeLeft <= 0){
+                
+                toDelete.delete(item.id);
+                
+                itemsToDelete = itemsToDelete.filter((e)=>e.id != item.id);
+            }
+        }
+    },150);
+    onDestroy(()=>{
+        clearInterval(interval);
+    })
     let { onEdit: onSelect, onDelete, items = $bindable([]), headers, mappedHeaders,ref, canEdit, canDelete }: Props = $props();
+    let sortBy = $derived(headers[0]);
+    let isInverted = $state(false);
+    let orders = $derived(items.map<[number,unknown,boolean]>((e,i)=>[i,e[sortBy],false]).sort((a,b)=>sort(a[1],b[1],isInverted)));
 </script>
 
 <table>
     <thead>
         <tr>
             {#each headers as header}
-                <th>{header}</th>
+                <th onclick={()=>onClickSort(header)}>{header} {sortBy == header ? isInverted ? '▼' : '▲' : '' }</th>
             {/each}
             <th class="actions-column"></th>
         </tr>
     </thead>
     <tbody>
-        {#each items as item,index}
+        {#each orders as sortData (sortData[0])}
+        {@const item = items[sortData[0]]}
+        {@const index = sortData[0]}
             <tr>
                 {#each headers as header}
-                    <td data-header={header}>{mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}</td>
+                <td data-header={header}>{@html mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}</td>
                 {/each}
                 <td class="actions-cell" data-header="Actions">
                     {#if onSelect && (!canEdit || canEdit(ref ? ref[index] : item, index))}
-                        <button type="button" onclick={() => onSelect?.(ref ? ref[index] : item)}>Edit</button>
+                    <button type="button" onclick={() => onSelect?.(ref ? ref[index] : item)}>Edit</button>
                     {/if}
                     {#if onDelete && (!canDelete || canDelete(ref ? ref[index] : item, index))}
-                        <button type="button" onclick={() => onDelete?.(ref ? ref[index] : item)}>Delete</button>
+                        {#key itemsToDelete}
+                            {@const isPendingDelete = toDelete.has(index)}
+                            <button type="button" class:warn-red={isPendingDelete} onclick={() =>{
+                                if(isPendingDelete){
+                                    toDelete.delete(index);
+                                    itemsToDelete = itemsToDelete.filter((e)=> e.id != index);
+                                    onDelete(ref ? ref[index] : item);
+                                    return;
+                                }
+                                
+                                toDelete.add(index);
+                                itemsToDelete = [...itemsToDelete,{id:index,timeLeft:2000}]
+                                }}
+                            >{isPendingDelete ? "Delete?" : "Delete"}</button>
+                        {/key}
                     {/if}
                 </td>
             </tr>
@@ -44,6 +106,13 @@
     </tbody>
 </table>
 <style>
+    .warn-red{
+        background-color: red;
+
+    }
+    .warn-red{
+        background-color: red !important;
+    }
     table {
         width: 100%;
         border-collapse: collapse;
