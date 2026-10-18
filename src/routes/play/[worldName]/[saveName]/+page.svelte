@@ -18,6 +18,9 @@
 	} from '$lib/shared/gameStorage';
 	import { showError, showInfo, showSucess } from '$lib/notify';
 	import type { World } from '$lib/types/data/declarative';
+    import Popup from '$lib/components/Popup.svelte';
+    import ObjectTable from '$lib/components/ObjectTable.svelte';
+    import ButtonPopUp from '$lib/components/editor/ButtonPopUp.svelte';
 
 	type GameStatus = 'loading' | 'ready' | 'error';
 
@@ -33,6 +36,7 @@
 	let showSaveMenu = $state(false);
 	let showLoadMenu = $state(false);
 	let showSaveAsDialog = $state(false);
+	let showDebugPopup = $state(false);
 	let saveAsName = $state('');
 	let importInput = $state<HTMLInputElement | null>(null);
 	let saveSlotsVersion = $state(0);
@@ -284,6 +288,7 @@
 					<button type="button" onclick={openImportPicker}>Import JSON save</button>
 					<button type="button" onclick={returnToMenu}>Save and main menu</button>
 					<button type="button" onclick={leaveWithoutSaving}>Leave without saving</button>
+					<button type="button" onclick={()=>{showDebugPopup = true}}>debug</button>
 				</nav>
 			{/if}
 		</header>
@@ -316,8 +321,54 @@
 		</dialog>
 	</div>
 {/if}
+<Popup open={showDebugPopup} title="Debug" onClose={()=>showDebugPopup = false}>
+	<div class="form-group">
+		{#if engine}
+			{@const state = engine.getState()}
+			<h3>Characters</h3>
+			<details class="debug-info">
+				<summary>Actions Running</summary>
+				<ObjectTable headers={["Action Name","Self","Targets","Time Left"]}
+				items={state.runningActions.map(e =>({
+					"Action Name":e.actionName,
+					Self:e.actorId,
+					Targets:e.option.targets.map(e =>e.id).join(','),
+					"Time Left":e.completeAt - e.startedAt
+				}))}/>
+			</details>
+			<details class="debug-info">
+				<summary>Debug Messages</summary>
+				<ObjectTable headers={['Index','Type','Message']}
+				items={state.debug.map((e,i)=>({
+					Index:i,
+					Type:e.indexOf(':') != -1 ? e.substring(0,e.indexOf(':')) : '--',
+					Message:e}))}/>
+			</details>
 
+			{#each state.characters as char }
+			<details class="debug-info">
+  				<summary>Char:{char.name}({char.id})</summary>
+				<h4>Variables:</h4>
+				<ObjectTable
+				headers = {['Name','Value']}
+				items={char.vars.map(e =>({
+					Name:e.name,
+					Value:e.value
+				}))}/>
+				{#if char.autonomy}
+					<p>Goal:{char.autonomyState.currentGoal || "None"}</p>
+					<p>Last Action Done: {char.autonomyState.lastActionName}</p>
+				{/if}
+			</details>
+			{/each}
+		{/if}
+		<ButtonPopUp onclick={()=>showDebugPopup = false} text="Close" />
+	</div>
+</Popup>
 <style>
+	.debug-info{
+		margin: 6px 0;
+	}
 	.state-page,
 	.game-page {
 		box-sizing: border-box;

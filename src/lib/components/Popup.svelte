@@ -36,7 +36,7 @@
     }
     .popup {
         padding: 0;
-        width: min(100%, 30rem);
+        width: min(100%, 45rem);
         max-height: 90vh;
         border: 1px solid var(--border-subtle);
         border-radius: 8px;
