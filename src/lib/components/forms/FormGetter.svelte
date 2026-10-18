@@ -89,9 +89,12 @@
             {title:'Current Goal',value:'currentGoal'},
             {title:'Last Action Name',value:'lastActionName'},
             {title:'Cycle',value:'cycle'}
+        ],
+        world:[
+            {title:'Time',value:'time'}
         ]
     }
-    let metadataOptions = $derived(METADATA_OPTS[data._target as keyof typeof METADATA_OPTS] ?? []);
+    let metadataOptions = $derived(METADATA_OPTS[data._target as keyof typeof METADATA_OPTS] ?? data._in in METADATA_OPTS ? METADATA_OPTS[data._in as 'world'] : []);
     let objectsOptions = $state(OBJECTS_OPTS.general);
     $effect(()=>{
         if(!writeFormPropsTo){
@@ -156,7 +159,7 @@
             return;
         }
         if(NO_TARGET_STRUCTURES.includes(inProperty)){
-            inProperty += inProperty === 'self' ? `-${data._get}` : '-variable';
+            inProperty += ['self','world'].includes(inProperty) ? `-${data._get}` : '-variable';
         }else{
             inProperty += `:${data._target}-${data._get}`;
         }
@@ -189,7 +192,7 @@
             <InputSelect id={'getter-target'} label={'Object:'} bind:selected={data._target}
             items={objectsOptions}/>
         {/if}
-        {#if data._in != 'temp' && data._in != 'world'}
+        {#if data._in != 'temp'}
             <InputSelect id={'getter-get'} label={'Get:'} bind:selected={data._get}
             items={[
                 {title:'Variable',value:'variable'},

@@ -7,6 +7,8 @@ export type CharacterMetadata = 'idPlace'|'isPlayer'|'isObserved'|'name'|'id';
 export type PlaceMetadata = 'name'|'description'|'id';
 export type ActionRuntimeMetadata = `hasCategory:${string}`|'actionName'|'executionTime'|'isFromPlayer';
 export type AutonomyRuntimeMetadata = 'currentGoal'|'lastActionName'|'cycle';
+export type WorldMetadata = 'time';
+
 export type GettersType = 'self'|'target'|'runtime'|'temp'|'world';
 interface BaseGetter{
     type:'getter';
@@ -61,7 +63,7 @@ export type RuntimeAction = GetActionRuntimeMetadata;
 type PrefixTemp = 'temp';
 export type TempVariable = VariableGetter<PrefixTemp>;
 type GetWorldVariable = VariableGetter<'world'>;
-export type World = GetWorldVariable;
+export type World = GetWorldVariable | VariableMetadataGetter<'world',WorldMetadata>;
 export type Self<T = CharacterMetadata> = VariableGetter<'self'> | VariableMetadataGetter<'self', T>;
 
 type PrefixRuntimeAutonomy = 'runtime:autonomy';

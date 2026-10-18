@@ -103,7 +103,13 @@ const GETTER_HANDLERS: Record<string, GetterHandler> = {
 		if (getter.fallback !== undefined) return { ok: true, value: getter.fallback, path: `world-variable:${getter.variable}` };
 		return { ok: false, path: `world-variable:${getter.variable}`, reason: 'missing world variable' };
 	},
-
+	'world-metadata':(state,getter) =>{
+		const toGet = getter.variable;
+		if(toGet == 'time'){
+			return ok(state.time,`world-metadata:${getter.variable}`);
+		}
+		return {ok:false,path:`world-metadata:${getter.variable}`,reason:'missing metadata variable'}
+	},
 	'temp-variable': (state, getter, context) => {
 		const value = context.temp?.[getter.variable];
 		if (value !== undefined) return ok(value, `temp-variable:${getter.variable}`);
