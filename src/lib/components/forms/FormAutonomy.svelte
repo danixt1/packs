@@ -7,6 +7,7 @@
     import ListVars from "../lists/ListVars.svelte";
     import ObjectTable from "../ObjectTable.svelte";
     import {type CharacterAutonomyGoal, type CharacterAutonomyRule } from "$lib/types/data/declarative";
+    import type { CtxBuilder } from "$lib/shared/getterCtx";
 
     interface ActionInfo {
         name: string;
@@ -18,6 +19,7 @@
         value?: Record<string, any> | undefined;
         stack: ContextStack;
         actions?: ActionInfo[];
+        ctx:CtxBuilder
     }
 
     let {
@@ -25,7 +27,8 @@
         onAfterSubmit,
         value = $bindable({}),
         stack,
-        actions
+        actions,
+        ctx
     }: Props = $props();
     
     let memory = $state<Record<string,any>[]>([]);
@@ -111,9 +114,9 @@
             <InputText id='autonomy-goal-description' label='Description:' bind:value={frame.draft.description} autocomplete='off' />
             <InputNumber id='autonomy-goal-priority' label='Priority:' bind:value={frame.draft.priority}/>
             <h3>When:</h3>
-            <ListConditions {stack} bind:values={frame.draft.when} />
+            <ListConditions {stack} bind:values={frame.draft.when}  {ctx}/>
             <h3>Stay Active If:</h3>
-            <ListConditions {stack} bind:values={frame.draft.stayActiveIf} />
+            <ListConditions {stack} bind:values={frame.draft.stayActiveIf} {ctx} />
         </div>
     </Form>
 {/snippet}
@@ -125,7 +128,7 @@
                 {title:'Action',value:'action-rule'}
             ]} />
             <h3>When:</h3>
-            <ListConditions {stack} bind:values={frame.draft.when} allowedGetters={['self','runtime','world']} />
+            <ListConditions {stack} bind:values={frame.draft.when} {ctx}/>
             <InputText id='autonomy-rule-action' label='Action:' bind:value={frame.draft.actionName} autocomplete='off' required/>
             {#if frame.draft.actionName && actions && !actions.some(e => e.name === frame.draft.actionName) }
                 <p class="warn">

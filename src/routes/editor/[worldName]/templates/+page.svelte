@@ -12,6 +12,7 @@
     import { createContextStack, type ContextFrame } from '$lib/shared/contextStack.svelte';
     import { getCurrentWorldEditor } from '$lib/shared/worldEditor';
     import type { EventConditions, TextTemplate, TextTemplateEventRoleMatch } from '$lib/types/data/declarative';
+    import type { CtxBuilder } from '$lib/shared/getterCtx';
 
     type TemplateRole = TextTemplateEventRoleMatch & { name: string };
     type TemplateData = Partial<TextTemplate> & {
@@ -33,7 +34,11 @@
     let templates = $state(editor.getTextTemplates());
 
     const stack = createContextStack();
-
+    let ctx:CtxBuilder = $state({
+        allowedGetters:['runtime','world'],
+        allowedObjects:['event'],
+        editor:editor,
+    });
     const eventConditions: { value: EventConditions; title: string }[] = [
         { value: 'FROM_THE_PLAYER', title: 'From the player' },
         { value: 'TARGETS_PLAYER', title: 'Targets the player' },
@@ -311,7 +316,7 @@
         <InputText id="template-role-same-place" label="Same place as role (optional):" bind:value={frame.draft._samePlaceAs} autocomplete="off" wrapDiv />
         <div class="form-group">
             <h3>Role conditions</h3>
-            <ListConditions {stack} bind:values={frame.draft._roleConditions} />
+            <ListConditions {stack} bind:values={frame.draft._roleConditions} {ctx} />
         </div>
     </Form>
 {/snippet}

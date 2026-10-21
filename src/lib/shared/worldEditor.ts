@@ -3,6 +3,8 @@ import { loadWorld as loadStoredWorld } from './gameStorage';
 import type { LabelInfo } from "$lib/types/data/editor";
 let currentEditor:null|WorldEditor = null;
 
+export type targetsWithVar = 'character'|'temp'|'self'|'place'|'item'
+
 type VarRelation = ({
     relation:'use'
     relationWith:'text-template'|'display'|'action'|'dialogue',
@@ -20,6 +22,10 @@ interface itemWithOid{
     /** Object identificator */
     oid:string;
 }
+interface EventEditor{
+    sharedProperties:string[],
+    called:number
+}
 export interface CharacterEditor extends Character, itemWithOid{}
 export interface PlaceEditor extends Place, itemWithOid{}
 export interface DialogueEditor extends DialogueTree, itemWithOid{}
@@ -30,10 +36,13 @@ export interface ActionEditor extends ActionDeclaration, itemWithOid{}
 export class WorldEditor {
     private listEvents:Set<string> =new Set();
 
+    private possibleVarsToObject:Record<string,Set<string>> = {};
+    private categories:string[] = [];
     private relationVars:Record<string,VarRelation[]> = {};
     private labelslinks:Record<string,LabelMapper> = {};
     private refsByOID:Record<string,{is:'label'|'var',prop:string}[]> = {};
     private objectsByOid:Record<string,any> = {};
+
     public worldName:string;
     public description:string;
 
@@ -45,6 +54,8 @@ export class WorldEditor {
     private items:Record<string,ItemEditor> = {};
     private displays:Record<string,DisplayEditor> = {};
     private worldVars:VariableDeclarator[] = [];
+    private eventsInfo:Record<string,EventEditor> = {};
+
     private worldVersion:number[] = [1,0,0];
     private editorInfo:World['editor'];
     public readonly worldId?:string;
@@ -94,6 +105,9 @@ export class WorldEditor {
         if(action.display){
             this.extractVariablesRefInText(action.display.name)       .forEach((e)=>this.analyzeGetter(e,oid,'display-name'))
             this.extractVariablesRefInText(action.display.description).forEach((e)=>this.analyzeGetter(e,oid,'display-description'))
+        }
+        if(action.categories){
+            this.categories = [...this.categories,...action.categories];
         }
         if(action.interruption){
             if(action.interruption.interruptSelfConditions){
@@ -278,8 +292,21 @@ export class WorldEditor {
         this.deleteObject(oid);
         selected.call(this,obj);
     }
+    public getVarsNameFrom(objName:targetsWithVar){
+        let toSend:string = objName;
+        if(objName === 'character'){
+            toSend = 'char';
+        }
+        return Array.from(this.possibleVarsToObject[toSend] ?? []);
+    }
     public getListEvents(){
         return Array.from(this.listEvents);
+    }
+    public getInfoFromEvent(event:string){
+        return this.eventsInfo[event];
+    }
+    public getCategories(){
+        return this.categories;
     }
     private extractVariablesRefInText(text:string){
         let matchs =text.match(/([^\\]|^)(\$([^$]+)[^\\]\$)/g);
@@ -318,8 +345,15 @@ export class WorldEditor {
                 break;
             case 'event':
                 this.listEvents.add(effect.event);
+                if(!this.eventsInfo[effect.event]){
+                    this.eventsInfo[effect.event] = {sharedProperties:[],called:0}
+                }
+                this.eventsInfo[effect.event].called ++;
                 if(effect.data){
-                    for(const value of Object.values(effect.data)){
+                    for(const [key,value] of Object.entries(effect.data)){
+                        if(!this.eventsInfo[effect.event].sharedProperties.includes(key)){
+                            this.eventsInfo[effect.event].sharedProperties.push(key);
+                        }
                         if(typeof value === 'object'){
                             this.analyzeGetter(value,originOid,sublocation + '-action:event(data)');
                         }
@@ -457,6 +491,10 @@ export class WorldEditor {
         if(!this.refsByOID[oid]){
             this.refsByOID[oid] = [];
         }
+        if(!this.possibleVarsToObject[referedType]){
+            this.possibleVarsToObject[referedType] = new Set();
+        }
+        this.possibleVarsToObject[referedType].add(varData.name);
         this.refsByOID[oid].push({is:'var',prop:varData.name})
         this.relationVars[varData.name].push({
             relation:'declare',

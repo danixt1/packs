@@ -20,7 +20,8 @@ The editor uses [`contextStack.svelte.ts`](../src/lib/shared/contextStack.svelte
    - `ContextHost.svelte` renders all stacked frames simultaneously. Ancestor frames are styled with `display: none !important`, while the active frame is visible.
    - Ancestor component states, uncommitted form inputs, scroll positions, and focus are preserved across navigation without unmounting.
 4. **Isolated I/O Boundaries**:
-   - Both input on `push()` and output on `resolve()` are processed through `deepSnapshot()` (structured cloning), preventing proxy leakage and accidental mutations of parent state before confirmation.
+   - Form input on `push()` and output on `resolve()` are processed through `deepSnapshot()` (structured cloning), preventing proxy leakage and accidental mutations of parent data before confirmation.
+   - Frame metadata is shallow-copied so it can carry callbacks and class instances such as `WorldEditor` without losing their methods. Nested metadata values keep their original references.
    - Cancelling a frame discards changes cleanly with zero side-effects (`await stack.push()` returns `null`).
 5. **Breadcrumb Navigation**:
    - `ContextHost.svelte` provides automatic breadcrumbs with `aria-current="location"`.

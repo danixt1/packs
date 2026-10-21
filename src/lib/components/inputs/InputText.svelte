@@ -33,8 +33,8 @@
     let listboxId = $derived(`${id}-suggestions`);
     let hasSuggestions = $derived(suggestions.length > 0);
     let filteredSuggestions = $derived(
-        suggestions.filter((suggestion) =>
-            suggestion.toLowerCase().startsWith(value.trim().toLowerCase())
+        suggestions.filter((suggestion) =>value ?
+            suggestion.toLowerCase().startsWith(value.trim().toLowerCase()) : true
         )
     );
     let showSuggestions = $derived(

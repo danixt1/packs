@@ -17,13 +17,18 @@
     import FormAutonomy from "$lib/components/forms/FormAutonomy.svelte";
     import ContextHost from "$lib/components/ContextHost.svelte";
     import { createContextStack } from "$lib/shared/contextStack.svelte";
+    import type { CtxBuilder } from "$lib/shared/getterCtx";
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
     let characters = $state(editor.getCharacters());
     let knowVars = $derived(Array.from(new Set(characters.map(e =>e.vars.map(a =>a.name)).flat())))
     const stack = createContextStack();
-
+    let ctxAutonomy:CtxBuilder = $state({
+        allowedGetters:['self','runtime','world'],
+        allowedObjects:['autonomy','character','character/place'],
+        editor:editor,
+    });
     let charsList = $derived(characters.map((character) => ({
             Id: character.id,
             Name: character.name,
@@ -190,6 +195,7 @@
     <FormAutonomy
         bind:value={frame.draft}
         {stack}
+        ctx = {ctxAutonomy}
         actions={editor.getActions()}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(autonomy) => frame.resolve(autonomy)}

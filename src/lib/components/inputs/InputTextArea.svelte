@@ -1,4 +1,5 @@
 <script lang="ts">
+    import type { HTMLTextareaAttributes } from "svelte/elements";
     import BaseInput from "./BaseInput.svelte";
     interface Props {
         id: string;
@@ -9,8 +10,9 @@
         maxlength?: number;
         label?: string;
         wrapDiv?: boolean;
+        additional?:HTMLTextareaAttributes
     }
-    let { id, name, value = $bindable(), required = false, minlength, maxlength, label, wrapDiv }: Props = $props();
+    let { id, name, value = $bindable(), required = false, minlength, maxlength, label, wrapDiv,additional = {} }: Props = $props();
 </script>
 <BaseInput id={id} label={label} wrapDiv={wrapDiv}>
     <textarea
@@ -22,5 +24,6 @@
     {required}
     {minlength}
     {maxlength}
+    {...additional}
     ></textarea>
 </BaseInput>

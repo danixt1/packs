@@ -7,7 +7,7 @@
     import Form from "../Form.svelte";
     import FormGetter from "./FormGetter.svelte";
     import FormValue from "./FormValue.svelte";
-    import type { GettersType } from "$lib/types/data/getters";
+    import type { GetterCtx } from "$lib/shared/getterCtx";
 
     type OperandName = 'left' | 'right' | 'variableToCheck';
     type OperandMode = 'getter' | 'value';
@@ -30,7 +30,7 @@
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
-        allowedGetters?:GettersType[];
+        getterCtx:GetterCtx;
     }
 
     let {
@@ -41,7 +41,7 @@
         autoAttach = $bindable(),
         attachTo,
         writeFormPropsTo = $bindable(),
-        allowedGetters
+        getterCtx
     }: Props = $props();
 
     let activeEditor = $state<'condition' | OperandName>('condition');
@@ -50,7 +50,6 @@
     let nestedFormKey = $state(0);
     let operandValue = $state<any>();
     let activeOperand = $derived(activeEditor === 'condition' ? null : activeEditor);
-    let activeValue = $derived(activeOperand ? data[activeOperand] : undefined);
     let description = $state(data.description ?? '');
 
     async function handleStackOperand(name: OperandName) {
@@ -168,7 +167,7 @@
                 value={typeof currentVal === 'object' && currentVal?.type === 'getter' ? currentVal : {}}
                 onAfterSubmit={(val) => frame.resolve(val)}
                 onCancel={() => frame.cancel()}
-                {allowedGetters}
+                getterCtx={getterCtx}
             />
         {:else}
             <FormValue
@@ -242,7 +241,7 @@
                         bind:writeFormPropsTo={nestedFormProps}
                         onAfterSubmit={returnToCondition}
                         onCancel={returnToCondition}
-                        {allowedGetters}
+                        getterCtx={getterCtx}
                     />
                 {:else}
                     <FormValue

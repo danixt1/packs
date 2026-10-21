@@ -1,5 +1,6 @@
 <script lang="ts">
-    import type { ContextStack } from "$lib/shared/contextStack.svelte";
+    import type { ContextFrame, ContextStack } from "$lib/shared/contextStack.svelte";
+    import { type CtxBuilder } from "$lib/shared/getterCtx";
     import type { EffectFomAction } from "$lib/types/data/declarative";
     import FormEffect from "../forms/FormEffect.svelte";
     import OrderedList from "./OrderedList.svelte";
@@ -11,6 +12,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (value: EffectFomAction) => void;
         onCreatePressed?: () => void;
+        ctx?:CtxBuilder
     }
 
     let {
@@ -19,11 +21,12 @@
         onEdit,
         onCancel,
         onAfterSubmit,
-        onCreatePressed
+        onCreatePressed,
+        ctx
     }: Props = $props();
 
     let items = $state<EffectFomAction[]>([]);
-
+    let tempVarsWithPosition = $derived<{varName:string,index:number}[]>((ctx?.tempVars ?? []).map(e => ({index:-1,varName:e})));
     $effect(() => {
         const incoming = values ?? [];
         if (JSON.stringify($state.snapshot(items)) === JSON.stringify(incoming)) {
@@ -36,15 +39,32 @@
         items = next;
         values = next;
     }
+    function newCtx(tempVars:string[]):CtxBuilder|undefined{
+        if(!ctx)return undefined;
+        return {
+            allowedGetters:ctx.allowedGetters,
+            editor:ctx.editor,
+            tempVars:tempVars,
+            allowedObjects:ctx.allowedObjects,
+            actionCategories:ctx.actionCategories
+        }
+    }
 
     async function handleStackCreate() {
         if (!stack) return;
+        let localCtx = newCtx(tempVarsWithPosition.map(e => e.varName));
         const result = await stack.push<EffectFomAction, EffectFomAction>({
             title: 'Add Effect',
             data: { type: 'event', event: '' },
+            meta:{mode:'create',ctx:localCtx},
             render: renderEffectForm
         });
         if (result) {
+            if(result.type === 'setter' && 
+            result.var.in === 'temp-variable' && 
+            !tempVarsWithPosition.some((e)=>e.varName === result.var.variable)){
+                tempVarsWithPosition.push({varName:result.var.variable,index:items.length});
+            }
             setItems([...items, result]);
             onAfterSubmit?.(result);
         } else {
@@ -54,12 +74,24 @@
 
     async function handleStackEdit(effect: EffectFomAction, index: number) {
         if (!stack) return;
+        let localCtx = newCtx(tempVarsWithPosition.filter(e => e.index <= index).map(e => e.varName));
+
+        if(effect.type === 'setter' && effect.var.in === 'temp-variable'){
+            tempVarsWithPosition = tempVarsWithPosition.filter(e => e.varName != effect.var.variable);
+        }
         const result = await stack.push<EffectFomAction, EffectFomAction>({
             title: `Edit Effect (${label(effect)})`,
             data: $state.snapshot(effect),
+            meta:{mode:'edit',ctx:localCtx},
             render: renderEffectForm
         });
         if (result) {
+            if(result.type === 'setter' && 
+                result.var.in === 'temp-variable' && 
+                !tempVarsWithPosition.some((e)=>e.varName === result.var.variable)
+            ){
+                tempVarsWithPosition.push({varName:result.var.variable,index:items.length});
+            }
             const next = [...items];
             next[index] = result;
             setItems(next);
@@ -105,8 +137,9 @@
     }
 </script>
 
-{#snippet renderEffectForm(frame: any)}
+{#snippet renderEffectForm(frame: ContextFrame)}
     <FormEffect
+        ctx = {frame.meta?.ctx}
         stack={stack!}
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}

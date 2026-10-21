@@ -10,6 +10,7 @@
     import ListEffects from "../lists/ListEffects.svelte";
     import { InputNumber, InputSelect, InputSwitch, InputText } from "../inputs";
     import { validateConditionalList, type ConditionToken } from "$lib/shared/conditionalList";
+    import { createGetterCtx, type CtxBuilder } from "$lib/shared/getterCtx";
 
     type EffectType = EffectFomAction['type'];
     type PrimitiveValue = string | number | boolean;
@@ -25,13 +26,15 @@
         onAfterSubmit?: (data: EffectFomAction) => void;
         value?: EffectFomAction;
         stack: ContextStack;
+        ctx?:CtxBuilder
     }
 
     let {
         onCancel,
         onAfterSubmit,
         value = $bindable<EffectFomAction>(),
-        stack
+        stack,
+        ctx
     }: Props = $props();
 
     let data = $state<Record<string, any>>({});
@@ -42,7 +45,32 @@
     let eventContextFields = $state<EventField[]>([]);
     let eventDataFields = $state<EventField[]>([]);
     let eventContextTags = $state<string[]>([]);
-
+    let ctxGetter = (()=>{
+        if(!ctx){
+            return createGetterCtx()
+        }
+        let newCtx = createGetterCtx();
+        if(ctx.allowedGetters)newCtx.setAllowedGetters(ctx.allowedGetters);
+        if(ctx.allowedObjects)newCtx.setAllowedObjects(ctx.allowedObjects);
+        if(ctx.actionCategories)newCtx.setCategories(ctx.actionCategories);
+        if(ctx.editor){
+            return newCtx.varsCallback((e)=>{
+                if(e === 'character/place'){
+                    e = 'place';
+                };
+                if(e === 'temp' && ctx.tempVars){
+                    return ctx.tempVars;
+                }
+                
+                return ctx.editor.getVarsNameFrom(e);
+            })
+        }
+        return newCtx.varsCallback((e)=>{
+            if(e === 'temp' && ctx.tempVars){
+                return ctx.tempVars;
+            }
+        })
+    })()
     let lastValue: EffectFomAction | undefined;
     let hasLoadedValue = false;
 
@@ -429,6 +457,7 @@
 
 {#snippet renderGetterForm(frame: ContextFrame<Record<string, any>, Record<string, any>>)}
     <FormGetter
+        getterCtx={ctxGetter}
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(getter) => frame.resolve(getter)}
@@ -453,19 +482,19 @@
 
 {#snippet renderConditionsForm(frame: ContextFrame<any[], any[]>)}
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <ListConditions bind:values={frame.draft} {stack} />
+        <ListConditions bind:values={frame.draft} {stack} {ctx}/>
     </Form>
 {/snippet}
 
 {#snippet renderTrueEffectsForm(frame: ContextFrame<EffectFomAction[], EffectFomAction[]>)}
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <ListEffects bind:values={frame.draft} {stack} />
+        <ListEffects bind:values={frame.draft} {stack} {ctx}/>
     </Form>
 {/snippet}
 
 {#snippet renderFalseEffectsForm(frame: ContextFrame<EffectFomAction[], EffectFomAction[]>)}
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <ListEffects bind:values={frame.draft} {stack} />
+        <ListEffects bind:values={frame.draft} {stack} {ctx}/>
     </Form>
 {/snippet}
 

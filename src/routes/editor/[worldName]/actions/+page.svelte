@@ -14,12 +14,34 @@
     import { validateActionDraft } from "$lib/shared/actionValidation";
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import { showError, showSucess } from "$lib/notify";
-    import type { ActionDeclaration } from "$lib/types/data/declarative";
+    import type { ActionDeclaration, CollectorToGet } from "$lib/types/data/declarative";
+    import type { GettersType } from "$lib/types/data/getters";
+    import type { allowedObjects, CtxBuilder } from "$lib/shared/getterCtx";
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let actions = $state(editor.getActions());
     const stack = createContextStack();
 
+    let baseCtx:CtxBuilder ={allowedGetters:['runtime','self','target','temp','world'] as GettersType[],editor:editor,allowedObjects:['action','character','character/place','item','place'],actionCategories:editor.getCategories()}
+    function setAvaliableObjectsForCtx(collectors:CollectorToGet[],ctx?:CtxBuilder){
+        
+        if(!ctx)return;
+        let allowed:Set<allowedObjects> = new Set(['action']);
+        for(const collector of collectors){
+            if(collector.target === 'character'){
+                allowed.add('character').add('character/place');
+                continue;
+            }
+            if(collector.target === 'connectedPlaces' || collector.target === 'place'){
+                allowed.add('place');
+                continue;
+            }
+            if(collector.target === 'item'){
+                allowed.add('item');
+            }
+        }
+        ctx.allowedObjects = Array.from(allowed);
+    }
     function emptyAction(): ActionDeclaration  & {_categoriesText:string} {
         return {
             name: '',
@@ -43,7 +65,7 @@
             title: 'New Action',
             data: emptyAction(),
             render: renderActionForm,
-            meta: { mode: 'create' }
+            meta: { mode: 'create',ctx:{...baseCtx} }
         });
 
         if (result) {
@@ -69,7 +91,7 @@
             title: `Edit ${initial.name}`,
             data: initial,
             render: renderActionForm,
-            meta: { mode: 'edit', editingOid }
+            meta: { mode: 'edit', editingOid,ctx:{...baseCtx} }
         });
 
         if (result) {
@@ -194,7 +216,7 @@
         <InputTextArea id="action-description" label="Description:" bind:value={frame.draft.description} wrapDiv />
         <div class="form-group b-line">
             <h3>Collect Targets:</h3>
-            <ListCollectors {stack} bind:values={frame.draft.targets} />
+            <ListCollectors {stack} bind:values={frame.draft.targets} onAfterSubmit={()=>{setAvaliableObjectsForCtx(frame.draft.targets,frame.meta?.ctx)}} />
         </div>
         {#if frame.draft.targets && frame.draft.targets.length > 0}
         <InputNumber id="action-time" label="Execution time:" bind:value={frame.draft.executionTime} required min={0} wrapDiv />
@@ -227,15 +249,15 @@
         </div>
         <div class="form-group">
             <h3>Activation conditions</h3>
-            <ListConditions {stack} bind:values={frame.draft.activationConditions} />
+            <ListConditions {stack} bind:values={frame.draft.activationConditions} ctx={baseCtx}/>
         </div>
         <div class="form-group">
             <h3>Effects on activate</h3>
-            <ListEffects {stack} bind:values={frame.draft.onActivate} />
+            <ListEffects {stack} bind:values={frame.draft.onActivate} ctx={frame.meta?.ctx}/>
         </div>
         <div class="form-group">
             <h3>Effects on complete</h3>
-            <ListEffects {stack} bind:values={frame.draft.onComplete} />
+            <ListEffects {stack} bind:values={frame.draft.onComplete} ctx={frame.meta?.ctx}/>
         </div>
         <div class="form-group">
             <h3>Interruption</h3>
@@ -248,7 +270,7 @@
         </div>
         <div class="form-group">
             <h3>Effects on interrupt</h3>
-            <ListEffects {stack} bind:values={frame.draft.onInterrupt} />
+            <ListEffects {stack} bind:values={frame.draft.onInterrupt} ctx={frame.meta?.ctx}/>
         </div>
         {/if}
     </Form>
@@ -271,11 +293,11 @@
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
         <div class="form-group">
             <h3>Self interruption conditions</h3>
-            <ListConditions {stack} bind:values={frame.draft.interruptSelfConditions} />
+            <ListConditions {stack} bind:values={frame.draft.interruptSelfConditions} ctx={baseCtx}/>
         </div>
         <div class="form-group">
             <h3>Target interruption conditions</h3>
-            <ListConditions {stack} bind:values={frame.draft.interruptTargetConditions} />
+            <ListConditions {stack} bind:values={frame.draft.interruptTargetConditions} ctx={baseCtx}/>
         </div>
     </Form>
 {/snippet}

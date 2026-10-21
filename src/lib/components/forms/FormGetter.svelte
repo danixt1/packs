@@ -1,8 +1,9 @@
 <script lang="ts">
     import {InputSelect,InputText} from "$lib/components/inputs";
     import { showError } from "$lib/notify";
-    import type { GettersType } from "$lib/types/data/getters";
+    import type { GetterCtx } from "$lib/shared/getterCtx";
     import Form from "../Form.svelte";
+    import CopyPasteData from "./CopyPasteData.svelte";
 
     interface GetterDeclarator {
         type: 'getter';
@@ -20,10 +21,11 @@
         /** Property in `autoAttach` that receives the generated getter. */
         attachTo?: string;
         writeFormPropsTo?:Record<string,any>;
-        allowedGetters?: GettersType[]
+        /** Object with auxiliar hint system to the get*/
+        getterCtx?:GetterCtx
     }
     let { onCancel, onAfterSubmit, value = $bindable(),
-        autoAttach = $bindable(), attachTo, writeFormPropsTo = $bindable(),allowedGetters }: Props = $props();
+        autoAttach = $bindable(), attachTo, writeFormPropsTo = $bindable(),getterCtx }: Props = $props();
     let data = $state<Record<string, any>>({});
     const OBJECTS_OPTS = {
         general:[
@@ -39,6 +41,7 @@
         ]
     }
     let allowedTypes = $derived.by(()=>{
+        let allowedGetters = getterCtx?._getter.getAllowedGetters();
         const allEments = [
             {title:'Self',value:'self'},
             {title:'Target',value:'target'},
@@ -79,8 +82,6 @@
             {title:'Place Id',value:'placeId'}
         ],
         action:[
-            // TODO: need to make the has category options
-            {title:'Has Category',value:'hasCategory:'},
             {title:'Action Name',value:'actionName'},
             {title:'Execution Time',value:'executionTime'},
             {title:'Is From Player',value:'isFromPlayer'}
@@ -94,8 +95,14 @@
             {title:'Time',value:'time'}
         ]
     }
-    let metadataOptions = $derived(METADATA_OPTS[data._target as keyof typeof METADATA_OPTS] ?? data._in in METADATA_OPTS ? METADATA_OPTS[data._in as 'world'] : []);
-    let objectsOptions = $state(OBJECTS_OPTS.general);
+    let metadataOptions = $derived(
+        METADATA_OPTS[data._target as keyof typeof METADATA_OPTS]
+            ?? (data._in in METADATA_OPTS ? METADATA_OPTS[data._in as 'world'] : [])
+    );
+    let objectsOptions = $state(setObjectOptions('general'));
+    function setObjectOptions(mode:'general'|'runtime'){
+        return OBJECTS_OPTS[mode].filter((e)=>(getterCtx?._getter.getAllowedObjects() ?? []).includes(e.value as any));
+    }
     $effect(()=>{
         if(!writeFormPropsTo){
             return;
@@ -105,8 +112,16 @@
         }
     })
     $effect(()=>{
+        if(getterCtx){
+            let categories =(getterCtx._getter.getActionCategories() ?? []).map(e =>({
+                title:'Has Category '+e,value:'hasCategory:'+e
+            }));
+            METADATA_OPTS.action = [...METADATA_OPTS.action,...categories];
+        }
+    })
+    $effect(()=>{
         if(!value){
-            data = {};
+            data = {_in:'self',_get:'variable'};
             return;
         }
         if(value.type === 'getter'){
@@ -135,18 +150,25 @@
             return;
         }
         if(data._in === 'runtime'){
-            objectsOptions = OBJECTS_OPTS.runtime;
-            if(OBJECTS_OPTS.runtime.find(o=>o.value === data._target) === undefined){
-                data._target = OBJECTS_OPTS.runtime[0].value;
-            }
-        }else{
-            objectsOptions = OBJECTS_OPTS.general;
-            if(OBJECTS_OPTS.general.find(o=>o.value === data._target) === undefined){
-                data._target = OBJECTS_OPTS.general[0].value;
+            const runtime = setObjectOptions('runtime');
+            objectsOptions =runtime;
+            if(runtime.find(o=>o.value === data._target) === undefined){
+                data._target = runtime[0].value;
             }
         }
+        if(data._in === 'target'){
+            const general = setObjectOptions('general');
+            objectsOptions = general;
+            if(general.find(o=>o.value === data._target) === undefined){
+                data._target = general[0].value;
+            }
+        }
+        if(data._in === 'world'){
+            data._target = '';
+            return
+        }
         if(data._in === 'self'){
-            data._target = 'character';
+            data._target = getterCtx?._getter.getAllowedObjects()[0] ?? 'character';
         }
         if(data._in ==='temp'){
             data._get = 'variable';
@@ -185,6 +207,7 @@
     }
 </script>
 {#snippet inputs()}
+    <CopyPasteData onCopy = {()=>data} onPaste={(e)=>data = e} name='Getter'/>
     <div class="form-group base-data">
         <InputSelect id={'getter-location'} label={'In:'} bind:selected={data._in}
         items={allowedTypes} />
@@ -206,7 +229,7 @@
         {/if}
     </div>
     {#if data._get === 'variable'}
-        <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable} autocomplete='off'/>
+        <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable} autocomplete='off' suggestions={getterCtx?._getter.getVars(data._target) ?? []}/>
     {:else if data._get === 'metadata'}
         <InputSelect id={'getter-metadata'} label={'Metadata:'} wrapDiv bind:selected={data.variable}
         items={metadataOptions}/>

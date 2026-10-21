@@ -7,6 +7,7 @@
     import FormGetter from "./FormGetter.svelte";
     import ListConditions from "../lists/ListConditions.svelte";
     import { validateConditionalList, type ConditionToken } from "$lib/shared/conditionalList";
+    import type { CtxBuilder } from "$lib/shared/getterCtx";
 
     type CollectorKind = 'character'|'place'| 'item' | 'self' | 'connectedPlaces';
     const ENTS = ['character','place','item'];

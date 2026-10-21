@@ -15,12 +15,17 @@
     import { createContextStack } from "$lib/shared/contextStack.svelte";
     import { showError, showSucess } from "$lib/notify";
     import ButtonPopUp from "$lib/components/editor/ButtonPopUp.svelte";
+    import type { CtxBuilder } from "$lib/shared/getterCtx";
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let dialogues = $state(editor.getDialogues());
     const stack = createContextStack();
     let labelsInfo = $state(editor.getLabels());
-
+    let globalCtx:CtxBuilder = {
+        allowedGetters:['self','target','world'],
+        allowedObjects:['character','character/place'],
+        editor:editor,
+    }
     function emptyDialogue(): Record<string, any> {
         return {
             id: '',
@@ -222,7 +227,7 @@
                 ...editor.getCharacters().map((character) => ({ title: `char:${character.name} (${character.id})`, value: { type: 'character', id: character.id } }))
             ]} />
             <h2>On enter effects:</h2>
-            <ListEffects {stack} bind:values={frame.draft.onEnter} />
+            <ListEffects {stack} bind:values={frame.draft.onEnter} ctx={globalCtx}/>
             <h2>Choices:</h2>
             {#if (frame.draft.choices || []).length > 0}
                 <ObjectTable
@@ -248,11 +253,11 @@
         <InputSwitch id="choice-end-dialogue" label="End dialogue" bind:value={frame.draft.endDialogue} wrapDiv />
         <div class="form-group">
             <h2>Conditions</h2>
-            <ListConditions {stack} bind:values={frame.draft.conditions} />
+            <ListConditions {stack} bind:values={frame.draft.conditions} ctx={globalCtx}/>
         </div>
         <div class="form-group">
             <h2>Choice effects</h2>
-            <ListEffects {stack} bind:values={frame.draft.effects} />
+            <ListEffects {stack} bind:values={frame.draft.effects} ctx={globalCtx}/>
         </div>
     </Form>
 {/snippet}
@@ -287,7 +292,7 @@
                 {/key}
             {/if}
             <h2>Conditions</h2>
-            <ListConditions {stack} bind:values={frame.draft.conditions} />
+            <ListConditions {stack} bind:values={frame.draft.conditions} ctx={globalCtx}/>
         </div>
     </Form>
 {/snippet}

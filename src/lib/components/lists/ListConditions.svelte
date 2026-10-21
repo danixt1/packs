@@ -1,5 +1,5 @@
 <script lang="ts">
-    import type { ContextStack } from "$lib/shared/contextStack.svelte";
+    import type { ContextFrame, ContextStack } from "$lib/shared/contextStack.svelte";
     import FormCondition from "../forms/FormCondition.svelte";
     import OrderedList from "./OrderedList.svelte";
     import {
@@ -7,7 +7,7 @@
         isConditionObject,
         type ConditionToken
     } from "$lib/shared/conditionalList";
-    import type { GettersType } from "$lib/types/data/getters";
+    import { createGetterCtx, type CtxBuilder } from "$lib/shared/getterCtx";
 
     interface Props {
         values?: ConditionToken[];
@@ -16,9 +16,8 @@
         onCancel?: () => void;
         onAfterSubmit?: (value: ConditionToken) => void;
         onCreatePressed?: () => void;
-        allowedGetters?:GettersType[]
+        ctx?:CtxBuilder
     }
-
     let {
         values = $bindable<ConditionToken[]>([]),
         stack,
@@ -26,8 +25,26 @@
         onCancel,
         onAfterSubmit,
         onCreatePressed,
-        allowedGetters
+        ctx
     }: Props = $props();
+    let getterCtx = $state(createGetterCtx());
+    $effect(()=>{
+        if(ctx){
+            if(ctx.allowedGetters)getterCtx.setAllowedGetters(ctx.allowedGetters);
+            if(ctx.allowedObjects)getterCtx.setAllowedObjects(ctx.allowedObjects);
+            if(ctx.actionCategories)getterCtx.setCategories(ctx.actionCategories);
+            getterCtx.varsCallback((e)=>{
+                if(e === 'character/place'){
+                    e = 'place';
+                }
+                
+                if(e === 'temp'){
+                    return ctx.tempVars ?? []
+                }
+                return ctx.editor.getVarsNameFrom(e);
+            })
+        }
+    })
 
     function tokens(): ConditionToken[] {
         return values ?? [];
@@ -36,7 +53,6 @@
     function setItems(next: ConditionToken[]) {
         values = next;
     }
-
     async function handleStackCreate() {
         if (!stack) return;
         const condition = await stack.push<any, any>({
@@ -92,12 +108,12 @@
     }
 </script>
 
-{#snippet renderConditionForm(frame: any)}
+{#snippet renderConditionForm(frame: ContextFrame)}
     <FormCondition
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(condition) => frame.resolve(condition)}
-        {allowedGetters}
+        getterCtx = {getterCtx}
     />
 {/snippet}
 

@@ -104,7 +104,10 @@ export function createContextStack(): ContextStack {
                 title: options.title,
                 initialData: isolatedInput,
                 draft: deepSnapshot(options.data),
-                meta: options.meta ? deepSnapshot(options.meta) : undefined,
+                // Metadata can contain services/classes (such as WorldEditor) or
+                // callbacks, so keep its references instead of structured-cloning it.
+                // Form data remains isolated through the snapshots above/below.
+                meta: options.meta ? { ...options.meta } : undefined,
                 render: options.render,
                 resolve: (data: TOut) => {
                     if (settled) return;
