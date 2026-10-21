@@ -1,6 +1,7 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
     import type { VariableDeclarator } from "$lib/types/data/declarative";
+    import CopyPasteData from "../forms/CopyPasteData.svelte";
     import FormVar from "../forms/FormVar.svelte";
     import ObjectTable from "../ObjectTable.svelte";
 
@@ -86,6 +87,7 @@
 {/snippet}
 
 <div class="form-group">
+    <CopyPasteData name='var-list' top={45} onCopy={()=>values} onPaste={(e:any)=>values = e} />
     <h3>{title}</h3>
     {#if !values || values.length === 0}
         <p>No variables to show.</p>

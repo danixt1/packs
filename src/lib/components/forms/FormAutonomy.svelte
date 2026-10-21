@@ -8,6 +8,7 @@
     import ObjectTable from "../ObjectTable.svelte";
     import {type CharacterAutonomyGoal, type CharacterAutonomyRule } from "$lib/types/data/declarative";
     import type { CtxBuilder } from "$lib/shared/getterCtx";
+    import CopyPasteData from "./CopyPasteData.svelte";
 
     interface ActionInfo {
         name: string;
@@ -156,12 +157,16 @@
 {/snippet}
 
 <Form onSubmit={()=>mainSubmit()} onCancel={()=>{onCancel?.();}}>
+    <CopyPasteData name="autonomy" onCopy={()=>value} onPaste={(e:any)=>value = e} />
     <div class="form-group">
         <InputSwitch label="Enabled?" id="autonomy-enabled" bind:value={value.enable}/>
         <InputNumber label="Interval Between decisions" id='autonomy-decisionInterval' bind:value={value.decisionInterval}/>
         <InputNumber label="Max Decisions per turn" id='autonomy-maxActionsPerCycle' bind:value={value.maxActionsPerCycle}/>
     </div>
+    <!--
+    Too isolated. questionable quality for using.
     <ListVars title='Memory Variables:' {stack} bind:values={memory}/>
+    -->
     <div class="form-group">
         {#if value.rules && value.rules.length  > 0}
                 <h3>Rules</h3>

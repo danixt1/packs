@@ -11,6 +11,7 @@
     import { InputNumber, InputSelect, InputSwitch, InputText } from "../inputs";
     import { validateConditionalList, type ConditionToken } from "$lib/shared/conditionalList";
     import { createGetterCtx, type CtxBuilder } from "$lib/shared/getterCtx";
+    import CopyPasteData from "./CopyPasteData.svelte";
 
     type EffectType = EffectFomAction['type'];
     type PrimitiveValue = string | number | boolean;
@@ -284,6 +285,7 @@
 </script>
 
 {#snippet inputs()}
+    <CopyPasteData name={'effect'} onCopy={()=>data} onPaste={(e:any)=>{data = e;selectedType = e.type}} />
     <section class="effect-type-selector" aria-labelledby="effect-type-heading">
         <h2 id="effect-type-heading">Choose an effect</h2>
         <p>This choice determines which effect you are adding</p>
@@ -303,7 +305,7 @@
         </div>
         {#if selectedType === 'move'}
             <div class="form-group">
-                <button type="button" class="nested-button" data-testid="button-move-moveId" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>Edit character to move</button>
+                <button type="button" class="nested-button" data-testid="button-move-moveId" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>{data.moveId?'from:'+ data.moveId.in + ':'+data.moveId.variable : "Add character to move"}</button>
                 <InputSelect id='effect-move-toId-type'
                 bind:selected={data._valueKind} label="Type:"
                 items={[

@@ -2,6 +2,7 @@
     import type { ContextFrame, ContextStack } from "$lib/shared/contextStack.svelte";
     import { type CtxBuilder } from "$lib/shared/getterCtx";
     import type { EffectFomAction } from "$lib/types/data/declarative";
+    import CopyPasteData from "../forms/CopyPasteData.svelte";
     import FormEffect from "../forms/FormEffect.svelte";
     import OrderedList from "./OrderedList.svelte";
 
@@ -148,6 +149,8 @@
 {/snippet}
 
 <div class="effect-list form-group">
+    <CopyPasteData name='list-effects' top={-17}
+     onCopy={()=>items} onPaste={(e:any)=>{if(Array.isArray(e))values = e}}/>
     <OrderedList
         bind:values={items}
         getLabel={label}
@@ -163,6 +166,7 @@
         display: flex;
         flex-direction: column;
         gap: 0.5rem;
+        border: 3px solid var(--border-default);
     }
     .add-button {
         align-self: flex-start;

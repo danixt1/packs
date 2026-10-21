@@ -2,11 +2,12 @@
     import { showError, showSucess } from "$lib/notify";
 
     interface Props{
-        onCopy():Record<string,any>
-        onPaste(receivedData:Record<string,any>):void,
+        onCopy():Record<string,any> | Record<string,any>[]
+        onPaste(receivedData:Record<string,any> | Record<string,any>[]):void,
         name:string
+        top?:number
     }
-    let {onCopy,onPaste,name}:Props = $props();
+    let {onCopy,onPaste,name,top}:Props = $props();
     async function handleOnCopy(){
         let data = onCopy();
         let dataToPass ='PACKS-'+name +JSON.stringify(data);
@@ -39,16 +40,21 @@
         onPaste(newData);
     }
 </script>
-<div class="opts-bar">
-    <button type="button" class="margin" onclick={handleOnCopy}>Copy</button>
-    <button type="button" onclick={handleOnPaste}>Paste</button>
+<div class="copy-paste">
+    <div class="opts-bar" style:top={top ? top+'px':'0px'}>
+        <button type="button" class="margin" onclick={handleOnCopy}>Copy</button>
+        <button type="button" onclick={handleOnPaste}>Paste</button>
+    </div>
 </div>
 <style>
+    .copy-paste{
+        position: relative;
+    }
     .opts-bar{
         position: absolute;
         display: flex;
         justify-content: flex-end;
-        right: 10px;
+        right: 0px;
     }
     .margin{
         margin-right: 3px;

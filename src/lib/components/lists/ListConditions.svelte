@@ -8,6 +8,7 @@
         type ConditionToken
     } from "$lib/shared/conditionalList";
     import { createGetterCtx, type CtxBuilder } from "$lib/shared/getterCtx";
+    import CopyPasteData from "../forms/CopyPasteData.svelte";
 
     interface Props {
         values?: ConditionToken[];
@@ -118,6 +119,7 @@
 {/snippet}
 
 <div class="condition-list">
+    <CopyPasteData top={10} name={'list-conditions'} onCopy={()=>values} onPaste={(e:any)=>values = e} />
     <div class="toolbar">
         <button type="button" onclick={addCondition}>Add Condition</button>
         <button type="button" onclick={() => addToken('AND')}>AND</button>
@@ -126,7 +128,6 @@
         <button type="button" onclick={() => addToken('(')}>(</button>
         <button type="button" onclick={() => addToken(')')}>)</button>
     </div>
-
     <OrderedList
         bind:values={values}
         getLabel={describeToken}
