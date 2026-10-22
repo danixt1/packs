@@ -3,7 +3,7 @@ import { loadWorld as loadStoredWorld } from './gameStorage';
 import type { LabelInfo } from "$lib/types/data/editor";
 let currentEditor:null|WorldEditor = null;
 
-export type targetsWithVar = 'character'|'temp'|'self'|'place'|'item'
+export type targetsWithVar = 'character'|'temp'|'self'|'place'|'item'|'world'
 
 type VarRelation = ({
     relation:'use'
@@ -294,8 +294,18 @@ export class WorldEditor {
     }
     public getVarsNameFrom(objName:targetsWithVar){
         let toSend:string = objName;
-        if(objName === 'character'){
+        if(objName === 'character' || objName === 'self'){
             toSend = 'char';
+        }
+        if(objName === 'temp'){
+            const names = new Set<string>();
+            const visit = (value:unknown) => {
+                if(!value || typeof value !== 'object') return;
+                if('tempVarName' in value && typeof value.tempVarName === 'string') names.add(value.tempVarName);
+                Object.values(value).forEach(visit);
+            };
+            this.getActions().forEach(visit);
+            return Array.from(names);
         }
         return Array.from(this.possibleVarsToObject[toSend] ?? []);
     }
@@ -305,23 +315,22 @@ export class WorldEditor {
     public getInfoFromEvent(event:string){
         return this.eventsInfo[event];
     }
+    public getTextTemplateFieldsFromEvent(event:string){
+        return [...new Set(this.eventsInfo[event]?.sharedProperties ?? [])];
+    }
     public getCategories(){
         return this.categories;
     }
     private extractVariablesRefInText(text:string){
-        let matchs =text.match(/([^\\]|^)(\$([^$]+)[^\\]\$)/g);
-        if(!matchs){
-            return [];
-        }
-        return matchs.map(extract);
-        function extract(matchedText:string){
-            matchedText = matchedText.substring(matchedText.indexOf('$') + 1,matchedText.length - 1);
-            let [_,fullLoc,varName] = matchedText.match(/(\w+:[\w/]+-\w+):([\w_]+)/)!;
-            return {
-                in:fullLoc,
-                variable:varName
-            } as VariableToGet
-        }
+		const refs:VariableToGet[] = [];
+		for(const [,placeholder] of text.matchAll(/(?<!\\)\$([^$\n]+)(?<!\\)\$/g)){
+			const parsed = placeholder.match(/^([\w/:-]+):([\w_]+)$/);
+			if(!parsed) continue;
+			const [,fullLoc,varName] = parsed;
+			if(!/^(?:\w+:[\w/]+-\w+|[\w/]+-\w+)$/.test(fullLoc)) continue;
+			refs.push({ in:fullLoc, variable:varName } as VariableToGet);
+		}
+		return refs;
     }
     private analyzeConditionalLists(list:ConditionalList<any>[],originOid:string,sublocation:string){
         for(const value of Object.values(list)){

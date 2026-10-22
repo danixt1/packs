@@ -3,7 +3,7 @@
     import ButtonEditorCreate from '$lib/components/editor/ButtonEditorCreate.svelte';
     import EditorWrapper from '$lib/components/EditorWrapper.svelte';
     import Form from '$lib/components/Form.svelte';
-    import { InputCard, InputNumber, InputSelect, InputText, InputTextArea } from '$lib/components/inputs';
+    import { InputCard, InputNumber, InputSelect, InputText, InputTextEditor } from '$lib/components/inputs';
     import ListConditions from '$lib/components/lists/ListConditions.svelte';
     import ObjectTable from '$lib/components/ObjectTable.svelte';
     import Popup from '$lib/components/Popup.svelte';
@@ -77,6 +77,7 @@
     }
 
     async function startEdit(template: Record<string, unknown>) {
+        
         const originalOid = template.oid as string;
         const initial = $state.snapshot(template) as TemplateData;
         initial.categories ??= [];
@@ -163,7 +164,8 @@
         return true;
     }
     function submitTemplate(frame:ContextFrame){
-        let originalOid = frame.meta?.originalId || null;
+        let originalOid = frame.meta?.originalOid || null;
+        
         if(handleSaveTemplate(frame.draft,originalOid)){
             const name = String(frame.draft.name ?? '').trim();
             const templateText = String(frame.draft.template ?? '').trim();
@@ -271,19 +273,10 @@
 
 {#snippet renderTemplateForm(frame: ContextFrame)}
     {@const roles = getRolesFromDraft(frame.draft)}
+    {@const roleFields = Object.fromEntries(roles.map((role) => [role.name, editor.getTextTemplateFieldsFromEvent(role.event)]))}
     <Form onSubmit={() => submitTemplate(frame)} onCancel={() => frame.cancel()}>
         <InputText id="template-name" label="Name:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
-        <InputTextArea id="template-text" label="Template text:" bind:value={frame.draft.template} required wrapDiv />
-        <InputNumber id="template-priority" label="Priority:" bind:value={frame.draft.priority} required wrapDiv />
-        <InputText id="template-categories" label="Categories (comma separated):" bind:value={frame.draft._categoriesText} autocomplete="off" wrapDiv />
         <div class="form-group">
-            <h3>Event match</h3>
-            <InputSelect
-                id="template-primary-role"
-                label="Primary role:"
-                bind:selected={frame.draft.match.primaryRole}
-                items={[{ value: '', title: 'Select a role' }, ...roles.map((r) => ({ value: r.name, title: r.name }))]}
-            />
             {#if roles.length === 0}
                 <p>No event roles configured.</p>
             {:else}
@@ -301,6 +294,18 @@
                 />
             {/if}
             <button type="button" class="nested-button" onclick={() => openRole(frame)}>Add event role</button>
+        </div>
+        <InputTextEditor id="template-text" label="Template text:" bind:value={frame.draft.template} mode="template" {editor} {roleFields} required wrapDiv />
+        <InputNumber id="template-priority" label="Priority:" bind:value={frame.draft.priority} required wrapDiv />
+        <InputText id="template-categories" label="Categories (comma separated):" bind:value={frame.draft._categoriesText} autocomplete="off" wrapDiv />
+        <div class="form-group">
+            <h3>Event match</h3>
+            <InputSelect
+                id="template-primary-role"
+                label="Primary role:"
+                bind:selected={frame.draft.match.primaryRole}
+                items={[{ value: '', title: 'Select a role' }, ...roles.map((r) => ({ value: r.name, title: r.name }))]}
+            />
         </div>
     </Form>
 {/snippet}

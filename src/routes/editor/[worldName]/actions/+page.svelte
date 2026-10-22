@@ -3,7 +3,7 @@
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
     import Form from "$lib/components/Form.svelte";
-    import { InputCard, InputNumber, InputSelect, InputText, InputTextArea } from "$lib/components/inputs";
+    import { InputCard, InputNumber, InputSelect, InputText, InputTextArea, InputTextEditor } from "$lib/components/inputs";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
     import Popup from "$lib/components/Popup.svelte";
     import ListCollectors from "$lib/components/lists/ListCollectors.svelte";
@@ -177,7 +177,8 @@
         const updated = await stack.push<any, any>({
             title: 'Configure Display',
             data: $state.snapshot(parentFrame.draft.display),
-            render: renderDisplayForm
+            render: renderDisplayForm,
+            meta: { tempVars: collectTempVars(parentFrame.draft) }
         });
         if (updated) {
             parentFrame.draft.display = updated;
@@ -207,6 +208,17 @@
     function actionAudienceLabel(availableTo?: string[]) {
         const audiences = availableTo?.length ? availableTo : ['player'];
         return audiences.map((audience) => audience === 'player' ? 'Player' : 'Autonomous').join(' + ');
+    }
+
+    function collectTempVars(value: unknown) {
+        const names = new Set<string>();
+        const visit = (current: unknown) => {
+            if (!current || typeof current !== 'object') return;
+            if ('tempVarName' in current && typeof current.tempVarName === 'string') names.add(current.tempVarName);
+            Object.values(current).forEach(visit);
+        };
+        visit(value);
+        return Array.from(names);
     }
 </script>
 
@@ -278,8 +290,8 @@
 
 {#snippet renderDisplayForm(frame: ContextFrame)}
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <InputText id="display-name" label="Display name:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
-        <InputTextArea id="display-description" label="Display description:" bind:value={frame.draft.description} required wrapDiv />
+        <InputTextEditor id="display-name" label="Display name:" bind:value={frame.draft.name} mode="display" {editor} tempVars={frame.meta?.tempVars ?? []} required singleLine wrapDiv />
+        <InputTextEditor id="display-description" label="Display description:" bind:value={frame.draft.description} mode="display" {editor} tempVars={frame.meta?.tempVars ?? []} required wrapDiv />
         <InputSelect id="display-show-as" label="Show as:" bind:selected={frame.draft.showAs} wrapDiv items={[
             { title: 'Option of object', value: 'optionOfObject' },
             { title: 'Option of action list', value: 'optionOfActionList' }

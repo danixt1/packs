@@ -305,7 +305,7 @@
         </div>
         {#if selectedType === 'move'}
             <div class="form-group">
-                <button type="button" class="nested-button" data-testid="button-move-moveId" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>{data.moveId?'from:'+ data.moveId.in + ':'+data.moveId.variable : "Add character to move"}</button>
+                <button type="button" class="nested-button" data-testid="button-move-moveId" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>{data.moveId?'from: '+ data.moveId.in + ':'+data.moveId.variable : "Add character to move"}</button>
                 <InputSelect id='effect-move-toId-type'
                 bind:selected={data._valueKind} label="Type:"
                 items={[

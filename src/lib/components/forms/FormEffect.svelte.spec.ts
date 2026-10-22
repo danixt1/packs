@@ -153,10 +153,10 @@ test('renders only one getter editor at a time for move effects', async () => {
     const stack = createContextStack();
     const screen = await render(FormEffect, { stack, value: moveEffect });
 
-    await expect.element(screen.getByRole('button', { name: 'Edit character to move' })).toBeVisible();
+    await expect.element(screen.getByRole('button', { name: `from: ${moveEffect.moveId.in}:${moveEffect.moveId.variable}` })).toBeVisible();
     await expect.element(screen.getByRole('button', { name: 'Edit destination' })).toBeVisible();
 
-    await screen.getByRole('button', { name: 'Edit character to move' }).click();
+    await screen.getByRole('button', { name: `from: ${moveEffect.moveId.in}:${moveEffect.moveId.variable}` }).click();
     expect(stack.current?.title).toBe('Configure Character to Move');
     expect(stack.current?.draft).toEqual(moveEffect.moveId);
 
