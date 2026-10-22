@@ -36,14 +36,24 @@
     }
     .popup {
         padding: 0;
-        width: min(100%, 45rem);
-        max-height: 90vh;
         border: 1px solid var(--border-subtle);
         border-radius: 8px;
         background: var(--bg-panel-solid);
         color: var(--color-text);
         box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.55);
         overflow: auto;
+    }
+    @media screen and (max-width:732px){
+        .popup{
+            width: calc(99% - 2px);
+            height: 100vh;
+        }
+    }
+    @media screen and (min-width:732px){
+        .popup{
+            width: 45rem;
+            max-height: 90vh;
+        }
     }
     h2 {
         margin: 0;
