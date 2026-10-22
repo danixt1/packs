@@ -114,7 +114,10 @@ const GETTER_HANDLERS: Record<string, GetterHandler> = {
 		const value = context.temp?.[getter.variable];
 		if (value !== undefined) return ok(value, `temp-variable:${getter.variable}`);
 		if (getter.fallback !== undefined) return { ok: true, value: getter.fallback, path: `temp-variable:${getter.variable}` };
-		return { ok: false, path: `temp-variable:${getter.variable}`, reason: 'missing temp variable' };
+		if(!context.temp){
+			context.temp = {};
+		}
+		return { ok: true, path: `temp-variable:${getter.variable}`, variable:{name:getter.variable,value:'',type:'string'} };
 	},
 
 	'self-variable': (state, getter, context) => {

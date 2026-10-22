@@ -196,6 +196,7 @@ function writeVariable(state: RuntimeState, variableGetter: any, value: any, mod
 		state.debug.push(`Cannot write ${variableGetter?.in}:${variableGetter?.variable}`);
 		return false;
 	}
+	let putInVar = resolved.variable;
 	let incoming = value;
 	if (typeof value === 'object' && value?.type === 'random-interval') {
 		incoming = Math.floor(rng() * (value.max - value.min + 1)) + value.min;
@@ -207,15 +208,23 @@ function writeVariable(state: RuntimeState, variableGetter: any, value: any, mod
 	}
 	if (isGetter(incoming)) incoming = resolveGetter(state, incoming, context).value;
 
-	const current = resolved.variable.value;
-	if (mode === 'set') resolved.variable.value = incoming;
-	if (mode === 'increment') resolved.variable.value = Number(current) + Number(incoming);
-	if (mode === 'decrement') resolved.variable.value = Number(current) - Number(incoming);
-	if (mode === 'multiply') resolved.variable.value = Number(current) * Number(incoming);
-	if (mode === 'divide') resolved.variable.value = Number(current) / Number(incoming);
-	if (resolved.variable.type === 'number') {
-		if (resolved.variable.min !== undefined) resolved.variable.value = Math.max(resolved.variable.min, Number(resolved.variable.value));
-		if (resolved.variable.max !== undefined) resolved.variable.value = Math.min(resolved.variable.max, Number(resolved.variable.value));
+	const current = putInVar.value;
+	if (mode === 'set') putInVar.value = incoming;
+	if (mode === 'increment') putInVar.value = Number(current) + Number(incoming);
+	if (mode === 'decrement') putInVar.value = Number(current) - Number(incoming);
+	if (mode === 'multiply') putInVar.value = Number(current) * Number(incoming);
+	if (mode === 'divide') putInVar.value = Number(current) / Number(incoming);
+	if (putInVar.type === 'number') {
+		if (putInVar.min !== undefined) putInVar.value = Math.max(putInVar.min, Number(putInVar.value));
+		if (putInVar.max !== undefined) putInVar.value = Math.min(putInVar.max, Number(putInVar.value));
+	}
+	if(resolved.path?.startsWith('temp-variable:')){
+		if(context.temp){
+			context.temp[putInVar.name] = putInVar.value;
+			return true;
+		}
+		state.debug.push(`Cannot write temp ${variableGetter?.in}:${variableGetter?.variable}`);
+		return false;
 	}
 	return true;
 }

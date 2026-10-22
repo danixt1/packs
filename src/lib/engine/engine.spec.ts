@@ -8,7 +8,7 @@ import {
 	validateWorld
 } from '$lib/engine';
 import { resolveGetter } from './getters';
-import type { World } from '$lib/types/data/declarative';
+import type { EffectFomAction, World } from '$lib/types/data/declarative';
 
 const byName = (worldUnderTest: any, name: string) => worldUnderTest.actions.find((action: any) => action.name === name);
 const numberVar = (vars: { name: string; value: unknown }[], name: string) => vars.find((item) => item.name === name)?.value as number;
@@ -695,4 +695,30 @@ describe('actions, events, dialogue, autonomy, and persistence', () => {
 		expect(engine.getState().eventQueue.some((event) => event.event === 'INSTANT-PROBE_INTERRUPTED')).toBe(false);
 		expect(engine.getState().eventQueue.some((event) => event.event === 'INSTANT-PROBE_COMPLETED')).toBe(false);
 	});
+	it('creates temp var and uses it while making a action',()=>{
+		const testWorld = engineTestWorld({
+			'probe':{
+				onActivate:[
+					{
+						type:'setter',
+						mode:'set',
+						var:{type:'getter',in:'temp-variable',variable:'declared'},
+						value:15
+					},
+					{
+						type:'setter',
+						mode:'decrement',
+						var:{type:'getter',in:'self-variable',variable:'health'},
+						value:{type:'getter',in:'temp-variable',variable:'declared'}
+					}
+				] as EffectFomAction[]
+			}
+		})
+		const state = createRuntimeState(testWorld);
+		const engine = createGameEngine(testWorld, state);
+		engine.dispatch({ type: 'start-action', actionOptionId: engine.getView().availableActions.find((option) => option.actionName === 'probe')!.id });
+		const runtimeArthur = engine.getState().characters.find((character) => character.id === 'arthur')!;
+		expect(engine.getState().debug).toStrictEqual([]);
+		expect(runtimeArthur.vars.find(e =>e.name === 'health')?.value).equal(85);
+	})
 });
