@@ -9,6 +9,7 @@
         getLabel: (value: T, index: number) => string;
         onEdit?: (value: T, index: number) => void;
         onDelete?: (value: T, index: number) => void;
+        onReorder?: (values: T[]) => void;
         validateChange?: (values: T[]) => boolean;
         onInvalidChange?: (message: string) => void;
         invalidChangeMessage?: string;
@@ -20,6 +21,7 @@
         getLabel,
         onEdit,
         onDelete,
+        onReorder,
         validateChange,
         onInvalidChange,
         invalidChangeMessage = 'That change would make the list invalid.',
@@ -100,6 +102,7 @@
         }
 
         setItems(next);
+        onReorder?.(next.map((item) => item.value));
         dragIndex = null;
         overIndex = null;
     }
@@ -116,6 +119,7 @@
     <ul class="items">
         {#each items as item, index (item.id)}
             <li
+                data-testid={'orderedlist-item-' + index}
                 class="item"
                 class:dragging={dragIndex === index}
                 class:over={overIndex === index && dragIndex !== index}
@@ -129,9 +133,9 @@
                 <span class="label">{getLabel(item.value, index)}</span>
                 <span class="actions">
                     {#if onEdit}
-                        <button type="button" onclick={() => onEdit?.(item.value, index)}>Edit</button>
+                        <button data-testid={'orderedlist-button-edit-'+index} type="button" onclick={() => onEdit?.(item.value, index)}>Edit</button>
                     {/if}
-                    <button type="button" onclick={() => removeItem(index)}>Delete</button>
+                    <button data-testid={'orderedlist-button-delete-'+index} type="button" onclick={() => removeItem(index)}>Delete</button>
                 </span>
             </li>
         {/each}

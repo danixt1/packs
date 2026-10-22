@@ -118,8 +118,15 @@
         onEdit?.(effect, index);
     }
 
-    function deleteEffect(_: EffectFomAction, index: number) {
-        setItems(items.filter((__, itemIndex) => itemIndex !== index));
+    function deleteEffect() {
+        // OrderedList has already updated its bound `items` array before
+        // calling onDelete, so only sync the new list back to the component value.
+        values = items;
+    }
+
+    function reorderEffects(next: EffectFomAction[]) {
+        items = next;
+        values = next;
     }
 
     function label(effect: EffectFomAction): string {
@@ -156,6 +163,7 @@
         getLabel={label}
         onEdit={stack || onEdit ? editEffect : undefined}
         onDelete={deleteEffect}
+        onReorder={reorderEffects}
         emptyText="No effects yet. Add an effect to start."
     />
     <button type="button" class="add-button" onclick={addEffect}>Add Effect</button>
