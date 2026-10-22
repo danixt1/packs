@@ -16,6 +16,7 @@ export interface StoredWorldMetadata {
 	createdAt: number;
 	updatedAt: number;
 	isBundled?: boolean;
+	isStored?:boolean;
 }
 
 export interface StoredSaveMetadata {
@@ -248,13 +249,15 @@ function worldDataKey(worldId: string) {
 function saveDataKey(worldId: string, slotId: string) {
 	return `${SAVE_DATA_PREFIX}${worldId}-${slotId}`;
 }
-
 export function listWorlds(): StoredWorldMetadata[] {
 	const metadata = readWorldMetadata();
 	let bundledMetadata = metadata.find((world) => world.id === MAIN_WORLD_ID);
 	if (!bundledMetadata) {
 		bundledMetadata = metadataFromWorld(bundledWorld, MAIN_WORLD_ID);
-		writeWorldMetadata([...metadata, bundledMetadata]);
+		bundledMetadata.isStored = false;
+		//writeWorldMetadata([...metadata, bundledMetadata]);
+	}else{
+		bundledMetadata.isStored = true;
 	}
 	const custom = metadata.filter((world) => world.id !== MAIN_WORLD_ID);
 	return [bundledMetadata, ...custom].sort((left, right) => left.name.localeCompare(right.name));
@@ -381,7 +384,6 @@ export function renameSave(worldId: string, slotId: string, name: string): Store
 }
 
 export function deleteWorld(worldId: string): boolean {
-	if (worldId === MAIN_WORLD_ID) return false;
 	removeKey(worldDataKey(worldId));
 	for (const save of listSaves(worldId)) removeKey(saveDataKey(worldId, save.slotId));
 	writeSaveMetadata(readSaveMetadata().filter((save) => save.worldId !== worldId));

@@ -140,6 +140,10 @@
 						<button type="button" class="world-delete-btn" title={`Delete ${world.name}`} onclick={(event) => removeWorld(event, world.id)}>
 							Delete
 						</button>
+					{:else if world.isStored}
+						<button type="button" class="world-delete-btn" title={`Delete ${world.name}`} onclick={(event) => removeWorld(event, world.id)}>
+							Delete overrides
+						</button>
 					{/if}
 				</article>
 			{/each}
