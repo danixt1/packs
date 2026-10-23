@@ -190,6 +190,8 @@ function metadataFromWorld(world: World, id: string, previous?: StoredWorldMetad
 	};
 }
 
+const bundledWorldMetadata = metadataFromWorld(bundledWorld, MAIN_WORLD_ID);
+
 function isWorldMetadata(value: unknown): value is StoredWorldMetadata {
 	return isRecord(value)
 		&& typeof value.id === 'string'
@@ -253,7 +255,7 @@ export function listWorlds(): StoredWorldMetadata[] {
 	const metadata = readWorldMetadata();
 	let bundledMetadata = metadata.find((world) => world.id === MAIN_WORLD_ID);
 	if (!bundledMetadata) {
-		bundledMetadata = metadataFromWorld(bundledWorld, MAIN_WORLD_ID);
+		bundledMetadata = { ...bundledWorldMetadata };
 		bundledMetadata.isStored = false;
 		//writeWorldMetadata([...metadata, bundledMetadata]);
 	}else{
