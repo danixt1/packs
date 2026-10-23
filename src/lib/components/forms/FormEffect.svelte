@@ -50,10 +50,13 @@
         if(!ctx){
             return createGetterCtx()
         }
+        
         let newCtx = createGetterCtx();
         if(ctx.allowedGetters)newCtx.setAllowedGetters(ctx.allowedGetters);
         if(ctx.allowedObjects)newCtx.setAllowedObjects(ctx.allowedObjects);
         if(ctx.actionCategories)newCtx.setCategories(ctx.actionCategories);
+        if(ctx.selfMetadata)newCtx.setSelfMetadata(ctx.selfMetadata);
+
         if(ctx.editor){
             return newCtx.varsCallback((e)=>{
                 if(e === 'character/place'){
@@ -62,7 +65,11 @@
                 if(e === 'temp' && ctx.tempVars){
                     return ctx.tempVars;
                 }
-                
+                if(e === 'self'){
+                    return ctx.selfVars ?? (ctx.selfMetadata
+                     && ctx.selfMetadata != 'action' 
+                     && ctx.selfMetadata != 'autonomy' ? ctx.editor.getVarsNameFrom(ctx.selfMetadata) : []);
+                }
                 return ctx.editor.getVarsNameFrom(e);
             })
         }

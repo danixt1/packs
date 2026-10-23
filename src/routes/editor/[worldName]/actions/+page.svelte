@@ -16,29 +16,37 @@
     import { showError, showSucess } from "$lib/notify";
     import type { ActionDeclaration, CollectorToGet } from "$lib/types/data/declarative";
     import type { GettersType } from "$lib/types/data/getters";
-    import type { allowedObjects, CtxBuilder } from "$lib/shared/getterCtx";
+    import type { allowedObjectsStructures, CtxBuilder, ObjectsWithMetadata } from "$lib/shared/getterCtx";
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let actions = $state(editor.getActions());
     const stack = createContextStack();
 
     let baseCtx:CtxBuilder ={allowedGetters:['runtime','self','target','temp','world'] as GettersType[],editor:editor,allowedObjects:['action','character','character/place','item','place'],actionCategories:editor.getCategories()}
+    
     function setAvaliableObjectsForCtx(collectors:CollectorToGet[],ctx?:CtxBuilder){
         
         if(!ctx)return;
-        let allowed:Set<allowedObjects> = new Set(['action']);
+        let allowed:Set<allowedObjectsStructures> = new Set(['action']);
+        let selfMetadata:ObjectsWithMetadata | null = null;
         for(const collector of collectors){
             if(collector.target === 'character'){
                 allowed.add('character').add('character/place');
+                selfMetadata = 'character'
                 continue;
             }
             if(collector.target === 'connectedPlaces' || collector.target === 'place'){
                 allowed.add('place');
+                selfMetadata = 'place';
                 continue;
             }
             if(collector.target === 'item'){
                 allowed.add('item');
+                selfMetadata = 'item'
             }
+        }
+        if(selfMetadata){
+            ctx.selfMetadata = selfMetadata;
         }
         ctx.allowedObjects = Array.from(allowed);
     }
@@ -86,7 +94,7 @@
         initial.onActivate ??= [];
         initial.onInterrupt ??= [];
         initial.onComplete ??= [];
-
+        setAvaliableObjectsForCtx(initial.targets,baseCtx);
         const result = await stack.push<any, any>({
             title: `Edit ${initial.name}`,
             data: initial,
@@ -261,7 +269,7 @@
         </div>
         <div class="form-group">
             <h3>Activation conditions</h3>
-            <ListConditions {stack} bind:values={frame.draft.activationConditions} ctx={baseCtx}/>
+            <ListConditions {stack} bind:values={frame.draft.activationConditions} ctx={frame.meta?.ctx}/>
         </div>
         <div class="form-group">
             <h3>Effects on activate</h3>

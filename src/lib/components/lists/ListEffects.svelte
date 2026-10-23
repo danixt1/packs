@@ -27,13 +27,20 @@
     }: Props = $props();
 
     let items = $state<EffectFomAction[]>([]);
-    let tempVarsWithPosition = $derived<{varName:string,index:number}[]>((ctx?.tempVars ?? []).map(e => ({index:-1,varName:e})));
+    let tempVarsWithPosition = $state<{varName:string,index:number}[]>([]);
     $effect(() => {
         const incoming = values ?? [];
         if (JSON.stringify($state.snapshot(items)) === JSON.stringify(incoming)) {
             return;
         }
         items = incoming;
+        let temps:{varName:string,index:number}[] = [];
+        incoming.forEach((e,i)=>{
+            if(e.type != 'setter')return;
+            if(e.var.in != 'temp-variable')return
+            temps.push({varName:e.var.variable,index:i});
+        });
+        tempVarsWithPosition = [...tempVarsWithPosition,...temps];
     });
 
     function setItems(next: EffectFomAction[]) {
@@ -47,12 +54,15 @@
             editor:ctx.editor,
             tempVars:tempVars,
             allowedObjects:ctx.allowedObjects,
-            actionCategories:ctx.actionCategories
+            actionCategories:ctx.actionCategories,
+            selfMetadata:ctx.selfMetadata,
+            selfVars:ctx.selfVars
         }
     }
 
     async function handleStackCreate() {
         if (!stack) return;
+        
         let localCtx = newCtx(tempVarsWithPosition.map(e => e.varName));
         const result = await stack.push<EffectFomAction, EffectFomAction>({
             title: 'Add Effect',

@@ -34,11 +34,17 @@
             if(ctx.allowedGetters)getterCtx.setAllowedGetters(ctx.allowedGetters);
             if(ctx.allowedObjects)getterCtx.setAllowedObjects(ctx.allowedObjects);
             if(ctx.actionCategories)getterCtx.setCategories(ctx.actionCategories);
+            if(ctx.selfMetadata)getterCtx.setSelfMetadata(ctx.selfMetadata);
+            
             getterCtx.varsCallback((e)=>{
                 if(e === 'character/place'){
                     e = 'place';
                 }
-                
+                if(e === 'self'){
+                    return ctx.selfVars ?? (ctx.selfMetadata
+                     && ctx.selfMetadata != 'action' 
+                     && ctx.selfMetadata != 'autonomy' ? ctx.editor.getVarsNameFrom(ctx.selfMetadata) : []);
+                }
                 if(e === 'temp'){
                     return ctx.tempVars ?? []
                 }

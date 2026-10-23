@@ -2,6 +2,7 @@
     import {InputSelect,InputText} from "$lib/components/inputs";
     import { showError } from "$lib/notify";
     import type { GetterCtx } from "$lib/shared/getterCtx";
+    import { derived } from "svelte/store";
     import Form from "../Form.svelte";
     import CopyPasteData from "./CopyPasteData.svelte";
 
@@ -97,9 +98,16 @@
     }
     let metadataOptions = $derived(
         METADATA_OPTS[data._target as keyof typeof METADATA_OPTS]
-            ?? (data._in in METADATA_OPTS ? METADATA_OPTS[data._in as 'world'] : [])
+            ?? (data._in in METADATA_OPTS ? METADATA_OPTS[data._in as 'world'] 
+            : (getterCtx?._getter.getSelfMetadata() ? METADATA_OPTS[getterCtx?._getter.getSelfMetadata()!] : [])
+        )
     );
     let objectsOptions = $state(setObjectOptions('general'));
+    let suggestions = $derived(getterCtx?._getter.getVars(data._target ? data._target : data._in) ?? []);
+    let selectableGetters = $derived([
+            (data._target != 'action' ? {title:'Variable',value:'variable'}: null),
+            (data._in != 'temp' ? {title:'Metadata',value:'metadata'} : null)
+        ].filter(e => e != null))
     function setObjectOptions(mode:'general'|'runtime'){
         return OBJECTS_OPTS[mode].filter((e)=>(getterCtx?._getter.getAllowedObjects() ?? []).includes(e.value as any));
     }
@@ -116,7 +124,9 @@
             let categories =(getterCtx._getter.getActionCategories() ?? []).map(e =>({
                 title:'Has Category '+e,value:'hasCategory:'+e
             }));
-            METADATA_OPTS.action = [...METADATA_OPTS.action,...categories];
+            if(categories.length > 0){
+                METADATA_OPTS.action = [...METADATA_OPTS.action,...categories];
+            }
         }
     })
     $effect(()=>{
@@ -124,14 +134,26 @@
             data = {_in:'self',_get:'variable'};
             return;
         }
+        let t = $state.snapshot(value);
         if(value.type === 'getter'){
-            const [scope, source] = value.in.split(':', 2);
-            const isSelfGetter = scope === 'self-variable' || scope === 'self-metadata';
-            const sourceParts = isSelfGetter ? [scope.slice('self-'.length)] : (source?.split('-') ?? []);
+            const [scope, source]:[string,string] = value.in.split(':', 2);
+            let _in = scope;
+            let _get = '';
+            let _target = '';
+            if(!value.in.includes('-')){
+                showError('Passed Getter is invalid!',`in:${value.in} don't is a valid structure`);
+            }
+            if(source && source.includes('-')){
+                [_target,_get] = source.split('-',2);   
+            }
+            if(scope.includes('-')){
+                [_in,_get] = scope.split('-',2);
+            }
+
             data = {
-                _in: isSelfGetter ? 'self' : scope,
-                _target: isSelfGetter ? 'character' : sourceParts[0],
-                _get: isSelfGetter ? sourceParts[0] : sourceParts[1],
+                _in: _in,
+                _target: _target,
+                _get: _get,
                 variable: value.variable,
                 fallback: value.fallback
             };
@@ -168,10 +190,11 @@
             return
         }
         if(data._in === 'self'){
-            data._target = getterCtx?._getter.getAllowedObjects()[0] ?? 'character';
+            data._target = '';
         }
         if(data._in ==='temp'){
             data._get = 'variable';
+            data._target = '';
         }
     });
     function onSubmit(){
@@ -215,21 +238,11 @@
             <InputSelect id={'getter-target'} label={'Object:'} bind:selected={data._target}
             items={objectsOptions}/>
         {/if}
-        {#if data._in != 'temp'}
-            <InputSelect id={'getter-get'} label={'Get:'} bind:selected={data._get}
-            items={[
-                {title:'Variable',value:'variable'},
-                {title:'Metadata',value:'metadata'}
-            ]}/>
-        {:else}
-            <InputSelect id={'getter-get'} label={'Get:'} disabled bind:selected={data._get} 
-            items={[
-                {title:'Variable',value:'variable'}
-            ]}/>
-        {/if}
+        <InputSelect id={'getter-get'} label={'Get:'} bind:selected={data._get} disabled={selectableGetters.length === 1}
+        items={selectableGetters}/>
     </div>
     {#if data._get === 'variable'}
-        <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable} autocomplete='off' suggestions={getterCtx?._getter.getVars(data._target) ?? []}/>
+        <InputText id={'getter-variable'} label={'Variable:'} wrapDiv bind:value={data.variable} autocomplete='off' suggestions={suggestions}/>
     {:else if data._get === 'metadata'}
         <InputSelect id={'getter-metadata'} label={'Metadata:'} wrapDiv bind:selected={data.variable}
         items={metadataOptions}/>
