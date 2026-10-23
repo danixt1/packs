@@ -2,7 +2,7 @@
 
 The editor is built from reusable components that create and modify the data declared in [`declarative.d.ts`](../src/lib/types/data/declarative.d.ts). Editor routes own the data being edited and compose the reusable components needed to display and update it.
 
-The current editor flow is based on the **ContextStack** architecture (`components/lists`, `components/forms`, and `ContextHost.svelte`). The old `PageSwitch` and legacy `formPopupFlow` state models have been replaced by recursive, promise-based stack navigation. The remaining components in `components/editor` are button components that are still used by editor routes and are kept there for convenience.
+The current editor flow is based on the **ContextStack** architecture (`components/lists`, `components/forms`, and `ContextHost.svelte`). They are recursive, promise-based stack navigation.
 
 ## ContextStack Architecture
 
@@ -61,7 +61,7 @@ Forms are reusable editors for individual data values. Under the ContextStack pa
 - renders a Cancel button only when `onCancel` is provided; and
 - renders the form's child inputs through a Svelte snippet.
 
-## Remaining components in `components/editor`
+## components in `components/editor`
 
 The `components/editor` folder is still used for reusable editor buttons:
 
