@@ -412,12 +412,16 @@ export class WorldEditor {
         }
     }
     private delAllRefs(oid:string){
-        let refs = this.refsByOID[oid];
+        let refs =this.refsByOID[oid];
+
         if(!refs){
             return
         }
         for(const ref of refs){
             if(ref.is == 'var'){
+                if(!this.relationVars[ref.prop]){
+                    continue
+                }
                 this.relationVars[ref.prop] = this.relationVars[ref.prop].filter((e)=>e.oid != oid);
                 if(this.relationVars[ref.prop].length === 0){
                     delete this.relationVars[ref.prop]

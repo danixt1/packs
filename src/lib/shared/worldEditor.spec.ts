@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest';
 import { WorldEditor, type LabelMapper } from './worldEditor';
-import type { World } from '$lib/types/data/declarative';
+import type { ActionDeclaration, EventEffect, World } from '$lib/types/data/declarative';
 function buildBlankWorld():World{
     return {
         actions:[],
@@ -133,3 +133,55 @@ it('loads, updates, deletes, and serializes text templates', () => {
     expect(editor.getTextTemplates()).toHaveLength(0);
     expect(editor.toWorld().textTemplates).toEqual([]);
 });
+
+it('correct update action with temp vars',()=>{
+    const world = buildBlankWorld();
+    let changeEvent:EventEffect = {
+                type:'event',
+                event:'TEST_EVENT',
+                data:{}
+            }
+    let action:ActionDeclaration = {
+        name:'test-action',
+        targets:[{
+            collectIf:[],
+            target:'character',
+            type:'collector'
+        }],
+        activationConditions:[],
+        executionTime:5,
+        onActivate:[
+            {
+                type:'setter',
+                mode:'set',
+                value:{type:'getter',in:'self-variable',variable:'currentTime'},
+                var:{type:'getter',in:'temp-variable',variable:'test-var'}
+            },
+            {
+                type:'setter',
+                mode:'decrement',
+                value:{type:'getter',in:'self-variable',variable:'startedAt'},
+                var:{type:'getter',in:'temp-variable',variable:'test-var'}
+            },
+            changeEvent
+        ],
+        onComplete:[],
+    }
+    world.characters.push({
+        id:'test-char',
+        name:'test',
+        controlledByPlayer:true,
+        vars:[
+            {name:'char-var1',type:'number',value:24}
+        ]
+    })
+    const editor = new WorldEditor(world);
+    editor.addAction(action);
+    let updated = editor.getActions()[0];
+    changeEvent.data = {
+        ctx:{type:'getter',in:'temp-variable',variable:'test-var'}
+    }
+    updated.onActivate[1] = changeEvent;
+    editor.updateObject(updated);
+    expect(editor.getListEvents()).toStrictEqual(['TEST_EVENT'])
+})
