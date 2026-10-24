@@ -85,40 +85,46 @@
 
     .list {
         display: flex;
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-
-    .choice {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 38px;
-        padding: 6px 12px;
+        width: 100%;
+        overflow: hidden;
         border: 1px solid var(--border-default);
         border-radius: 12px;
         background: var(--bg-panel-solid);
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .choice {
+        position: relative;
+        display: flex;
+        flex: 1 1 0;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        min-height: 40px;
+        padding: 2px 12px;
+        border-left: 1px solid var(--border-default);
+        background: transparent;
         color: var(--color-text);
         cursor: pointer;
         user-select: none;
-        transition: background-color 0.2s ease-in-out, border-color 0.2s ease-in-out;
+        text-align: center;
+        transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
     }
 
-    .choice:hover:not(.disabled) {
+    .choice:first-child {
+        border-left: 0;
+    }
+
+    .choice:hover:not(.disabled):not(.selected) {
         background: var(--bg-card-hover);
-        border-color: var(--border-strong);
     }
 
     .choice.selected {
-        background: var(--bg-card-hover);
-        border-color: var(--border-strong);
+        background: var(--border-strong);
     }
 
     .choice:focus-within {
-        outline: 2px solid var(--color-accent);
-        outline-offset: 2px;
+        z-index: 1;
     }
 
     .choice input {

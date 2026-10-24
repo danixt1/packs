@@ -12,6 +12,7 @@
     import { validateConditionalList, type ConditionToken } from "$lib/shared/conditionalList";
     import { createGetterCtx, type CtxBuilder } from "$lib/shared/getterCtx";
     import CopyPasteData from "./CopyPasteData.svelte";
+    import InputChoice from "../inputs/InputChoice.svelte";
 
     type EffectType = EffectFomAction['type'];
     type PrimitiveValue = string | number | boolean;
@@ -300,7 +301,7 @@
         {#if selectedType === 'move'}
             <div class="form-group">
                 <button type="button" class="nested-button" data-testid="button-move-moveId" onclick={() => handleStackGetter('moveId', 'Configure Character to Move')}>{data.moveId?'from: '+ data.moveId.in + ':'+data.moveId.variable : "Add character to move"}</button>
-                <InputSelect id='effect-move-toId-type'
+                <InputChoice id='effect-move-toId-type'
                 bind:selected={data._valueKind} label="Type:"
                 items={[
                     {title:'Literal',value:'literal'},

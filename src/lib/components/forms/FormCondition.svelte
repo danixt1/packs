@@ -8,6 +8,7 @@
     import FormGetter from "./FormGetter.svelte";
     import FormValue from "./FormValue.svelte";
     import type { GetterCtx } from "$lib/shared/getterCtx";
+    import InputChoice from "../inputs/InputChoice.svelte";
 
     type OperandName = 'left' | 'right' | 'variableToCheck';
     type OperandMode = 'getter' | 'value';
@@ -152,7 +153,7 @@
 {#snippet renderOperandForm(frame: any)}
     {@const currentVal = frame.draft.val}
     <div class="operand-editor">
-        <InputSelect
+        <InputChoice
             id="operand-mode"
             label="Value source:"
             wrapDiv
@@ -221,7 +222,7 @@
         {/if}
         <InputText id="condition-description" label="Description" wrapDiv bind:value={description} autocomplete="off" />
     {:else}
-        <InputSelect
+        <InputChoice
             id="operand-mode"
             label="Value source:"
             wrapDiv

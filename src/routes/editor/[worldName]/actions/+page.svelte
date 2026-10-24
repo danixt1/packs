@@ -236,7 +236,7 @@
         <InputTextArea id="action-description" label="Description:" bind:value={frame.draft.description} wrapDiv />
         <div class="form-group b-line">
             <h3>Collect Targets:</h3>
-            <ListCollectors {stack} bind:values={frame.draft.targets} onAfterSubmit={()=>{setAvaliableObjectsForCtx(frame.draft.targets,frame.meta?.ctx)}} />
+            <ListCollectors {stack} ctx={baseCtx} bind:values={frame.draft.targets} onAfterSubmit={()=>{setAvaliableObjectsForCtx(frame.draft.targets,frame.meta?.ctx)}} />
         </div>
         {#if frame.draft.targets && frame.draft.targets.length > 0}
         <InputNumber id="action-time" label="Execution time:" bind:value={frame.draft.executionTime} required min={0} wrapDiv />

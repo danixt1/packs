@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
+    import type { CtxBuilder } from "$lib/shared/getterCtx";
     import type { CollectorToGet } from "$lib/types/data/declarative";
     import FormCollector from "../forms/FormCollector.svelte";
     import OrderedList from "./OrderedList.svelte";
@@ -11,6 +12,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (value: CollectorToGet) => void;
         onCreatePressed?: () => void;
+        ctx:CtxBuilder;
     }
 
     let {
@@ -19,7 +21,8 @@
         onEdit,
         onCancel,
         onAfterSubmit,
-        onCreatePressed
+        onCreatePressed,
+        ctx
     }: Props = $props();
 
     function describeCollector(value: CollectorToGet): string {
@@ -84,6 +87,7 @@
 {#snippet renderCollectorForm(frame: any)}
     <FormCollector
         {stack}
+        {ctx}
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(collector) => frame.resolve(collector)}

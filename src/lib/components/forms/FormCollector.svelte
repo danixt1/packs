@@ -19,13 +19,15 @@
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
+        ctx:CtxBuilder;
     }
 
     let {
         value = $bindable<CollectorToGet>(),
         stack,
         onCancel,
-        onAfterSubmit
+        onAfterSubmit,
+        ctx
     }: Props = $props();
     let collectIf = $state<ConditionToken[]>([]);
 
@@ -129,6 +131,10 @@
             <ListConditions
                 bind:values={collectIf}
                 {stack}
+                ctx={{editor:ctx.editor,
+                    selfMetadata:value.target as 'character'|'place'|'item',
+                    allowedGetters:['self','target','world','runtime'],
+                    allowedObjects:value.target === 'character' ? ['character','character/place'] : [value.target as 'place'|'item'] }}
             />
         </div>
     {:else if value.target === 'connectedPlaces'}
