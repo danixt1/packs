@@ -1,7 +1,7 @@
 <script lang="ts">
     import type { ContextFrame, ContextStack } from "$lib/shared/contextStack.svelte";
     import { type CtxBuilder } from "$lib/shared/getterCtx";
-    import type { EffectFomAction } from "$lib/types/data/declarative";
+    import type { EffectFomAction, VariableModify } from "$lib/types/data/declarative";
     import CopyPasteData from "../forms/CopyPasteData.svelte";
     import FormEffect from "../forms/FormEffect.svelte";
     import OrderedList from "./OrderedList.svelte";
@@ -91,7 +91,7 @@
             tempVarsWithPosition = tempVarsWithPosition.filter(e => e.varName != effect.var.variable);
         }
         const result = await stack.push<EffectFomAction, EffectFomAction>({
-            title: `Edit Effect (${label(effect)})`,
+            title: `Edit Effect (${(new DOMParser()).parseFromString(label(effect), 'text/html').body.textContent})`,
             data: $state.snapshot(effect),
             meta:{mode:'edit',ctx:localCtx},
             render: renderEffectForm
@@ -140,17 +140,47 @@
     }
 
     function label(effect: EffectFomAction): string {
+        function accent(text:string){
+            return `<span style="color:var(--color-accent)">${text}</span>`
+        }
         switch (effect.type) {
             case 'move':
-                return 'Move character';
+                let toId = effect.toId;
+                if(typeof toId === 'object'){
+                    toId = `${toId.in}:${toId.variable}`
+                }
+                return `${accent('Move character')} To ${toId}`;
             case 'event':
-                return `Event: ${effect.event || '(unnamed)'}`;
+                return `${accent('Event')} ${effect.event || '(unnamed)'} ${effect.data ?'with data: '+ Object.keys(effect.data).join(',') : ''}`;
             case 'conditional':
-                return `Conditional (${effect.onTrue.length} true / ${effect.onFalse?.length ?? 0} false effects)`;
+                return `${accent('Conditional')} (${effect.onTrue.length} true / ${effect.onFalse?.length ?? 0} false effects)`;
             case 'setter':
-                return `Set variable (${effect.mode}) in ${effect.var.in}:${effect.var.variable}`;
+                const OPTS:Record<VariableModify['mode'],string> = {
+                     decrement:'-=',
+                     divide:'/=',
+                     increment:'+=',
+                     multiply:'*=',
+                     set:'='
+                }
+                let varToSet = `${accent('SET')} ${effect.var.in}:${effect.var.variable} ${accent(OPTS[effect.mode])} `;
+                if(typeof effect.value === 'object'){
+
+                    if(effect.value.type === 'getter'){
+                        return varToSet +`${effect.value.in}:${effect.value.variable}`;
+                    }
+                    if(effect.value.type === 'random-interval'){
+                        return varToSet + `RANDOM(${effect.value.min},${effect.value.max})`
+                    }
+                    if(effect.value.type === 'random-value'){
+                        return varToSet + `ANY OF:${effect.value.values.join(',')}`
+                    }
+                }
+                if(typeof effect.value === 'string'){
+                    return `${varToSet}"${effect.value}"`
+                }
+                return varToSet + effect.value;
             case 'start-dialogue':
-                return `Start dialogue: ${effect.dialogueId ?? effect.intent ?? '(unspecified)'}`;
+                return `${accent('Start Dialogue')} ${effect.dialogueId ?? effect.intent ?? '(unspecified)'}`;
         }
     }
 </script>

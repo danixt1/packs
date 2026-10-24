@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { setCurrentWindowToScroll } from "$lib/shared/pageFocused";
     import type { Snippet } from "svelte";
 
     interface Props{
@@ -8,17 +9,22 @@
         children: Snippet;
     }
     let { title, onClose, open, children }: Props = $props();
-
+    let popupPage:HTMLElement|undefined = $state();
     function dismiss() {
         onClose?.();
     }
+    $effect(()=>{
+        if(open && popupPage){
+            setCurrentWindowToScroll(popupPage);
+        }
+    })
     let isSmarthphone = (()=>typeof navigator.maxTouchPoints === 'number' ? navigator.maxTouchPoints > 0 : false)()
 </script>
 <svelte:window onkeydown={(event) => { if (open && event.key === 'Escape') dismiss(); }} />
 
 {#if open}
     <div class="popup-backdrop" role="presentation" onclick={(event) => {if(isSmarthphone)return; if (event.target === event.currentTarget) dismiss(); }}>
-        <dialog open class="popup" aria-labelledby="object-editor-title">
+        <dialog open class="popup" aria-labelledby="object-editor-title" bind:this={popupPage}>
             <h2 id="object-editor-title">{title ?? 'Create Object'}</h2>
             {@render children()}
         </dialog>

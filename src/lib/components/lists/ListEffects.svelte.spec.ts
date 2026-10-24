@@ -31,7 +31,7 @@ test('delete only the choose effect',async ()=>{
     // Delete the event effect and keep the move and setter effects.
     await screen.getByTestId('orderedlist-button-delete-0').click();
     await expect.element(screen.getByText('Move character')).toBeVisible();
-    await expect.element(screen.getByText('Set variable')).toBeVisible();
+    await expect.element(screen.getByText('Set self-variable')).toBeVisible();
 })
 
 test('keeps effects in their new order after dragging', async () => {
@@ -47,8 +47,8 @@ test('keeps effects in their new order after dragging', async () => {
         ]
     });
 
-    await screen.getByText('Event: FIRST').dropTo(screen.getByText('Move character'));
+    await screen.getByText('Event FIRST').dropTo(screen.getByText('Move character'));
 
     await expect.element(screen.getByTestId('orderedlist-item-0')).toHaveTextContent('Move character');
-    await expect.element(screen.getByTestId('orderedlist-item-1')).toHaveTextContent('Event: FIRST');
+    await expect.element(screen.getByTestId('orderedlist-item-1')).toHaveTextContent('Event FIRST');
 });

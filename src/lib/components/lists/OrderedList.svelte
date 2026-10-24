@@ -130,7 +130,7 @@
                 ondragend={onDragEnd}
             >
                 <span class="grip" aria-hidden="true">⠿</span>
-                <span class="label">{getLabel(item.value, index)}</span>
+                <span class="label">{@html getLabel(item.value, index)}</span>
                 <span class="actions">
                     {#if onEdit}
                         <button data-testid={'orderedlist-button-edit-'+index} type="button" onclick={() => onEdit?.(item.value, index)}>Edit</button>

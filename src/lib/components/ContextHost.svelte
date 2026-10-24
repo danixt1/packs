@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
+    import { getCurrentScrollabelWindow } from "$lib/shared/pageFocused";
     import { onMount, tick, type Snippet } from "svelte";
 
     interface Props {
@@ -19,13 +20,17 @@
     }
     $effect(()=>{
         stack.beforePush((newFrame)=>{
-            let scrollTop = document.querySelector('.popup')?.scrollTop;
-
+            let elem = getCurrentScrollabelWindow();
+            if(!elem){
+                return;
+            }
+            let scrollTop = elem.scrollTop;
+            elem.scrollTop = 0;
             newFrame.savedScrollPos = scrollTop;
         })
         stack.afterPop(async (oldFrame)=>{
             await tick();
-            let ele = document.querySelector('.popup');
+            let ele = getCurrentScrollabelWindow()
             if(ele){
                 ele.scrollTop = oldFrame.savedScrollPos || 0;
             }
