@@ -705,6 +705,13 @@ describe('actions, events, dialogue, autonomy, and persistence', () => {
 						var:{type:'getter',in:'temp-variable',variable:'declared'},
 						value:15
 					},
+					// check the capacity of holding the value
+					{
+						type:'setter',
+						mode:'increment',
+						var:{type:'getter',in:'temp-variable',variable:'declared'},
+						value:5
+					},
 					{
 						type:'setter',
 						mode:'decrement',
@@ -719,6 +726,6 @@ describe('actions, events, dialogue, autonomy, and persistence', () => {
 		engine.dispatch({ type: 'start-action', actionOptionId: engine.getView().availableActions.find((option) => option.actionName === 'probe')!.id });
 		const runtimeArthur = engine.getState().characters.find((character) => character.id === 'arthur')!;
 		expect(engine.getState().debug).toStrictEqual([]);
-		expect(runtimeArthur.vars.find(e =>e.name === 'health')?.value).equal(85);
+		expect(runtimeArthur.vars.find(e =>e.name === 'health')?.value).equal(80);
 	})
 });
