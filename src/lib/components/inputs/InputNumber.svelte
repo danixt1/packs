@@ -22,6 +22,7 @@
     name={name}
     bind:value={value}
     class="def-input"
+    inputmode="decimal"
     {required}
     {min}
     {max}

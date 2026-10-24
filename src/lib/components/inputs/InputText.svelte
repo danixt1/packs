@@ -23,7 +23,7 @@
         maxlength,
         label,
         wrapDiv,
-        autocomplete,
+        autocomplete = 'off',
         suggestions = []
     }: Props = $props();
 
@@ -88,6 +88,8 @@
             {minlength}
             {maxlength}
             {autocomplete}
+            autocorrect="off"
+            autocapitalize="none"
             role={hasSuggestions ? "combobox" : undefined}
             aria-autocomplete={hasSuggestions ? "list" : undefined}
             aria-haspopup={hasSuggestions ? "listbox" : undefined}

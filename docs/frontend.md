@@ -28,7 +28,7 @@ All reusable input components are located in `src/lib/components/inputs`.
 The folder's `index.ts` file re-exports the components, so they can be imported together:
 
 ```ts
-import { InputCard, InputNumber, InputSelect, InputSwitch, InputText, InputTextArea } from "$lib/components/inputs";
+import { InputCard, InputChoice, InputNumber, InputSelect, InputSwitch, InputText, InputTextArea } from "$lib/components/inputs";
 ```
 
 All input components support the optional `wrapDiv` prop. When it is `true`, the component is wrapped in a `<div class="form-group">`, which applies the standard spacing. Set it to `false` when the component is already inside a `.form-group` or requires a custom layout.
@@ -76,7 +76,7 @@ interface InputNumberProps extends BaseInput {
     placeholder?: string;
 }
 
-// InputSelect.svelte: select input for choosing one option.
+// InputSelect.svelte: compact dropdown for choosing one option.
 interface InputSelectProps extends BaseInput {
     label: string;
     items: { value: string; title: string }[];
@@ -84,8 +84,17 @@ interface InputSelectProps extends BaseInput {
     disabled?: boolean;
 }
 
+// InputChoice.svelte: visible radio-card input for choosing one option.
+// Use this when options should stay visible; use InputSelect for a compact dropdown.
+interface InputChoiceProps extends BaseInput {
+    label: string;
+    items: { value: string; title: string; disabled?: boolean }[];
+    selected: string;           // Bindable selected value.
+    disabled?: boolean;
+    onchange?: (event: Event) => void;
+}
+
 // InputCard.svelte: selectable cards for choosing zero or more options.
-// Use InputSelect when the user must choose only one option.
 interface InputCardProps extends BaseInput {
     label: string;
     items: { value: string; title: string }[];
@@ -107,7 +116,7 @@ interface InputSwitchProps extends BaseInput {
 
 Input components generate a stable `data-testid` automatically from their required `id` prop. The value is always `input-${id}`; no separate test ID prop is needed.
 
-For example, an input declared as `<InputText id="name" ... />` can be selected with `getByTestId('input-name')`. The same convention applies to `InputTextArea`, `InputNumber`, `InputSelect`, `InputSwitch`, and the `InputCard` group.
+For example, an input declared as `<InputText id="name" ... />` can be selected with `getByTestId('input-name')`. The same convention applies to `InputTextArea`, `InputNumber`, `InputSelect`, `InputChoice`, `InputSwitch`, and the `InputCard` group.
 
 ## Editor Components
 

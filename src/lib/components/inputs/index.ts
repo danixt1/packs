@@ -3,5 +3,6 @@ export {default as InputText} from './InputText.svelte';
 export {default as InputTextArea} from './InputTextArea.svelte';
 export {default as InputTextEditor} from './InputTextEditor.svelte';
 export {default as InputSelect} from './InputSelect.svelte';
+export {default as InputChoice} from './InputChoice.svelte';
 export {default as InputNumber} from './InputNumber.svelte';
 export {default as InputSwitch} from './InputSwitch.svelte';
