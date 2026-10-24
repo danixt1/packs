@@ -27,6 +27,7 @@
     let ctxAutonomy:CtxBuilder = $state({
         allowedGetters:['self','runtime','world'],
         allowedObjects:['autonomy','character','character/place'],
+        selfMetadata:'character',
         editor:editor,
     });
     let charsList = $derived(characters.map((character) => ({

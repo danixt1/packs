@@ -91,12 +91,10 @@
         }
     }
     async function startEditGoal(item:any,index:number) {
-        if(!item.when){
-            item.when = [];
-        }
-        if(!item.stayActiveIf){
-            item.stayActiveIf = []
-        }
+
+        item.when ??= [];
+        item.stayActiveIf ??= [];
+        
         const result = await stack.push({
             title:'Editing goal '+item.name,
             data:$state.snapshot(item),
@@ -104,7 +102,7 @@
             render:AutonomyGoal
         });
         if(result){
-            value.goals[index] = item;
+            value.goals[index] = result;
         }
     }
 </script>
@@ -130,11 +128,13 @@
             ]} />
             <h3>When:</h3>
             <ListConditions {stack} bind:values={frame.draft.when} {ctx}/>
-            <InputText id='autonomy-rule-action' label='Action:' bind:value={frame.draft.actionName} autocomplete='off' required/>
-            {#if frame.draft.actionName && actions && !actions.some(e => e.name === frame.draft.actionName) }
-                <p class="warn">
-                    Action <b>{frame.draft.actionName}</b> currently don't exist. remember to create after.
-                </p>
+            {#if frame.draft.type === 'action-rule'}
+                <InputText id='autonomy-rule-action' label='Action:' bind:value={frame.draft.actionName} autocomplete='off' required suggestions={actions?.map(e =>e.name)}/>
+                {#if frame.draft.actionName && actions && !actions.some(e => e.name === frame.draft.actionName) }
+                    <p class="warn">
+                        Action <b>{frame.draft.actionName}</b> currently don't exist. remember to create after.
+                    </p>
+                {/if}
             {/if}
             <InputText id='autonomy-rule-name' label='Rule Name:' bind:value={frame.draft.name} autocomplete='off' required/>
             <InputText id='autonomy-rule-description' label='Description:' bind:value={frame.draft.description} autocomplete='off' />
@@ -143,7 +143,7 @@
             <InputNumber id='autonomy-rule-cooldown' label='Cooldown' bind:value={frame.draft.cooldown} />
             {#if frame.draft.type == 'action-rule'}
                 <InputNumber id='autonomy-rule-weight' label='Weight:' bind:value={frame.draft.weight} />
-                <InputSelect id='autonomy-rule-type' label='Type:' bind:selected={frame.draft.targeting} items={[
+                <InputSelect id='autonomy-rule-targeting' label='Type:' bind:selected={frame.draft.targeting} items={[
                     {title:'First Valid',value:'firstValid'},
                     {title:'Random Valid',value:'randomValid'},
                     {title:'All Valid',value:'allValid'}
