@@ -94,6 +94,11 @@
         if (hasLoadedValue && value === lastValue) return;
         data = $state.snapshot(value ?? { type: 'event', event: '' });
         selectedType = data.type ?? 'event';
+        if (selectedType === 'conditional') {
+            data.conditions ??= [];
+            data.onTrue ??= [];
+            data.onFalse ??= [];
+        }
         targetIdMode = data.targetId && typeof data.targetId === 'object' ? 'getter' : 'value';
 
         const configuredValue = data.type === 'move' ? data.toId : data.value;
@@ -254,24 +259,6 @@
             randomValue = result;
             data.value = result;
         }
-    }
-
-    async function handleStackConditions() {
-        const result = await stack.push<any[], any[]>({
-            title: 'Configure Conditions',
-            data: data.conditions ?? [],
-            render: renderConditionsForm
-        });
-        if (result) data.conditions = result;
-    }
-
-    async function handleStackEffectBranch(branch: 'onTrue' | 'onFalse') {
-        const result = await stack.push<EffectFomAction[], EffectFomAction[]>({
-            title: `Configure ${branch === 'onTrue' ? 'True' : 'False'} Effects`,
-            data: data[branch] ?? [],
-            render: branch === 'onTrue' ? renderTrueEffectsForm : renderFalseEffectsForm
-        });
-        if (result) data[branch] = result;
     }
 
     function addContextField() {
@@ -455,11 +442,18 @@
                 <button type="button" class="nested-button" onclick={() => handleStackGetter('targetId', 'Configure Target Getter')}>Edit target getter</button>
             </div>
         {:else if selectedType === 'conditional'}
-            <div class="form-group">
-                <button type="button" class="nested-button" onclick={handleStackConditions}>Configure conditions ({data.conditions?.length ?? 0})</button>
-                <button type="button" class="nested-button" onclick={() => handleStackEffectBranch('onTrue')}>Configure true effects ({data.onTrue?.length ?? 0})</button>
-                <button type="button" class="nested-button" onclick={() => handleStackEffectBranch('onFalse')}>Configure false effects ({data.onFalse?.length ?? 0})</button>
-            </div>
+            <section class="conditional-list" aria-label="Conditions">
+                <h3>Conditions</h3>
+                <ListConditions bind:values={data.conditions} {stack} {ctx}/>
+            </section>
+            <section class="conditional-list" aria-label="True effects">
+                <h3>On true</h3>
+                <ListEffects bind:values={data.onTrue} {stack} {ctx}/>
+            </section>
+            <section class="conditional-list" aria-label="False effects">
+                <h3>On false</h3>
+                <ListEffects bind:values={data.onFalse} {stack} {ctx}/>
+            </section>
         {/if}
     </section>
 {/snippet}
@@ -487,24 +481,6 @@
         onCancel={() => frame.cancel()}
         onAfterSubmit={(next) => frame.resolve(next)}
     />
-{/snippet}
-
-{#snippet renderConditionsForm(frame: ContextFrame<any[], any[]>)}
-    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <ListConditions bind:values={frame.draft} {stack} {ctx}/>
-    </Form>
-{/snippet}
-
-{#snippet renderTrueEffectsForm(frame: ContextFrame<EffectFomAction[], EffectFomAction[]>)}
-    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <ListEffects bind:values={frame.draft} {stack} {ctx}/>
-    </Form>
-{/snippet}
-
-{#snippet renderFalseEffectsForm(frame: ContextFrame<EffectFomAction[], EffectFomAction[]>)}
-    <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
-        <ListEffects bind:values={frame.draft} {stack} {ctx}/>
-    </Form>
 {/snippet}
 
 <Form onSubmit={onSubmit} onCancel={onCancel}>
@@ -578,6 +554,21 @@
         background: rgba(215, 177, 115, 0.08);
         font-size: 0.8rem;
         font-weight: 600;
+    }
+    .conditional-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+        margin: 0.75rem 0;
+        padding: 0.75rem;
+        border: 1px solid var(--border-subtle);
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .conditional-list h3 {
+        margin: 0;
+        color: var(--color-text-bright);
+        font-size: 0.95rem;
     }
     .zone{
         border: 1px solid var(--border-subtle);

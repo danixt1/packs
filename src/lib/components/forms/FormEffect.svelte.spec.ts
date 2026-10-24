@@ -166,7 +166,7 @@ test('renders only one getter editor at a time for move effects', async () => {
     expect(stack.current?.draft).toEqual(moveEffect.toId);
 });
 
-test('opens conditional effect editors from the main effect form', async () => {
+test('renders conditional lists together in the main effect form', async () => {
     const conditionalEffect: EffectFomAction = {
         type: 'conditional',
         conditions: [],
@@ -176,10 +176,13 @@ test('opens conditional effect editors from the main effect form', async () => {
     const stack = createContextStack();
     const screen = await render(FormEffect, { stack, value: conditionalEffect });
 
-    await screen.getByRole('button', { name: /Configure conditions/ }).click();
-
-    expect(stack.current?.title).toBe('Configure Conditions');
-    expect(stack.current?.draft).toEqual([]);
+    await expect.element(screen.getByRole('region', { name: 'Conditions' })).toBeVisible();
+    await expect.element(screen.getByRole('region', { name: 'True effects' })).toBeVisible();
+    await expect.element(screen.getByRole('region', { name: 'False effects' })).toBeVisible();
+    await expect.element(screen.getByRole('button', { name: 'Add Condition' })).toBeVisible();
+    await expect.element(screen.getByRole('button', { name: 'Add Effect' }).first()).toBeVisible();
+    await expect.element(screen.getByRole('button', { name: 'Add Effect' }).last()).toBeVisible();
+    expect(stack.depth).toBe(0);
 });
 for(const effectName of ['Move','Event','Conditional','Set variable','Start dialogue']){
     test(`fail on not passed data on ${effectName}`,async ()=>{
