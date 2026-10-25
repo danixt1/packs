@@ -292,6 +292,9 @@ export class WorldEditor {
         this.deleteObject(oid);
         selected.call(this,obj);
     }
+    getVarsRelations(varName:string){
+        return this.relationVars[varName];
+    }
     public getVarsNameFrom(objName:targetsWithVar){
         let toSend:string = objName;
         if(objName === 'character' || objName === 'self'){

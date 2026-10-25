@@ -1,5 +1,6 @@
 <script lang="ts">
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
+    import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
     import type { VariableDeclarator } from "$lib/types/data/declarative";
     import CopyPasteData from "../forms/CopyPasteData.svelte";
     import FormVar from "../forms/FormVar.svelte";
@@ -34,7 +35,9 @@
             values = [];
         }
     });
-
+    function accent(text:string){
+        return `<span style="color:var(--color-accent)">${text}</span>`
+    }
     async function handleStackCreate() {
         if (!stack) return;
         const result = await stack.push<Partial<VariableDeclarator>, VariableDeclarator>({
@@ -94,13 +97,49 @@
     {:else}
         <ObjectTable
             items={values.map((v) => {
+                const TYPE_VAR = {
+                    'boolean':accent('bool:'),
+                    'number':accent('num:'),
+                    'string':accent('str:')
+                }
+                function makeCard(title:string){
+                    return`
+                    <span style="border:1px solid var(--border-default);font-size:small;padding:1px 3px;margin-right:2px">
+                        ${title}
+                    </span>
+                    `
+                }
+                let cards = '';
+                let editor = getCurrentWorldEditor();
+                let data = editor.getVarsRelations(v.name);
+                let isUsed = false;
+                let isModified = false;
+                data?.forEach(e =>{
+                    if(e.relation === 'modify'){
+                        isModified = true;
+                    }
+                    if(e.relation === 'use'){
+                        isUsed = true;
+                    }
+                })
+                if(isUsed){
+                    cards = makeCard('READ');
+                }
+                if(isModified){
+                    cards+=makeCard('SET');
+                }
                 return {
-                    Name: v.name,
-                    Type: v.type,
-                    Value: v.type == 'string' ? `"${v.value}"` : v.value
+                    //avoid separation in smarthphone because the display grid.
+                    Name:{
+                        type:'table-descriptor',
+                        show:`<span>${TYPE_VAR[v.type as 'boolean'|'number'|'string']} ${v.name}</span>`,
+                        orderString:v.name
+                    },
+                    Value: v.type == 'string' ? `"${v.value}"` : v.value,
+                    Operations:cards ? `<span>${cards}</span>` : 'NONE'
                 }
             })}
-            headers={["Name", "Type", "Value"]}
+            headers={["Name","Operations" ,"Value"]}
             ref={values}
             onEdit={(v)=>{
                 const editPos = values.findIndex((e) => e.name === v.name);

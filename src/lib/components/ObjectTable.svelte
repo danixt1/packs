@@ -1,11 +1,18 @@
 <script lang="ts">
     import { onDestroy } from "svelte";
 
-
+    interface Descriptor{
+        /**
+         * Give informations about rendering of the element.
+         */
+        type:'table-descriptor',
+        show:string,
+        orderString:string
+    }
     interface Props{
         onEdit?: (item: Record<string, unknown>) => void;
         onDelete?: (item: Record<string, unknown>) => void;
-        items: Record<string, unknown>[];
+        items: Record<string,Descriptor | unknown>[];
         /** Original Object, if passed is passed in `onEdit` and `onDelete`.
          * Attention: Ref needs to by in the same order of items
         */
@@ -40,6 +47,18 @@
         sortBy = header;
         isInverted = false;
     }
+    function isADescriptor(item:unknown):item is Descriptor{
+        if(!item){
+            return false;
+        }
+        if(typeof item != 'object'){
+            return false;
+        }
+        if("type" in item && item.type === 'table-descriptor'){
+            return true
+        }
+        return false;
+    }
     let toDelete = $state(new Set<number>());
     let itemsToDelete =$state([] as {id:number,timeLeft:number}[]);
     let interval = setInterval(()=>{
@@ -59,7 +78,12 @@
     let { onEdit: onSelect, onDelete, items = $bindable([]), headers, mappedHeaders,ref, canEdit, canDelete }: Props = $props();
     let sortBy = $derived(headers[0]);
     let isInverted = $state(false);
-    let orders = $derived(items.map<[number,unknown,boolean]>((e,i)=>[i,e[sortBy],false]).sort((a,b)=>sort(a[1],b[1],isInverted)));
+    let orders = $derived(items
+    .map<[number,unknown,boolean]>((e,i)=>{
+        let v= e[sortBy];
+        return [i,isADescriptor(v) ? v.orderString : v,false];
+    }).
+    sort((a,b)=>sort(a[1],b[1],isInverted)));
 </script>
 
 <table>
@@ -77,29 +101,32 @@
         {@const index = sortData[0]}
             <tr>
                 {#each headers as header}
-                <td data-header={header}>{@html mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}</td>
+                {@const cellData = mappedHeaders?.[header] ? item[mappedHeaders[header]] : item[header]}
+                <td data-header={header}>{@html isADescriptor(cellData) ? cellData.show : cellData}</td>
                 {/each}
                 <td class="actions-cell" data-header="Actions">
-                    {#if onSelect && (!canEdit || canEdit(ref ? ref[index] : item, index))}
-                    <button type="button" onclick={() => onSelect?.(ref ? ref[index] : item)}>Edit</button>
-                    {/if}
-                    {#if onDelete && (!canDelete || canDelete(ref ? ref[index] : item, index))}
-                        {#key itemsToDelete}
-                            {@const isPendingDelete = toDelete.has(index)}
-                            <button type="button" class:warn-red={isPendingDelete} onclick={() =>{
-                                if(isPendingDelete){
-                                    toDelete.delete(index);
-                                    itemsToDelete = itemsToDelete.filter((e)=> e.id != index);
-                                    onDelete(ref ? ref[index] : item);
-                                    return;
-                                }
-                                
-                                toDelete.add(index);
-                                itemsToDelete = [...itemsToDelete,{id:index,timeLeft:2000}]
-                                }}
-                            >{isPendingDelete ? "Delete?" : "Delete"}</button>
-                        {/key}
-                    {/if}
+                    <div class="options">
+                        {#if onSelect && (!canEdit || canEdit(ref ? ref[index] : item, index))}
+                        <button type="button" onclick={() => onSelect?.(ref ? ref[index] : item)}>Edit</button>
+                        {/if}
+                        {#if onDelete && (!canDelete || canDelete(ref ? ref[index] : item, index))}
+                            {#key itemsToDelete}
+                                {@const isPendingDelete = toDelete.has(index)}
+                                <button type="button" class:warn-red={isPendingDelete} onclick={() =>{
+                                    if(isPendingDelete){
+                                        toDelete.delete(index);
+                                        itemsToDelete = itemsToDelete.filter((e)=> e.id != index);
+                                        onDelete(ref ? ref[index] : item);
+                                        return;
+                                    }
+                                    
+                                    toDelete.add(index);
+                                    itemsToDelete = [...itemsToDelete,{id:index,timeLeft:2000}]
+                                    }}
+                                >{isPendingDelete ? "Delete?" : "Delete"}</button>
+                            {/key}
+                        {/if}
+                    </div>
                 </td>
             </tr>
         {/each}
