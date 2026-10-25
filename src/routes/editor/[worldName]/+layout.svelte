@@ -1,6 +1,9 @@
 <script lang="ts">
     import { goto } from '$app/navigation';
     import {page} from '$app/state';
+    import { showError } from '$lib/notify';
+    import { saveWorld } from '$lib/shared/gameStorage';
+    import { getCurrentWorldEditor } from '$lib/shared/worldEditor';
     let { children } = $props();
     let menus:{display:string,name:string}[] = [
         {
@@ -32,6 +35,22 @@
             name:'actions'
         }
     ];
+    function runInDevMode(){
+        const worldId = page.params.worldName;
+        if(!worldId){
+            showError('Failed running the world in test mode');
+            return;
+        }
+        let editor = getCurrentWorldEditor(worldId);
+        try{
+            // for the first version, implement that in future.
+            let fileName = 'temp-'+ Math.round(98000 * Math.random()) + '-'+worldId;
+            saveWorld(worldId,editor.toWorld());
+            goto(`#/play/${encodeURIComponent(worldId)}?debug=true&dev-world=${encodeURIComponent(worldId)}`);
+        }catch(error){
+            showError('Failed to save world', error instanceof Error ? error.message : 'Unknown storage error');
+        }
+    }
 </script>
 <div class="flex-contents">
     <div class="editor-chrome">
@@ -41,6 +60,7 @@
                 <h1>{page.params.worldName === 'main' ? 'Adventure World' : page.params.worldName}</h1>
             </div>
             <div class="header-actions">
+                <button type="button" class="main-menu-button" onclick={runInDevMode}>Run Dev</button>
                 <button type="button" class="main-menu-button" onclick={() => goto('#/')}>Main menu</button>
             </div>
         </header>

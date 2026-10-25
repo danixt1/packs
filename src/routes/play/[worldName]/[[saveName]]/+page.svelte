@@ -2,7 +2,8 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import MainGame from '$lib/components/MainGame.svelte';
-	import { createGameEngine, type Engine, type GameView } from '$lib/engine';
+	import { createGameEngine, createRuntimeState, type Engine, type GameView } from '$lib/engine';
+	import type { RuntimeState } from '$lib/engine/types';
 	import {
 		compareWorldVersions,
 		createSave,
@@ -14,7 +15,7 @@
 		serializeSaveExport,
 		updateSave,
 		type StoredSave,
-		type WorldLoadResult
+		type WorldLoadResult,
 	} from '$lib/shared/gameStorage';
 	import { showError, showInfo, showSucess } from '$lib/notify';
 	import type { World } from '$lib/types/data/declarative';
@@ -44,7 +45,7 @@
 		saveSlotsVersion;
 		return save ? listSaves(save.worldId) : [];
 	});
-
+	let params = new URL(page.url.toString().replace('/#/','/')).searchParams;
 	function routeParams() {
 		return {
 			worldId: String(page.params.worldName ?? ''),
@@ -54,26 +55,46 @@
 
 	function initialize() {
 		const { worldId, slotId } = routeParams();
+		const isDevWorld = params.has('dev-world');
 		const worldResult: WorldLoadResult = loadWorld(worldId);
 		if (!worldResult.ok) {
 			fail(worldResult.reason);
 			return;
 		}
 
-		const saveResult = loadSave(worldId, slotId);
-		if (!saveResult.ok) {
-			fail(saveResult.reason);
-			return;
-		}
-		const restoredState = parseSavedState(saveResult.save.serializedState);
-		if (!restoredState) {
-			fail('Save data could not be decoded. The original save was left unchanged.');
-			return;
+		world = worldResult.world;
+		let restoredState: RuntimeState|undefined;
+		if (isDevWorld) {
+			const timestamp = Date.now();
+			restoredState = createRuntimeState($state.snapshot(world));
+			save = {
+				worldId,
+				slotId: 'dev-session',
+				name: 'Development session',
+				createdAt: timestamp,
+				updatedAt: timestamp,
+				worldVersion: [...world.version],
+				serializedState: JSON.stringify(restoredState)
+			};
+		} else {
+			if (!slotId) {
+				fail('Save not found.');
+				return;
+			}
+			const saveResult = loadSave(worldId, slotId);
+			if (!saveResult.ok) {
+				fail(saveResult.reason);
+				return;
+			}
+			restoredState = parseSavedState(saveResult.save.serializedState);
+			if (!restoredState) {
+				fail('Save data could not be decoded. The original save was left unchanged.');
+				return;
+			}
+			save = saveResult.save;
+			warningMessage = saveResult.warning ?? '';
 		}
 
-		world = worldResult.world;
-		save = saveResult.save;
-		warningMessage = saveResult.warning ?? '';
 		engine = createGameEngine(world, restoredState);
 		view = engine.getView();
 		status = 'ready';
@@ -92,6 +113,9 @@
 	}
 
 	function autosave() {
+		if(params.has('dev-world') || params.has('disabled-auto-save','true')){
+			return;
+		}
 		if (!engine || !world || !save) return;
 		const updated = updateSave(save.worldId, save.slotId, engine.getState(), world.version);
 		if (updated) save = updated;
@@ -269,7 +293,9 @@
 					<button type="button" onclick={() => (showSaveMenu = !showSaveMenu)}>Save <span aria-hidden="true">›</span></button>
 					{#if showSaveMenu}
 						<div class="submenu" aria-label="Save options">
-							<button type="button" onclick={saveGame}>Save current</button>
+							{#if !params.has('dev-world')}
+								<button type="button" onclick={saveGame}>Save current</button>
+							{/if}
 							<button type="button" onclick={saveAs}>Save as new file</button>
 						</div>
 					{/if}
@@ -284,11 +310,16 @@
 							{/each}
 						</div>
 					{/if}
+					{#if params.has('dev-world')}
+						<button type="button" onclick={()=>{goto(`#/editor/${params.get('dev-world')}`)}}>Back To Editor</button>
+					{/if}
 					<button type="button" onclick={exportCurrentSave}>Export JSON save</button>
 					<button type="button" onclick={openImportPicker}>Import JSON save</button>
 					<button type="button" onclick={returnToMenu}>Save and main menu</button>
+					{#if params.has('debug','true')}
+						<button type="button" onclick={()=>{showDebugPopup = true}}>debug</button>
+					{/if}
 					<button type="button" onclick={leaveWithoutSaving}>Leave without saving</button>
-					<button type="button" onclick={()=>{showDebugPopup = true}}>debug</button>
 				</nav>
 			{/if}
 		</header>

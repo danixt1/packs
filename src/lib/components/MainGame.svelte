@@ -7,6 +7,7 @@
 		view: GameView;
 		showMobileActions: boolean;
 		callEngine: (func: (engine: Engine) => void | GameView) => void;
+		activateDebugMode?:boolean;
 	}
 
 	let { view = $bindable(), showMobileActions = $bindable(), callEngine }: Props = $props();
