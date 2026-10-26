@@ -19,7 +19,7 @@
 </script>
 
 {#if mounted}
-    <ListCollectors bind:values={values} {stack} />
+    <ListCollectors bind:values={values} {stack}/>
 {/if}
 
 <ContextHost {stack} />

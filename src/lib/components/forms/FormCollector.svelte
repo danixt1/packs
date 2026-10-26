@@ -19,7 +19,7 @@
         autoAttach?: Record<string, any>;
         attachTo?: string;
         writeFormPropsTo?: Record<string, any>;
-        ctx:CtxBuilder;
+        ctx?:CtxBuilder;
     }
 
     let {
@@ -131,10 +131,10 @@
             <ListConditions
                 bind:values={collectIf}
                 {stack}
-                ctx={{editor:ctx.editor,
+                ctx={ctx ? {editor:ctx.editor,
                     selfMetadata:value.target as 'character'|'place'|'item',
                     allowedGetters:['self','target','world','runtime'],
-                    allowedObjects:value.target === 'character' ? ['character','character/place'] : [value.target as 'place'|'item'] }}
+                    allowedObjects:value.target === 'character' ? ['character','character/place'] : [value.target as 'place'|'item'] } : undefined}
             />
         </div>
     {:else if value.target === 'connectedPlaces'}

@@ -279,6 +279,9 @@
 				<p class="eyebrow">{world?.name}</p>
 				<h1>{save.name}</h1>
 			</div>
+			{#if params.has('dev-world')}
+				<button type="button" class="menu-button" onclick={()=>{goto(`#/editor/${params.get('dev-world')}`)}}>Back To Editor</button>
+			{/if}
 			<button
 				type="button"
 				class="menu-button"
@@ -309,9 +312,6 @@
 								</button>
 							{/each}
 						</div>
-					{/if}
-					{#if params.has('dev-world')}
-						<button type="button" onclick={()=>{goto(`#/editor/${params.get('dev-world')}`)}}>Back To Editor</button>
 					{/if}
 					<button type="button" onclick={exportCurrentSave}>Export JSON save</button>
 					<button type="button" onclick={openImportPicker}>Import JSON save</button>

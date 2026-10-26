@@ -109,9 +109,16 @@
                     </span>
                     `
                 }
+                function tryToLoadCurrentEditor(){
+                    try{
+                        return getCurrentWorldEditor();
+                    }catch{
+                        return undefined;
+                    }
+                }
                 let cards = '';
-                let editor = getCurrentWorldEditor();
-                let data = editor.getVarsRelations(v.name);
+                let editor = tryToLoadCurrentEditor();
+                let data = editor?.getVarsRelations(v.name) ?? [];
                 let isUsed = false;
                 let isModified = false;
                 data?.forEach(e =>{

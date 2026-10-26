@@ -11,14 +11,14 @@ test('edits the current collector and keeps its added condition after remounting
     //Collector > Condition > operator left
     await screen.getByTestId('input-condition-type').selectOptions('condition-relational');
     await screen.getByRole('button', { name: 'left' }).click();
-    await screen.getByTestId('input-operand-mode').selectOptions('value');
+    await screen.getByTestId('input-radio-operand-mode-value').click();
     await screen.getByTestId('input-value-string').fill('door');
     await screen.getByRole('button', { name: 'Confirm' }).click();
 
     // Collector > Condition > operator right
     await screen.getByTestId('input-condition-type').selectOptions('condition-relational');
     await screen.getByRole('button', { name: 'right' }).click();
-    await screen.getByTestId('input-operand-mode').selectOptions('value');
+    await screen.getByTestId('input-radio-operand-mode-value').click();
     await screen.getByTestId('input-value-string').fill('open');
     await screen.getByRole('button', { name: 'Confirm' }).click();
 

@@ -32,7 +32,7 @@
             <legend class="def-label">{label}</legend>
             <div class="list">
                 {#each items as item (item.value)}
-                    <label class="choice" class:selected={selected === item.value} class:disabled={item.disabled || disabled}>
+                    <label class="choice" data-testid={`input-radio-${id}-${item.value}`} class:selected={selected === item.value} class:disabled={item.disabled || disabled}>
                         <input
                             type="radio"
                             name={id}
@@ -52,7 +52,7 @@
         <legend class="def-label">{label}</legend>
         <div class="list">
             {#each items as item (item.value)}
-                <label class="choice" class:selected={selected === item.value} class:disabled={item.disabled || disabled}>
+                <label class="choice" class:selected={selected === item.value} data-testid={`input-radio-${id}-${item.value}`} class:disabled={item.disabled || disabled}>
                     <input
                         type="radio"
                         name={id}

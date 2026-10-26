@@ -27,8 +27,7 @@ test('add move event using literal toId',async ()=>{
     await screen.getByTestId('button-move-moveId').click();
     //Getter page
     await fillGetter(screen,'Target','Character','Variable','test');
-
-    await screen.getByTestId('input-effect-move-toId-type').selectOptions('Literal');
+    await screen.getByTestId('input-radio-effect-move-toId-type-literal').click();
     await screen.getByRole('button',{name:'Edit literal value'}).click();
 
     await screen.getByTestId('input-value-type').selectOptions('String');

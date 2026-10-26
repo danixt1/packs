@@ -12,7 +12,7 @@
         onCancel?: () => void;
         onAfterSubmit?: (value: CollectorToGet) => void;
         onCreatePressed?: () => void;
-        ctx:CtxBuilder;
+        ctx?:CtxBuilder;
     }
 
     let {
