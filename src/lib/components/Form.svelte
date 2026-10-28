@@ -6,12 +6,15 @@
         /** Adding a onCancel fn creates a Cancel button */
         onCancel?: () => void;
         children:Snippet;
+        encapsulate?:boolean
     }
-    let { onSubmit, onCancel, children }: Props = $props();
+    let { onSubmit, onCancel, children,encapsulate = true }: Props = $props();
 </script>
 
 <form onsubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-    {@render children()}
+    <div class="capsule">
+        {@render children()}
+    </div>
     <div class="form-actions">
         <button type="submit">Confirm</button>
         {#if onCancel}
@@ -20,6 +23,23 @@
     </div>
 </form>
 <style>
+    .capsule{
+        position: relative;
+        overflow: auto;
+    }
+    @media screen and (max-width:732px){
+        .capsule{
+            max-height: 83dvh;
+        }
+        .form-actions{
+            padding: 0.7rem !important;
+        }
+    }
+    @media screen and (min-width:732px){
+        .capsule{
+            max-height: 70vh;
+        }
+    }
     button:focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 2px;

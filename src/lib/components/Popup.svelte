@@ -41,6 +41,7 @@
         background: rgba(0, 0, 0, 0.88);
     }
     .popup {
+        z-index: 100;
         padding: 0;
         border: 1px solid var(--border-subtle);
         border-radius: 8px;
@@ -52,13 +53,13 @@
     @media screen and (max-width:732px){
         .popup{
             width: calc(99% - 2px);
-            height: 100vh;
+            height: 100dvh;
         }
     }
     @media screen and (min-width:732px){
         .popup{
             width: 45rem;
-            max-height: 90vh;
+            max-height: 90dvh;
         }
     }
     h2 {
