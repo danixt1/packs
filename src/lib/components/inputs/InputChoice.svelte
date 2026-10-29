@@ -1,18 +1,22 @@
 <script lang="ts">
-    interface ChoiceItem {
+    import type { HTMLInputAttributes } from 'svelte/elements';
+
+    export interface ChoiceItem {
         value: string;
         title: string;
+        descripton?:string;
         disabled?: boolean;
     }
-
-    interface Props {
+    
+    interface Props extends HTMLInputAttributes{
         id: string;
-        label: string;
+        label?: string;
         wrapDiv?: boolean;
         items: ChoiceItem[];
         selected: string;
         disabled?: boolean;
-        onchange?: (event: Event) => void;
+        expandedInfo?:boolean;
+        applyFocus?:boolean;
     }
 
     let {
@@ -22,53 +26,59 @@
         items,
         selected = $bindable(),
         disabled = false,
-        onchange
+        applyFocus,
+        expandedInfo,
+        ...others
     }: Props = $props();
+    function focusFirst(node:HTMLDivElement,isFirst:boolean){
+        if(applyFocus && isFirst){
+            node.focus();
+        }
+    }
 </script>
-
-{#if wrapDiv}
-    <div class="form-group">
+{#snippet base()}
         <fieldset {id} class="choices" data-testid={`input-${id}`} disabled={disabled}>
-            <legend class="def-label">{label}</legend>
-            <div class="list">
-                {#each items as item (item.value)}
-                    <label class="choice" data-testid={`input-radio-${id}-${item.value}`} class:selected={selected === item.value} class:disabled={item.disabled || disabled}>
+            {#if label}
+                <legend class="def-label">{label}</legend>
+            {/if}
+            <div class="list" class:column={expandedInfo}>
+                {#each items as item,index (item.value)}
+                    <label class="choice" class:selected={selected === item.value} class:disabled={item.disabled || disabled} data-testid={`input-radio-${id}-${item.value}`}>
                         <input
+                            use:focusFirst={index === 0}
                             type="radio"
                             name={id}
                             value={item.value}
                             bind:group={selected}
                             disabled={item.disabled || disabled}
-                            {onchange}
+                            {...others}
                         />
-                        <span>{item.title}</span>
+                        {#if expandedInfo}
+                            <div class="expanded">
+                                <h3>{item.title}</h3>
+                                <span>{item.descripton}</span>
+                            </div>
+                        {:else}
+                            <span>{item.title}</span>
+                        {/if}
                     </label>
                 {/each}
             </div>
         </fieldset>
+{/snippet}
+{#if wrapDiv}
+    <div class="form-group">
+        {@render base()}
     </div>
 {:else}
-    <fieldset {id} class="choices" data-testid={`input-${id}`} disabled={disabled}>
-        <legend class="def-label">{label}</legend>
-        <div class="list">
-            {#each items as item (item.value)}
-                <label class="choice" class:selected={selected === item.value} data-testid={`input-radio-${id}-${item.value}`} class:disabled={item.disabled || disabled}>
-                    <input
-                        type="radio"
-                        name={id}
-                        value={item.value}
-                        bind:group={selected}
-                        disabled={item.disabled || disabled}
-                        {onchange}
-                    />
-                    <span>{item.title}</span>
-                </label>
-            {/each}
-        </div>
-    </fieldset>
+    {@render base()}
 {/if}
 
 <style>
+    .expanded{
+        padding: 5px 0 30px 0;
+        width: 100%;
+    }
     .choices {
         display: flex;
         flex-direction: column;
@@ -82,7 +92,9 @@
     .choices legend {
         margin-bottom: 0.25rem;
     }
-
+    .column{
+        flex-direction: column;
+    }
     .list {
         display: flex;
         width: 100%;
@@ -92,7 +104,9 @@
         background: var(--bg-panel-solid);
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
     }
-
+    .column .choice{
+        min-height: auto !important;
+    }
     .choice {
         position: relative;
         display: flex;
@@ -110,11 +124,17 @@
         text-align: center;
         transition: background-color 0.2s ease-in-out, color 0.2s ease-in-out;
     }
-
+    .column .choice{
+        text-align: left;
+        border-left: none;
+        border-bottom: 1px solid var(--border-default);
+    }
     .choice:first-child {
         border-left: 0;
     }
-
+    .choice:last-child{
+        border-bottom: 0;
+    }
     .choice:hover:not(.disabled):not(.selected) {
         background: var(--bg-card-hover);
     }
@@ -122,9 +142,25 @@
     .choice.selected {
         background: var(--border-strong);
     }
+    /** Adjust box-shadow radius*/
+    .choice:first-child:focus-within{
+        border-radius: 12px 0px 0px 12px;
+    }
+    .choice:last-child:focus-within{
+        border-radius: 0px 12px 12px 0px;
+    }
+    /** Column mode*/
+    .column .choice:first-child:focus-within{
+        border-radius: 12px 12px 0 0;
+    }
+    .column .choice:last-child:focus-within{
+        border-radius: 0 0 12px 12px;
+    }
 
     .choice:focus-within {
         z-index: 1;
+        box-shadow: inset 0 0 0 2px var(--color-accent);
+        outline: none;
     }
 
     .choice input {
