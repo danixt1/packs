@@ -4,7 +4,7 @@
     export interface ChoiceItem {
         value: string;
         title: string;
-        descripton?:string;
+        description?:string;
         disabled?: boolean;
     }
     
@@ -56,7 +56,7 @@
                         {#if expandedInfo}
                             <div class="expanded">
                                 <h3>{item.title}</h3>
-                                <span>{item.descripton}</span>
+                                <span>{item.description}</span>
                             </div>
                         {:else}
                             <span>{item.title}</span>
@@ -75,8 +75,11 @@
 {/if}
 
 <style>
+    h3{
+        margin-top: 10px;
+    }
     .expanded{
-        padding: 5px 0 30px 0;
+        padding: 5px 0 10px 0;
         width: 100%;
     }
     .choices {
@@ -97,15 +100,12 @@
     }
     .list {
         display: flex;
-        width: 100%;
+        width: calc(100% - 2px);
         overflow: hidden;
         border: 1px solid var(--border-default);
         border-radius: 12px;
         background: var(--bg-panel-solid);
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-    }
-    .column .choice{
-        min-height: auto !important;
     }
     .choice {
         position: relative;
@@ -128,6 +128,7 @@
         text-align: left;
         border-left: none;
         border-bottom: 1px solid var(--border-default);
+        min-height: auto !important;
     }
     .choice:first-child {
         border-left: 0;

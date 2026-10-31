@@ -37,7 +37,7 @@
     }
     @media screen and (min-width:732px){
         .capsule{
-            max-height: 70vh;
+            max-height: 70dvh;
         }
     }
     button:focus-visible {
@@ -48,7 +48,7 @@
         display: flex;
         justify-content: flex-end;
         gap: 0.5rem;
-        padding: 1rem;
+        padding: 10px 10px 5px;
         border-top: var(--border-subtle) 1px solid;
     }
     button {
