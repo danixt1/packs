@@ -21,7 +21,7 @@
 </script>
 <div class="guided-screen">
     {#key currentPhase}
-        <div class={wrapDiv ? "form-group screen-item" : "screen-item"} >
+        <div class={wrapDiv ? "form-group screen-item" : "screen-item"} transition:fly={{x:300,duration:200}}>
             {@render screens[currentPhase](nextPhase)}
         </div>
     {/key}
@@ -30,10 +30,11 @@
     .guided-screen {
         display: grid;
         height: 100%;
+        overflow-x: hidden;
     }
-
     .screen-item {
         overflow: hidden;
+        overflow-y: auto;
         grid-area: 1 / 1;
     }
 </style>

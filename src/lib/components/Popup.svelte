@@ -7,6 +7,7 @@
         open: boolean;
         onClose?: () => void;
         children: Snippet;
+        fullHeight?:boolean;
     }
     let { title, onClose, open, children }: Props = $props();
     let popupPage:HTMLElement|undefined = $state();
@@ -26,7 +27,9 @@
     <div class="popup-backdrop" role="presentation" onclick={(event) => {if(isSmarthphone)return; if (event.target === event.currentTarget) dismiss(); }}>
         <dialog open class="popup" aria-labelledby="object-editor-title" bind:this={popupPage}>
             <h2 id="object-editor-title">{title ?? 'Create Object'}</h2>
-            {@render children()}
+            <div class="children">
+                {@render children()}
+            </div>
         </dialog>
     </div>
 {/if}
@@ -41,6 +44,8 @@
         background: rgba(0, 0, 0, 0.88);
     }
     .popup {
+        display: flex;
+        flex-direction: column;
         z-index: 100;
         padding: 0;
         border: 1px solid var(--border-subtle);
@@ -48,18 +53,24 @@
         background: var(--bg-panel-solid);
         color: var(--color-text);
         box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.55);
+    }
+    .children{
         overflow: auto;
     }
     @media screen and (max-width:732px){
+        .children{
+            flex-shrink: 1;
+            overflow: auto;
+        }
         .popup{
             width: calc(99% - 2px);
-            height: 100dvh;
+            height: calc(100vh - 4px);
         }
     }
     @media screen and (min-width:732px){
         .popup{
             width: 45rem;
-            max-height: 90dvh;
+            max-height: 93dvh;
         }
     }
     h2 {

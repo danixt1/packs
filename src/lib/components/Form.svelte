@@ -6,38 +6,52 @@
         /** Adding a onCancel fn creates a Cancel button */
         onCancel?: () => void;
         children:Snippet;
-        encapsulate?:boolean
+        fullSizeMode?:boolean;
+        confirmText?:string;
+        cancelText?:string;
     }
-    let { onSubmit, onCancel, children,encapsulate = true }: Props = $props();
+    let { onSubmit, onCancel, children, fullSizeMode, confirmText, cancelText }: Props = $props();
 </script>
 
-<form onsubmit={(event) => { event.preventDefault(); onSubmit(); }}>
+<form onsubmit={(event) => { event.preventDefault(); onSubmit(); }} class={fullSizeMode ? 'fullSize' : ''}>
     <div class="capsule">
         {@render children()}
     </div>
     <div class="form-actions">
-        <button type="submit">Confirm</button>
         {#if onCancel}
-            <button type="button" onclick={onCancel}>Cancel</button>
+        <button type="button" onclick={onCancel}>{cancelText || 'Cancel'}</button>
         {/if}
+        <button type="submit">{confirmText || 'Confirm'}</button>
     </div>
 </form>
 <style>
+    form{
+        display: flex;
+        justify-content: space-between;
+        flex-direction: column;
+    }
     .capsule{
-        position: relative;
         overflow: auto;
+        flex-shrink: 1;
     }
     @media screen and (max-width:732px){
-        .capsule{
-            max-height: 83dvh;
-        }
         .form-actions{
+            flex-shrink: 0;
             padding: 0.7rem !important;
+        }
+        form{
+            height:100%;
+        }
+        .fullSize{
+            height:87dvh;
         }
     }
     @media screen and (min-width:732px){
-        .capsule{
-            max-height: 70dvh;
+        .fullSize{
+            height:80dvh;
+        }
+        form{
+            max-height: 80dvh;
         }
     }
     button:focus-visible {

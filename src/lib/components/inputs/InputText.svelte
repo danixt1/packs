@@ -12,6 +12,7 @@
         label?: string;
         autocomplete?: FullAutoFill;
         suggestions?: string[];
+        applyFocus?:boolean;
     }
 
     let {
@@ -24,9 +25,15 @@
         label,
         wrapDiv,
         autocomplete = 'off',
-        suggestions = []
+        suggestions = [],
+        applyFocus,
     }: Props = $props();
 
+    function focusInput(node: HTMLInputElement) {
+        if (applyFocus) {
+            node.focus();
+        }
+    }
     let suggestionsOpen = $state(false);
     let activeSuggestionIndex = $state(-1);
 
@@ -78,6 +85,7 @@
 
     <div class="input-with-suggestions">
         <input
+            use:focusInput
             type="text"
             id={id}
             data-testid={`input-${id}`}
