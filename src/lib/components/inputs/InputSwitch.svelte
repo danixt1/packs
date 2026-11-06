@@ -6,11 +6,13 @@
         label?: string;
         wrapDiv?: boolean;
         value: boolean;
+        onchange?: (value: boolean) => void;
     }
-    let { id, label, wrapDiv, value = $bindable() }: Props = $props();
+    let { id, label, wrapDiv, value = $bindable(), onchange }: Props = $props();
 
     function toggle() {
         value = !value;
+        onchange?.(value);
     }
 </script>
 

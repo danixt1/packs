@@ -1,7 +1,7 @@
 <script lang="ts">
-    import type { FullAutoFill } from "svelte/elements";
+    import type { FullAutoFill, HTMLInputAttributes } from "svelte/elements";
 
-    interface Props {
+    interface Props extends HTMLInputAttributes {
         id: string;
         name?: string;
         value: string;
@@ -24,7 +24,8 @@
         label,
         wrapDiv,
         autocomplete = 'off',
-        suggestions = []
+        suggestions = [],
+        ...attrs
     }: Props = $props();
 
     let suggestionsOpen = $state(false);
@@ -78,6 +79,7 @@
 
     <div class="input-with-suggestions">
         <input
+            {...attrs}
             type="text"
             id={id}
             data-testid={`input-${id}`}
@@ -99,7 +101,8 @@
                 ? `${id}-suggestion-${activeSuggestionIndex}`
                 : undefined}
             onfocus={() => (suggestionsOpen = true)}
-            oninput={() => {
+            oninput={(e) => {
+                attrs.oninput?.(e);
                 suggestionsOpen = true;
                 activeSuggestionIndex = -1;
             }}

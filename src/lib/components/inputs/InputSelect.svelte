@@ -1,21 +1,21 @@
 <script lang="ts">
+    import type { HTMLSelectAttributes } from "svelte/elements";
     import BaseInput from "./BaseInput.svelte";
 
-    interface Props {
+    interface Props extends HTMLSelectAttributes{
         id: string;
         label: string;
         wrapDiv?: boolean;
         items: {value:any, title:string}[];
         selected: any;
         disabled?:boolean;
-        onchange?: (event: Event) => void;
     }
-    let { id, label, wrapDiv, items, selected = $bindable(), disabled, onchange }: Props = $props();
+    let { id, label, wrapDiv, items, selected = $bindable(), disabled, ...atts }: Props = $props();
     
 </script>
 
 <BaseInput {id} {label} {wrapDiv}>
-    <select {id} data-testid={`input-${id}`} bind:value={selected} class="def-select" disabled={disabled} {onchange}>
+    <select {id} data-testid={`input-${id}`} bind:value={selected} class="def-select" disabled={disabled} {...atts}>
         {#each items as item (item.value)}
             <option value={item.value}>{item.title}</option>
         {/each}

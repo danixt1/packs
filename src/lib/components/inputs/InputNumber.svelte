@@ -1,7 +1,8 @@
 <script lang="ts">
+    import type { HTMLInputAttributes } from "svelte/elements";
     import BaseInput from "./BaseInput.svelte";
 
-    interface Props {
+    interface Props extends HTMLInputAttributes {
         id: string;
         name?: string;
         value: number | null | undefined;
@@ -12,7 +13,7 @@
         placeholder?: string;
         wrapDiv?: boolean;
     }
-    let { id, name, value = $bindable(), required, min, max,label, placeholder, wrapDiv }: Props = $props();
+    let { id, name, value = $bindable(), required, min, max,label, placeholder, wrapDiv,...attrs }: Props = $props();
 </script>
 <BaseInput id={id} label={label} wrapDiv={wrapDiv}>
 <input
@@ -27,5 +28,6 @@
     {min}
     {max}
     {placeholder}
+    {...attrs}
 />
 </BaseInput>
