@@ -4,6 +4,8 @@
     import { page } from '$app/state';
     import { parseWorldExport, saveWorld, serializeWorldExport, slugify } from '$lib/shared/gameStorage';
     import { showError, showSucess } from '$lib/notify';
+    import {InputTextArea, InputText} from "$lib/components/inputs";
+    import { type ContextFrame } from "$lib/shared/contextStack.svelte";
     let selectedWorld = $state(getCurrentWorldEditor(page.params.worldName));
     let importInput = $state<HTMLInputElement | null>(null);
 
@@ -81,20 +83,31 @@
         }
     }
 </script>
+{#snippet renderContextForm(frame:ContextFrame)}
+    <!-- TODO: make the system to add sublevels-->
+    <InputText label='Name:' id='ctx-name' required bind:value={frame.draft.name}/>
+    <InputTextArea label='Description' id='ctx-description' bind:value={frame.draft.description}/>
 
+{/snippet}
 <div class="world-edit">
     <div class="panels">
+        <div class="ctx form-group">
+            <h2>Contexts</h2>
+            <p>Manage contexts to hide not required elements</p>
+            <button>New Context</button>
+        </div>
         <div class="base-info">
             <h2>World: {selectedWorld.worldName}</h2>
-            <span>Description: {selectedWorld.description}</span>
+            <InputTextArea label="Description: " id='world-desc' bind:value={selectedWorld.description} />
             <ul>
                 <li>Characters: {selectedWorld.getCharacters().length}</li>
                 <li>Items: {selectedWorld.getItems().length}</li>
                 <li>Places: {selectedWorld.getPlaces().length}</li>
                 <li>Actions: {selectedWorld.getActions().length}</li>
-                <li>Labels: {selectedWorld.getLabels().length}</li>
                 <li>Text Templates: {selectedWorld.getTextTemplates().length}</li>
-                <li>Dialogues: Not set</li>
+                <li>Dialogues: {selectedWorld.getDialogues().length}</li>
+                <li>Events: {selectedWorld.getListEvents().length}</li>
+                <li>Labels: {selectedWorld.getLabels().length}</li>
             </ul>
         </div>
     </div>
@@ -157,5 +170,31 @@
     }
     .base-info{
         margin:15px
+    }
+    .ctx p{
+        margin-top: 0;
+    }
+    .ctx button{
+        width:100px;
+        height: 34px;
+        margin-right: 5px;
+        background-color: var(--bg-button);
+        color: var(--color-text);
+        border: var(--border-subtle) 1px solid;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        transition: background-color 0.2s, border-color 0.2s;
+    }
+    @media (max-width: 640px) {
+        .ctx button{
+            width: 100%;
+        }
+    }
+    .ctx button:focus-visible {
+        outline: 2px solid var(--color-accent);
+        outline-offset: 2px;
+    }
+    .ctx button:hover {
+        background-color: var(--bg-card-hover);
     }
 </style>
