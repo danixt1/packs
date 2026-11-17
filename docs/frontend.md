@@ -106,11 +106,20 @@ interface InputCardProps extends BaseInput {
 interface InputSwitchProps extends BaseInput {
     value: boolean;             // Bindable Boolean value.
 }
+
+// InputMultipleItems.svelte: Use when is needed to select multiple items, intregated with a search bar.
+interface InputMultipleItemsProps{
+    value:{name:string,parent:string|null}[]; // Bindable
+    items:{name:string,title?:string,parent?:string|null,parentTitle?:string|null};
+}
+
 ```
 
 `InputCard` calls `onChange` whenever an item is selected or unselected. The callback receives the item's `value` and a Boolean indicating whether the item is now selected.
 
 `InputText` can receive an optional `suggestions` array. The input remains editable; the component filters the supplied values by a case-insensitive prefix match, and choosing a suggestion fills the input. The list supports keyboard navigation and touch selection. Pass values from the relevant editor context, for example `<InputText id="place" label="Place" bind:value={placeId} suggestions={availablePlaceIds} />`.
+
+`InputMultipleItems` can receive a parent in items. a `parent` is used when you need to inform that this item is a child, the depth can by defined by dots. example: item with {name:"attacked",parent:"combat.action.attack"} is declaring a selectable *attacked* item who is 3 level depth:["combat","action","attack"].
 
 ### Referring to inputs in tests
 
