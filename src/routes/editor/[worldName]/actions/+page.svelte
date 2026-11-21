@@ -1,6 +1,8 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { page } from "$app/state";
     import ButtonEditorCreate from "$lib/components/editor/ButtonEditorCreate.svelte";
+    import ContextMembershipInput from "$lib/components/editor/ContextMembershipInput.svelte";
     import EditorWrapper from "$lib/components/EditorWrapper.svelte";
     import Form from "$lib/components/Form.svelte";
     import { InputCard, InputNumber, InputSelect, InputText, InputTextArea, InputTextEditor } from "$lib/components/inputs";
@@ -13,6 +15,7 @@
     import { createContextStack,type ContextFrame } from "$lib/shared/contextStack.svelte";
     import { validateActionDraft } from "$lib/shared/actionValidation";
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { listenForWorldEditorContextsChanged } from "$lib/shared/worldEditorContextEvents";
     import { showError, showSucess } from "$lib/notify";
     import type { ActionDeclaration, CollectorToGet } from "$lib/types/data/declarative";
     import type { GettersType } from "$lib/types/data/getters";
@@ -21,6 +24,10 @@
     const editor = getCurrentWorldEditor(page.params.worldName);
     let actions = $state(editor.getActions());
     const stack = createContextStack();
+
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        actions = editor.getActions();
+    }));
 
     let baseCtx:CtxBuilder ={allowedGetters:['runtime','self','target','temp','world'] as GettersType[],editor:editor,allowedObjects:['action','character','character/place','item','place'],actionCategories:editor.getCategories()}
     
@@ -50,7 +57,7 @@
         }
         ctx.allowedObjects = Array.from(allowed);
     }
-    function emptyAction(): ActionDeclaration  & {_categoriesText:string} {
+    function emptyAction(): ActionDeclaration  & {_categoriesText:string;_contextPaths:string[]} {
         return {
             name: '',
             description: '',
@@ -64,7 +71,8 @@
             targets: [],
             onActivate: [],
             onInterrupt: [],
-            onComplete: []
+            onComplete: [],
+            _contextPaths: []
         };
     }
 
@@ -94,6 +102,7 @@
         initial.onActivate ??= [];
         initial.onInterrupt ??= [];
         initial.onComplete ??= [];
+        initial._contextPaths = editor.getObjectContexts('action', initial.name);
         setAvaliableObjectsForCtx(initial.targets,baseCtx);
         const result = await stack.push<any, any>({
             title: `Edit ${initial.name}`,
@@ -137,7 +146,12 @@
             showError(result.reason ?? 'Invalid action');
             return;
         }
+        const selectedContextPaths = Array.isArray(draft._contextPaths) ? draft._contextPaths : [];
+        const previousName = editingOid
+            ? (editor.getObject(editingOid) as ActionDeclaration | undefined)?.name
+            : undefined;
         delete draft._categoriesText;
+        delete draft._contextPaths;
         delete draft.oid;
 
         const action = draft as ActionDeclaration;
@@ -160,6 +174,7 @@
             editor.addAction(action);
             showSucess('Action created');
         }
+        editor.setObjectContexts('action', action.name, selectedContextPaths, previousName ?? action.name);
         actions = editor.getActions();
     }
 
@@ -234,6 +249,7 @@
     <Form onSubmit={() => onSubmit(frame)} onCancel={() => frame.cancel()}>
         <InputText id="action-name" label="Id:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
         <InputTextArea id="action-description" label="Description:" bind:value={frame.draft.description} wrapDiv />
+        <ContextMembershipInput id="action-contexts" label="Object contexts:" contexts={editor.getContexts()} appliesTo="objects" bind:value={frame.draft._contextPaths} />
         <div class="form-group b-line">
             <h3>Collect Targets:</h3>
             <ListCollectors {stack} ctx={baseCtx} bind:values={frame.draft.targets} onAfterSubmit={()=>{setAvaliableObjectsForCtx(frame.draft.targets,frame.meta?.ctx)}} />

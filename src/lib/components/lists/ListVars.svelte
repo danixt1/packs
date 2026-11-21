@@ -1,10 +1,15 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import type { ContextStack } from "$lib/shared/contextStack.svelte";
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { listenForWorldEditorContextsChanged } from "$lib/shared/worldEditorContextEvents";
     import type { VariableDeclarator } from "$lib/types/data/declarative";
     import CopyPasteData from "../forms/CopyPasteData.svelte";
     import FormVar from "../forms/FormVar.svelte";
     import ObjectTable from "../ObjectTable.svelte";
+    import type { WorldEditor } from "$lib/shared/worldEditor";
+
+    type VariableListValue = Record<string, any> & { name: string };
 
     interface Props {
         values: Record<string,any>[];
@@ -18,6 +23,8 @@
         onCreatePressed?:() => void;
         title?:string;
         suggestions?:string[];
+        contextEditor?:WorldEditor;
+        variableContextPaths?:Record<string,string[]>;
     }
     let {
         values = $bindable([]),
@@ -27,8 +34,22 @@
         onAfterSubmit,
         onCreatePressed,
         title = 'Variables',
-        suggestions
+        suggestions,
+        contextEditor,
+        variableContextPaths = $bindable({})
     }: Props = $props();
+    let contextRevision = $state(0);
+
+    onMount(() => contextEditor
+        ? listenForWorldEditorContextsChanged(contextEditor.worldId ?? '', () => contextRevision++)
+        : undefined
+    );
+
+    let visibleValues = $derived.by(() => {
+        contextRevision;
+        const currentValues = values as VariableListValue[];
+        return contextEditor ? contextEditor.filterVariablesByCurrentContexts(currentValues) : currentValues;
+    });
 
     $effect(()=>{
         if(values === undefined){
@@ -46,7 +67,8 @@
             render: renderVarForm,
             meta: {
                 mode: 'create',
-                existingIds: values.map((v) => v.name)
+                existingIds: values.map((v) => v.name),
+                contextPaths: []
             }
         });
         if (result) {
@@ -67,7 +89,8 @@
             meta: {
                 mode: 'edit',
                 originalId: target.name,
-                existingIds: values.filter((_, i) => i !== index).map((v) => v.name)
+                existingIds: values.filter((_, i) => i !== index).map((v) => v.name),
+                contextPaths: variableContextPaths[target.name] ?? contextEditor?.getVariableContexts(target.name) ?? []
             }
         });
         if (result) {
@@ -82,21 +105,38 @@
 {#snippet renderVarForm(frame: any)}
     <FormVar
         nameSuggestions={suggestions}
+        editor={contextEditor}
+        bind:contextPaths={frame.meta.contextPaths}
         bind:value={frame.draft}
         existingNames={frame.meta?.existingIds}
         onCancel={() => frame.cancel()}
-        onAfterSubmit={(v) => frame.resolve(v)}
+        onAfterSubmit={(v) => {
+            if(contextEditor){
+                const existingNewNameContexts = frame.meta?.originalId === v.name
+                    ? []
+                    : contextEditor.getVariableContexts(v.name);
+                variableContextPaths = {
+                    ...variableContextPaths,
+                    [v.name]: [...new Set([...(frame.meta?.contextPaths ?? []), ...existingNewNameContexts])]
+                };
+            }
+            frame.resolve(v);
+        }}
     />
 {/snippet}
 
 <div class="form-group">
     <CopyPasteData name='var-list' top={45} onCopy={()=>values} onPaste={(e:any)=>values = e} />
     <h3>{title}</h3>
-    {#if !values || values.length === 0}
+    {#if !visibleValues || visibleValues.length === 0}
+        {#if values?.length}
+            <p>No variables in the selected contexts.</p>
+        {:else}
         <p>No variables to show.</p>
+        {/if}
     {:else}
         <ObjectTable
-            items={values.map((v) => {
+            items={visibleValues.map((v) => {
                 const TYPE_VAR = {
                     'boolean':accent('bool:'),
                     'number':accent('num:'),
@@ -147,7 +187,7 @@
                 }
             })}
             headers={["Name","Operations" ,"Value"]}
-            ref={values}
+            ref={visibleValues}
             onEdit={(v)=>{
                 const editPos = values.findIndex((e) => e.name === v.name);
                 if (stack && editPos >= 0) {
@@ -158,6 +198,11 @@
             }}
             onDelete={(v)=>{
                 values = values.filter((e)=>e.name !=v.name);
+                const variableName = String(v.name ?? '');
+                if(variableContextPaths[variableName]){
+                    variableContextPaths = {...variableContextPaths};
+                    delete variableContextPaths[variableName];
+                }
             }}
         />
     {/if}

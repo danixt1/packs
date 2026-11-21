@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { page } from '$app/state';
     import ButtonEditorCreate from '$lib/components/editor/ButtonEditorCreate.svelte';
     import EditorWrapper from '$lib/components/EditorWrapper.svelte';
@@ -11,11 +12,14 @@
     import ContextHost from '$lib/components/ContextHost.svelte';
     import { createContextStack, type ContextFrame } from '$lib/shared/contextStack.svelte';
     import { getCurrentWorldEditor } from '$lib/shared/worldEditor';
+    import ContextMembershipInput from '$lib/components/editor/ContextMembershipInput.svelte';
+    import { listenForWorldEditorContextsChanged } from '$lib/shared/worldEditorContextEvents';
     import type { EventConditions, TextTemplate, TextTemplateEventRoleMatch } from '$lib/types/data/declarative';
     import type { CtxBuilder } from '$lib/shared/getterCtx';
 
     type TemplateRole = TextTemplateEventRoleMatch & { name: string };
     type TemplateData = Partial<TextTemplate> & {
+        oid?: string;
         _baseOID?: string;
         _categoriesText?: string;
         _event?: string;
@@ -27,11 +31,16 @@
         _sameSubjectAs?: string;
         _samePlaceAs?: string;
         _roleConditions?: any[];
+        _contextPaths?: string[];
         match?: TextTemplate['match'];
     };
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let templates = $state(editor.getTextTemplates());
+
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        templates = editor.getTextTemplates();
+    }));
 
     const stack = createContextStack();
     let ctx:CtxBuilder = $state({
@@ -54,6 +63,7 @@
             priority: 0,
             categories: [],
             _categoriesText: '',
+            _contextPaths: [],
             match: {
                 primaryRole: '',
                 roles: {}
@@ -62,7 +72,7 @@
     }
 
     async function startCreate() {
-        const result = await stack.push<TemplateData, TextTemplate>({
+        const result = await stack.push<TemplateData, TemplateData>({
             title: 'New Text Template',
             data: emptyTemplate(),
             render: renderTemplateForm,
@@ -70,7 +80,9 @@
         });
 
         if (result) {
-            editor.addTextTemplate(result);
+            const { _contextPaths = [], ...templateData } = result;
+            editor.addTextTemplate(templateData as TextTemplate);
+            editor.setObjectContexts('text-template', String(templateData.name ?? ''), _contextPaths);
             showSucess('Template created');
             templates = editor.getTextTemplates();
         }
@@ -84,8 +96,9 @@
         initial._categoriesText = initial.categories.join(', ');
         initial.match ??= { primaryRole: '', roles: {} };
         initial.match.roles ??= {};
+        initial._contextPaths = editor.getObjectContexts('text-template', String(initial.name ?? ''));
 
-        const result:TextTemplate | null = await stack.push<TemplateData, TextTemplate>({
+        const result:TemplateData | null = await stack.push<TemplateData, TemplateData>({
             title: `Edit ${initial.name}`,
             data: initial,
             render: renderTemplateForm,
@@ -93,7 +106,10 @@
         });
 
         if (result) {
-            editor.updateObjectWithOid(originalOid, result);
+            const previousName = (editor.getObject(originalOid) as TextTemplate | undefined)?.name;
+            const { _contextPaths = [], oid: _ignoredOid, ...templateData } = result;
+            editor.updateObjectWithOid(originalOid, templateData);
+            editor.setObjectContexts('text-template', String(templateData.name ?? ''), _contextPaths, previousName ?? String(templateData.name ?? ''));
             templates = editor.getTextTemplates();
             showSucess('Template updated');
         }
@@ -276,6 +292,7 @@
     {@const roleFields = Object.fromEntries(roles.map((role) => [role.name, editor.getTextTemplateFieldsFromEvent(role.event)]))}
     <Form onSubmit={() => submitTemplate(frame)} onCancel={() => frame.cancel()}>
         <InputText id="template-name" label="Name:" bind:value={frame.draft.name} required autocomplete="off" wrapDiv />
+        <ContextMembershipInput id="template-contexts" label="Object contexts:" contexts={editor.getContexts()} appliesTo="objects" bind:value={frame.draft._contextPaths} />
         <div class="form-group">
             {#if roles.length === 0}
                 <p>No event roles configured.</p>

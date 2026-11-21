@@ -104,11 +104,11 @@ export function createGetterFormLogic(props:PropsFormGetter){
         const result = allowedGetters ? allowedGetters.map((getter) => allEments.find((a) => a.value === getter)!) : allEments;
         return result;
     })
-    let _in = $state(untrack(()=> allowedTypes[0].value));
+    let _in = $state(untrack(()=> allowedTypes[0]?.value ?? 'self'));
     let targetItems = $derived(setObjectOptions(_in === 'runtime' ? 'runtime' : 'general'));
     let getItems: { title: string; value: string }[] = $state([]);
     let metadataItems: { title: string; value: string }[] = $state([]);
-    let _target = $state(untrack(()=> targetItems[0].value));
+    let _target = $state(untrack(()=> targetItems[0]?.value ?? ''));
     let _get = $state('variable');
     let _variable = $state('');
     let _fallback = $state('');
@@ -117,7 +117,19 @@ export function createGetterFormLogic(props:PropsFormGetter){
     updateMetadataOpts();
 
     function setObjectOptions(mode:'general'|'runtime'){
-        return OBJECTS_OPTS[mode].filter((e)=>(props.getterCtx?._getter.getAllowedObjects() ?? []).includes(e.value as any));
+        const allowedObjects = props.getterCtx?._getter.getAllowedObjects();
+        return allowedObjects
+            ? OBJECTS_OPTS[mode].filter((e)=>allowedObjects.includes(e.value as any))
+            : OBJECTS_OPTS[mode];
+    }
+    function getVariableSuggestions(){
+        const getter = props.getterCtx?._getter;
+        if(!getter) return [];
+        const source = _in === 'self' ? 'self'
+            : _in === 'temp' ? 'temp'
+            : _in === 'world' ? 'world'
+            : _target;
+        return [...new Set(getter.getVars(source as any) ?? [])];
     }
     function updateItemOps(){
         getItems =[];
@@ -195,7 +207,7 @@ export function createGetterFormLogic(props:PropsFormGetter){
                 set selected(value:string){
                     _in = value;
                     if(!_target || !targetItems.find((e)=>e.value === _target)){
-                        _target = value == 'temp' ? 'any' :  targetItems[0].value;
+                        _target = value == 'temp' ? 'any' : (targetItems[0]?.value ?? '');
                     }
                     updateValue('_in', value);
                     updateItemOps();
@@ -254,6 +266,9 @@ export function createGetterFormLogic(props:PropsFormGetter){
                 set value(value:string){
                     _variable = value;
                     updateValue('variable', value);
+                },
+                get suggestions(){
+                    return getVariableSuggestions();
                 },
                 required:true,
             }

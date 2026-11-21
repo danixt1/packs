@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { listenForWorldEditorContextsChanged } from "$lib/shared/worldEditorContextEvents";
     import { page } from '$app/state';
     import { showError, showSucess } from "$lib/notify";
     import type { Character } from "$lib/types/data/declarative";
@@ -15,15 +17,28 @@
     import ListVars from "$lib/components/lists/ListVars.svelte";
     import InputSwitch from "$lib/components/inputs/InputSwitch.svelte";
     import FormAutonomy from "$lib/components/forms/FormAutonomy.svelte";
+    import ContextMembershipInput from "$lib/components/editor/ContextMembershipInput.svelte";
     import ContextHost from "$lib/components/ContextHost.svelte";
     import { createContextStack } from "$lib/shared/contextStack.svelte";
     import type { CtxBuilder } from "$lib/shared/getterCtx";
+
+    type CharacterFormData = Character & {
+        oid?: string;
+        _baseOID?: string;
+        _contextPaths: string[];
+        _variableContexts: Record<string, string[]>;
+    };
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let labelsInfo = $state(editor.getLabels());
     let characters = $state(editor.getCharacters());
     let knowVars = $derived(Array.from(new Set(characters.map(e =>e.vars.map(a =>a.name)).flat())))
     const stack = createContextStack();
+
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        characters = editor.getCharacters();
+        labelsInfo = editor.getLabels();
+    }));
     let ctxAutonomy:CtxBuilder = $state({
         allowedGetters:['self','runtime','world'],
         allowedObjects:['autonomy','character','character/place'],
@@ -41,9 +56,9 @@
     })));
 
     async function startCreate() {
-        const newChar = await stack.push<Partial<Character>, Character>({
+        const newChar = await stack.push<CharacterFormData, CharacterFormData>({
             title: 'New Character',
-            data: { id: '', name: '', labels: [], controlledByPlayer: false, vars: [] },
+            data: { id: '', name: '', labels: [], controlledByPlayer: false, vars: [], _contextPaths: [], _variableContexts: {} },
             render: renderCharacterForm,
             meta: { mode: 'create' }
         });
@@ -54,14 +69,17 @@
                 showError('Character already exists');
                 return;
             }
+            const { _contextPaths, _variableContexts, _baseOID: _ignoredBaseOID, ...characterData } = newChar;
             editor.addCharacter({
                 id: cleanId,
-                name: newChar.name,
-                labels: newChar.labels || [],
-                controlledByPlayer: newChar.controlledByPlayer ?? false,
-                vars: newChar.vars || [],
-                autonomy: newChar.autonomy
+                name: characterData.name,
+                labels: characterData.labels || [],
+                controlledByPlayer: characterData.controlledByPlayer ?? false,
+                vars: characterData.vars || [],
+                autonomy: characterData.autonomy
             });
+            editor.setObjectContexts('character', characterData.name, _contextPaths);
+            editor.syncVariableContexts(characterData.vars.map((variable) => variable.name), _variableContexts);
             characters = editor.getCharacters();
             showSucess('Character created');
         }
@@ -69,10 +87,17 @@
 
     async function startEdit(item: Record<string, any>) {
         const originalOid = item.oid as string;
-        const target = $state.snapshot(item) as Character & { _baseOID?: string };
+        const original = editor.getObject(originalOid) as Character | undefined;
+        if (!original) return;
+        const target = $state.snapshot({ ...original, oid: originalOid }) as CharacterFormData;
         target._baseOID = originalOid;
+        target._contextPaths = editor.getObjectContexts('character', target.name);
+        target._variableContexts = Object.fromEntries(target.vars.map((variable) => [
+            variable.name,
+            editor.getVariableContexts(variable.name)
+        ]));
 
-        const updated = await stack.push<Character & { _baseOID?: string }, Character & { _baseOID?: string }>({
+        const updated = await stack.push<CharacterFormData, CharacterFormData>({
             title: `Edit ${target.name || target.id}`,
             data: target,
             render: renderCharacterForm,
@@ -81,8 +106,15 @@
 
         if (updated) {
             const baseOid = updated._baseOID ?? originalOid;
-            delete updated._baseOID;
-            editor.updateObjectWithOid(baseOid, updated);
+            const previousObject = editor.getObject(originalOid) as Character | undefined;
+            const { _baseOID: _ignoredBaseOID, _contextPaths, _variableContexts, oid: _ignoredOid, ...characterData } = updated;
+            editor.updateObjectWithOid(baseOid, characterData);
+            editor.setObjectContexts('character', characterData.name, _contextPaths, previousObject?.name ?? characterData.name);
+            editor.syncVariableContexts(
+                characterData.vars.map((variable) => variable.name),
+                _variableContexts,
+                target.vars.map((variable) => variable.name)
+            );
             characters = editor.getCharacters();
             showSucess('Character updated');
         }
@@ -164,6 +196,7 @@
     <Form onSubmit={submitCharacterForm} onCancel={cancelCharacterForm}>
         <InputText id="charId" label="ID" bind:value={frame.draft.id} wrapDiv required autocomplete="off"/>
         <InputText id="charName" label="Name" bind:value={frame.draft.name} wrapDiv required autocomplete="off" />
+        <ContextMembershipInput id="character-contexts" label="Object contexts:" contexts={editor.getContexts()} appliesTo="objects" bind:value={frame.draft._contextPaths} />
         <InputSwitch id='controlledByPlayer' label="Controlled by player?" wrapDiv bind:value={frame.draft.controlledByPlayer} />
         <InputCard id="charLabels" label="Labels" items={labelsInfo.map((label) => ({
             value: label.name,
@@ -180,7 +213,7 @@
                 <button type="button" onclick={() => { delete frame.draft.autonomy; }}>Remove Autonomy</button>
             {/if}
         </BaseInput>
-        <ListVars {stack} bind:values={frame.draft.vars} suggestions={knowVars}/>
+        <ListVars {stack} bind:values={frame.draft.vars} suggestions={knowVars} contextEditor={editor} bind:variableContextPaths={frame.draft._variableContexts}/>
     </Form>
 {/snippet}
 

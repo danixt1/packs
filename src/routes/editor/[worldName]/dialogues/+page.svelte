@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { listenForWorldEditorContextsChanged } from "$lib/shared/worldEditorContextEvents";
     import { page } from '$app/state';
     import type { DialogueChoice, DialogueMatch, DialogueNode, DialogueTree } from "$lib/types/data/declarative";
 
@@ -15,12 +17,17 @@
     import { createContextStack } from "$lib/shared/contextStack.svelte";
     import { showError, showSucess } from "$lib/notify";
     import ButtonPopUp from "$lib/components/editor/ButtonPopUp.svelte";
+    import ContextMembershipInput from "$lib/components/editor/ContextMembershipInput.svelte";
     import type { CtxBuilder } from "$lib/shared/getterCtx";
 
     const editor = getCurrentWorldEditor(page.params.worldName);
     let dialogues = $state(editor.getDialogues());
     const stack = createContextStack();
     let labelsInfo = $state(editor.getLabels());
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        dialogues = editor.getDialogues();
+        labelsInfo = editor.getLabels();
+    }));
     let globalCtx:CtxBuilder = {
         allowedGetters:['self','target','world'],
         allowedObjects:['character','character/place'],
@@ -34,7 +41,8 @@
             priority: 0,
             startsAt: '',
             categories: [],
-            nodes: []
+            nodes: [],
+            _contextPaths: []
         };
     }
 
@@ -55,6 +63,7 @@
         const originalOid = dialogue.oid as string;
         const initial = $state.snapshot(dialogue);
         initial.priority ??= 0;
+        initial._contextPaths = editor.getObjectContexts('dialogue', initial.name);
 
         const result = await stack.push<any, any>({
             title: `Edit ${initial.name || initial.id}`,
@@ -80,6 +89,13 @@
             return;
         }
 
+        const contextPaths = Array.isArray(data._contextPaths) ? data._contextPaths : [];
+        const previousName = originalOid
+            ? (editor.getObject(originalOid) as DialogueTree | undefined)?.name
+            : undefined;
+        delete data._contextPaths;
+        delete data.oid;
+
         if (originalOid) {
             editor.updateObjectWithOid(originalOid, data);
             showSucess('Dialogue updated');
@@ -98,6 +114,7 @@
             editor.addDialogue(tree);
             showSucess('Dialogue created');
         }
+        editor.setObjectContexts('dialogue', data.name, contextPaths, previousName ?? data.name);
         dialogues = editor.getDialogues();
     }
 
@@ -195,6 +212,7 @@
     <Form onSubmit={() => frame.resolve(frame.draft)} onCancel={() => frame.cancel()}>
         <InputText id="dial-id" label="Id" bind:value={frame.draft.id} required wrapDiv autocomplete="off" />
         <InputText id="dial-name" label="Name" bind:value={frame.draft.name} required wrapDiv autocomplete="off" />
+        <ContextMembershipInput id="dialogue-contexts" label="Object contexts:" contexts={editor.getContexts()} appliesTo="objects" bind:value={frame.draft._contextPaths} />
         <InputText id="dial-intent" label="Dialogue Purpose" bind:value={frame.draft.intent} required wrapDiv autocomplete="off" />
         <InputNumber id="dial-priority" label="Priority" bind:value={frame.draft.priority} required wrapDiv />
         <InputText id="dial-start" label="Starts At" bind:value={frame.draft.startsAt} wrapDiv autocomplete="off" />

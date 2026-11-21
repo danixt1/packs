@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { listenForWorldEditorContextsChanged } from "$lib/shared/worldEditorContextEvents";
     import { page } from '$app/state';
     import type { Place } from "$lib/types/data/declarative";
 
@@ -14,16 +16,28 @@
     import ListVars from "$lib/components/lists/ListVars.svelte";
     import ContextHost from "$lib/components/ContextHost.svelte";
     import { createContextStack, type ContextFrame } from "$lib/shared/contextStack.svelte";
+    import ContextMembershipInput from "$lib/components/editor/ContextMembershipInput.svelte";
+
+    type PlaceFormData = Place & {
+        oid?: string;
+        _baseOID?: string;
+        _contextPaths: string[];
+        _variableContexts: Record<string, string[]>;
+    };
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let places = $state(editor.getPlaces());
 
     const stack = createContextStack();
 
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        places = editor.getPlaces();
+    }));
+
     async function startCreate() {
-        const newPlace = await stack.push<Partial<Place>, Place>({
+        const newPlace = await stack.push<PlaceFormData, PlaceFormData>({
             title: 'New Place',
-            data: { id: '', name: '', description: '', charactersId: [], connectedPlaces: [], vars: [] },
+            data: { id: '', name: '', description: '', charactersId: [], connectedPlaces: [], vars: [], _contextPaths: [], _variableContexts: {} },
             render: renderPlaceForm,
             meta: { mode: 'create' }
         });
@@ -46,6 +60,8 @@
                 connectedPlaces: newPlace.connectedPlaces || [],
                 vars: newPlace.vars || []
             });
+            editor.setObjectContexts('place', newPlace.name, newPlace._contextPaths);
+            editor.syncVariableContexts(newPlace.vars.map((variable) => variable.name), newPlace._variableContexts);
             places = editor.getPlaces();
             showSucess('Place created');
         }
@@ -53,10 +69,17 @@
 
     async function startEdit(item: Record<string, any>) {
         const originalOid = item.oid as string;
-        const target = $state.snapshot(item) as Place & { _baseOID?: string };
+        const original = editor.getObject(originalOid) as Place | undefined;
+        if (!original) return;
+        const target = $state.snapshot({ ...original, oid: originalOid }) as PlaceFormData;
         target._baseOID = originalOid;
+        target._contextPaths = editor.getObjectContexts('place', target.name);
+        target._variableContexts = Object.fromEntries(target.vars.map((variable) => [
+            variable.name,
+            editor.getVariableContexts(variable.name)
+        ]));
 
-        const updated = await stack.push<Place & { _baseOID?: string }, Place & { _baseOID?: string }>({
+        const updated = await stack.push<PlaceFormData, PlaceFormData>({
             title: `Edit ${target.id}`,
             data: target,
             render: renderPlaceForm,
@@ -65,6 +88,7 @@
 
         if (updated) {
             const cleanId = String(updated.id ?? '').trim();
+            const previousObject = editor.getObject(originalOid) as Place | undefined;
             if (cleanId.match(/[\s,'"]/)) {
                 showError('Id cannot have special characters and spaces');
                 return;
@@ -74,8 +98,15 @@
                 showError('Place id Already exist');
                 return;
             }
-            delete updated._baseOID;
-            editor.updateObjectWithOid(baseOid, updated);
+            const { _baseOID: _ignoredBaseOID, _contextPaths, _variableContexts, oid: _ignoredOid, ...placeData } = updated;
+            placeData.id = cleanId;
+            editor.updateObjectWithOid(baseOid, placeData);
+            editor.setObjectContexts('place', placeData.name, _contextPaths, previousObject?.name ?? placeData.name);
+            editor.syncVariableContexts(
+                placeData.vars.map((variable) => variable.name),
+                _variableContexts,
+                target.vars.map((variable) => variable.name)
+            );
             places = editor.getPlaces();
             showSucess('Place updated');
         }
@@ -137,9 +168,10 @@
             <InputText id="place-id" label="Place ID" bind:value={frame.draft.id} required autocomplete='off'/>
             <InputText id="place-name" label="Place Name" bind:value={frame.draft.name} required autocomplete='off'/>
             <InputTextArea id="place-description" label="Description" bind:value={frame.draft.description} />
+            <ContextMembershipInput id="place-contexts" label="Object contexts:" contexts={editor.getContexts()} appliesTo="objects" bind:value={frame.draft._contextPaths} />
             <InputCard id="place-characters" label="Characters In Place" bind:selectedItems={frame.draft.charactersId} items={charactersInfo} />
             <InputCard id="connected-places" label="Connected Places" bind:selectedItems={frame.draft.connectedPlaces} items={places.filter(e =>e.id != frame.draft.id).map((p) => ({ value: p.id, title: p.name }))} />
-            <ListVars {stack} bind:values={frame.draft.vars} />
+            <ListVars {stack} bind:values={frame.draft.vars} contextEditor={editor} bind:variableContextPaths={frame.draft._variableContexts} />
         </div>
     </Form>
 {/snippet}

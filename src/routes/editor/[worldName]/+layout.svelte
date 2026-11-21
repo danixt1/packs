@@ -1,10 +1,18 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import {page} from '$app/state';
     import { showError } from '$lib/notify';
     import { saveWorld } from '$lib/shared/gameStorage';
     import { getCurrentWorldEditor } from '$lib/shared/worldEditor';
+    import ContextSelector from '$lib/components/editor/ContextSelector.svelte';
+    import { listenForWorldEditorContextsChanged } from '$lib/shared/worldEditorContextEvents';
     let { children } = $props();
+    let editor = $state.raw(getCurrentWorldEditor(page.params.worldName));
+
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        editor = getCurrentWorldEditor(page.params.worldName);
+    }));
     let menus:{display:string,name:string}[] = [
         {
             display:'World',
@@ -71,6 +79,7 @@
                 </button>
             {/each}
         </nav>
+        <ContextSelector editor={editor} worldId={page.params.worldName ?? ''} />
     </div>
     <main>
         {@render children()}

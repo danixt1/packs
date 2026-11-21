@@ -7,6 +7,8 @@
     import InputSelect from "../inputs/InputSelect.svelte";
     import InputSwitch from "../inputs/InputSwitch.svelte";
     import InputText from "../inputs/InputText.svelte";
+    import ContextMembershipInput from "../editor/ContextMembershipInput.svelte";
+    import type { WorldEditor } from "$lib/shared/worldEditor";
 
     interface Props {
         onCancel?: () => void;
@@ -21,6 +23,8 @@
         /** Instead of making a Form pass the property who should by passed to Form*/
         writeFormPropsTo?: Record<string,any>;
         nameSuggestions?:string[];
+        editor?: WorldEditor;
+        contextPaths?: string[];
     }
     let {
         onCancel,
@@ -30,8 +34,18 @@
         existingNames,
         autoAttach,
         writeFormPropsTo = $bindable(),
-        nameSuggestions
+        nameSuggestions,
+        editor,
+        contextPaths = $bindable([])
     }: Props = $props();
+    let contextSelectionTouched = $state(false);
+
+    $effect(() => {
+        const variableName = String(data.name ?? '').trim();
+        if (editor && editing === null && variableName && !contextSelectionTouched) {
+            contextPaths = editor.getVariableContexts(variableName);
+        }
+    });
 
     $effect(()=>{
         if(!writeFormPropsTo){
@@ -124,6 +138,16 @@
             </BaseInput>
         {:else if data.type === 'boolean'}
             <InputSwitch id="varValue" label="Activate?" bind:value={data.value} />
+        {/if}
+        {#if editor}
+            <ContextMembershipInput
+                id="variable-contexts"
+                label="Variable contexts:"
+                contexts={editor.getContexts()}
+                appliesTo="variables"
+                bind:value={contextPaths}
+                onchange={() => contextSelectionTouched = true}
+            />
         {/if}
     </div>
 {/snippet}

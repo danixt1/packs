@@ -1,9 +1,19 @@
 import type { ActionDeclaration, Character, Collector, ConditionalList, ConditionExists, ConditionIsValid, ConditionRelational, DialogueTree, Display, EffectFomAction, EffectInterrupt, Item, Place, TextTemplate, VariableDeclarator, VariableModify, VariableToGet, World } from "$lib/types/data/declarative";
 import { loadWorld as loadStoredWorld } from './gameStorage';
-import type { LabelInfo } from "$lib/types/data/editor";
+import type { ContextEditing, Editor, LabelInfo } from "$lib/types/data/editor";
 let currentEditor:null|WorldEditor = null;
 
 export type targetsWithVar = 'character'|'temp'|'self'|'place'|'item'|'world'
+export type ContextObjectType = 'character'|'item'|'place'|'action'|'dialogue'|'text-template';
+
+//Proposed new OID system: char:marcus:variable:test | action:talk:onEffect[0]:onTrue[2]:set$target:character-variable$
+
+interface UsageRef{
+    ref:'declare'|'modify'|'use'
+    OID:string
+    parentOID:string | null
+    name:string
+}
 
 type VarRelation = ({
     relation:'use'
@@ -57,8 +67,11 @@ export class WorldEditor {
     private eventsInfo:Record<string,EventEditor> = {};
 
     private worldVersion:number[] = [1,0,0];
-    private editorInfo:World['editor'];
+    private editorInfo:Editor;
     public readonly worldId?:string;
+
+
+    private currentCtxs:ContextEditing[] = [];
 
     constructor(world:World, worldId?:string){
         this.worldId = worldId;
@@ -66,11 +79,11 @@ export class WorldEditor {
         this.description = world.description;
         this.worldVars = structuredClone(world.vars ?? []);
         this.worldVersion = [...(world.version ?? [1,0,0])];
-        this.editorInfo = structuredClone(world.editor);
-        const editorInfo = world.editor;
-        if(editorInfo){
-            Object.entries(editorInfo.labelsDescription ?? []).forEach(([k,v])=>this.addLabel(k,v));
-        }
+        this.editorInfo = structuredClone(world.editor) || {};
+        const editorInfo = world.editor || {};
+
+        Object.entries(this.editorInfo.labelsDescription ?? []).forEach(([k,v])=>this.addLabel(k,v));
+
         world.vars              .forEach( e => this.linkVariableDeclarator(e,'world:root'));
         world.characters        .forEach( e => this.addCharacter(e));
         world.places            .forEach( e => this.addPlace(e));
@@ -79,6 +92,8 @@ export class WorldEditor {
         world.items             .forEach( e => this.addItem(e));
         world.dialogues         ?.forEach(e => this.addDialogue(e));
         world.displays          ?.forEach(e => this.addDisplay(e));
+        this.cleanupInvalidContextMembers();
+
     }
     public addLabel(name:string,info:LabelInfo){
         if(!this.labelslinks[name]){
@@ -196,6 +211,171 @@ export class WorldEditor {
         this.displays[display.varName] = {...display, oid};
         this.linkVariableUsage(display.varName,oid,'display');
     }
+    public addContext(ctx:ContextEditing){
+        if(!this.editorInfo.ctxs){
+            this.editorInfo.ctxs = [];
+        }
+        const ctxs = this.editorInfo.ctxs;
+        if(!ctx.parent){
+            ctxs.push(ctx);
+            return;
+        }
+
+        const parentIndex = ctxs.findIndex((candidate) => {
+            const candidatePath = candidate.parent ? `${candidate.parent}.${candidate.name}` : candidate.name;
+            return candidatePath === ctx.parent;
+        });
+        if(parentIndex === -1){
+            ctxs.push(ctx);
+            return;
+        }
+
+        const parentPath = ctx.parent;
+        let insertAt = parentIndex + 1;
+        while(insertAt < ctxs.length){
+            const candidate = ctxs[insertAt];
+            const candidatePath = getContextPath(candidate);
+            if(!candidatePath.startsWith(`${parentPath}.`)){
+                break;
+            }
+            insertAt++;
+        }
+        ctxs.splice(insertAt, 0, ctx);
+    }
+    public deleteCtx(name:string,parent:string|null = null){
+        const ctxs = this.editorInfo.ctxs ?? [];
+        const context = ctxs.find(candidate => candidate.name === name && candidate.parent === parent);
+        if(!context){
+            return;
+        }
+        const deletedPaths = new Set([getContextPath(context)]);
+        let addedPath = true;
+        while(addedPath){
+            addedPath = false;
+            for(const candidate of ctxs){
+                if(candidate.parent && deletedPaths.has(candidate.parent)){
+                    const candidatePath = getContextPath(candidate);
+                    if(!deletedPaths.has(candidatePath)){
+                        deletedPaths.add(candidatePath);
+                        addedPath = true;
+                    }
+                }
+            }
+        }
+        this.editorInfo.ctxs = ctxs.filter(candidate => !deletedPaths.has(getContextPath(candidate)));
+        this.currentCtxs = this.currentCtxs.filter(candidate => !deletedPaths.has(getContextPath(candidate)));
+    }
+    public getObjectContexts(objectType:ContextObjectType, objectName:string){
+        return (this.editorInfo.ctxs ?? [])
+            .filter(context => context.objectsInCtx?.[objectType]?.includes(objectName))
+            .map(getContextPath);
+    }
+    public setObjectContexts(
+        objectType:ContextObjectType,
+        objectName:string,
+        selectedPaths:string[],
+        previousName = objectName
+    ){
+        const selected = new Set(selectedPaths);
+        const removePreviousName = previousName !== objectName && !this.hasObjectName(objectType, previousName);
+        for(const context of this.editorInfo.ctxs ?? []){
+            context.objectsInCtx ??= {};
+            const objects = new Set(context.objectsInCtx[objectType] ?? []);
+            if(removePreviousName){
+                objects.delete(previousName);
+            }
+            objects.delete(objectName);
+            if(selected.has(getContextPath(context))){
+                objects.add(objectName);
+            }
+            if(objects.size){
+                context.objectsInCtx[objectType] = [...objects];
+            }else{
+                delete context.objectsInCtx[objectType];
+            }
+        }
+    }
+    public getVariableContexts(variableName:string){
+        return (this.editorInfo.ctxs ?? [])
+            .filter(context => context.varsAllowed?.includes(variableName))
+            .map(getContextPath);
+    }
+    public setVariableContexts(variableName:string, selectedPaths:string[]){
+        const selected = new Set(selectedPaths);
+        for(const context of this.editorInfo.ctxs ?? []){
+            const variables = new Set(context.varsAllowed ?? []);
+            variables.delete(variableName);
+            if(selected.has(getContextPath(context))){
+                variables.add(variableName);
+            }
+            context.varsAllowed = [...variables];
+        }
+    }
+    public syncVariableContexts(currentNames:string[], contextsByName:Record<string,string[]>, previousNames:string[] = []){
+        for(const name of new Set(currentNames)){
+            this.setVariableContexts(name, contextsByName[name] ?? this.getVariableContexts(name));
+        }
+        for(const name of new Set(previousNames)){
+            this.removeVariableContextsIfUnused(name);
+        }
+    }
+    private removeVariableContextsIfUnused(variableName:string){
+        const isStillDeclared = [
+            ...Object.values(this.characters),
+            ...Object.values(this.items),
+            ...Object.values(this.places)
+        ].some(object => object.vars.some(variable => variable.name === variableName));
+        if(isStillDeclared) return;
+
+        for(const context of this.editorInfo.ctxs ?? []){
+            context.varsAllowed = (context.varsAllowed ?? []).filter(name => name !== variableName);
+        }
+    }
+    private hasObjectName(objectType:ContextObjectType, objectName:string){
+        const objects:Record<ContextObjectType, {name:string}[]> = {
+            character: Object.values(this.characters),
+            item: Object.values(this.items),
+            place: Object.values(this.places),
+            action: Object.values(this.actions),
+            dialogue: Object.values(this.dialogues),
+            'text-template': Object.values(this.textTemplates)
+        };
+        return objects[objectType].some(object => object.name === objectName);
+    }
+    private cleanupInvalidContextMembers(){
+        const objectNames:Record<ContextObjectType, Set<string>> = {
+            character: new Set(Object.values(this.characters).map(object => object.name)),
+            item: new Set(Object.values(this.items).map(object => object.name)),
+            place: new Set(Object.values(this.places).map(object => object.name)),
+            action: new Set(Object.values(this.actions).map(object => object.name)),
+            dialogue: new Set(Object.values(this.dialogues).map(object => object.name)),
+            'text-template': new Set(Object.values(this.textTemplates).map(object => object.name))
+        };
+        const variableNames = new Set([
+            ...Object.values(this.characters).flatMap(object => object.vars.map(variable => variable.name)),
+            ...Object.values(this.items).flatMap(object => object.vars.map(variable => variable.name)),
+            ...Object.values(this.places).flatMap(object => object.vars.map(variable => variable.name))
+        ]);
+
+        for(const context of this.editorInfo.ctxs ?? []){
+            context.varsAllowed = [...new Set((context.varsAllowed ?? []).filter(name => variableNames.has(name)))];
+            context.objectsInCtx ??= {};
+            for(const objectType of Object.keys(context.objectsInCtx)){
+                if(!Object.hasOwn(objectNames, objectType)){
+                    delete context.objectsInCtx[objectType];
+                }
+            }
+            for(const objectType of Object.keys(objectNames) as ContextObjectType[]){
+                const members = context.objectsInCtx[objectType] ?? [];
+                const validMembers = [...new Set(members.filter(name => objectNames[objectType].has(name)))];
+                if(validMembers.length){
+                    context.objectsInCtx[objectType] = validMembers;
+                }else{
+                    delete context.objectsInCtx[objectType];
+                }
+            }
+        }
+    }
     public deleteObject(oid:string){
         if(!this.objectsByOid[oid]){
             return;
@@ -214,29 +394,66 @@ export class WorldEditor {
         if(!selected){
             throw new Error('Invalid data OID:"'+objName + '" not found');
         }
-        delete selected[oid.slice(oid.indexOf(':') + 1)];
+        const selectedKey = oid.slice(oid.indexOf(':') + 1);
+        const deletedObject = selected[selectedKey] as {name?:string;vars?:VariableDeclarator[]} | undefined;
+        const deletedVariableNames = getContextObjectType(objName) && ['char','item','place'].includes(objName)
+            ? deletedObject?.vars?.map(variable => variable.name) ?? []
+            : [];
+        delete selected[selectedKey];
         delete this.objectsByOid[oid];
         this.delAllRefs(oid);
+        const contextType = getContextObjectType(objName);
+        if(contextType && deletedObject?.name && !this.hasObjectName(contextType, deletedObject.name)){
+            for(const context of this.editorInfo.ctxs ?? []){
+                const remaining = (context.objectsInCtx?.[contextType] ?? []).filter(name => name !== deletedObject.name);
+                if(remaining.length){
+                    context.objectsInCtx[contextType] = remaining;
+                }else if(context.objectsInCtx){
+                    delete context.objectsInCtx[contextType];
+                }
+            }
+        }
+        for(const variableName of new Set(deletedVariableNames)){
+            this.removeVariableContextsIfUnused(variableName);
+        }
     }
-    public getCharacters():CharacterEditor[]{
+    public getCharacters(ignoreCtx = false):CharacterEditor[]{
+        if(!ignoreCtx){
+            return this.applyCtxs(Object.values(this.characters),'character');
+        }
         return Object.values(this.characters);
     }
-    public getItems():ItemEditor[]{
+    public getItems(ignoreCtx = false):ItemEditor[]{
+        if(!ignoreCtx){
+            return this.applyCtxs(Object.values(this.items),'item');
+        }
         return Object.values(this.items);
     }
     public getLabels(){
         return Object.values(this.labelslinks)
     }
-    public getActions():ActionEditor[]{
+    public getActions(ignoreCtx = false):ActionEditor[]{
+        if(!ignoreCtx){
+            return this.applyCtxs(Object.values(this.actions),'action');
+        }
         return Object.values(this.actions);
     }
-    public getPlaces():PlaceEditor[]{
+    public getPlaces(ignoreCtx = false):PlaceEditor[]{
+        if(!ignoreCtx){
+            return this.applyCtxs(Object.values(this.places),'place');
+        }
         return Object.values(this.places);
     }
-    public getDialogues():DialogueEditor[]{
+    public getDialogues(ignoreCtx = false):DialogueEditor[]{
+        if(!ignoreCtx){
+            return this.applyCtxs(Object.values(this.dialogues),'dialogue');
+        }
         return Object.values(this.dialogues);
     }
-    public getTextTemplates():TextTemplateEditor[]{
+    public getTextTemplates(ignoreCtx = false):TextTemplateEditor[]{
+        if(!ignoreCtx){
+            return this.applyCtxs(Object.values(this.textTemplates),'text-template');
+        }
         return Object.values(this.textTemplates);
     }
     public getObject(oid:string){
@@ -255,12 +472,12 @@ export class WorldEditor {
             description: this.description,
             version: [...this.worldVersion],
             vars: structuredClone(this.worldVars),
-            characters: this.getCharacters().map(({ oid: _oid, ...character }) => character),
-            places: this.getPlaces().map(({ oid: _oid, ...place }) => place),
-            items: this.getItems().map(({ oid: _oid, ...item }) => item),
-            actions: this.getActions().map(({ oid: _oid, ...action }) => action),
+            characters: this.getCharacters(true).map(({ oid: _oid, ...character }) => character),
+            places: this.getPlaces(true).map(({ oid: _oid, ...place }) => place),
+            items: this.getItems(true).map(({ oid: _oid, ...item }) => item),
+            actions: this.getActions(true).map(({ oid: _oid, ...action }) => action),
             textTemplates: Object.values(this.textTemplates).map(({ oid: _oid, ...template }) => template),
-            dialogues: this.getDialogues().map(({ oid: _oid, ...dialogue }) => dialogue),
+            dialogues: this.getDialogues(true).map(({ oid: _oid, ...dialogue }) => dialogue),
             displays: Object.values(this.displays).map(({ oid: _oid, ...display }) => display),
             editor: Object.keys(labelsDescription).length > 0
                 ? { ...this.editorInfo, labelsDescription }
@@ -288,9 +505,27 @@ export class WorldEditor {
         if(!selected){
             throw new Error('Invalid oid, type "'+objName + '" not found');
         }
+        const currentObject = this.objectsByOid[oid] as {name?:string;vars?:VariableDeclarator[]} | undefined;
+        const contextType = getContextObjectType(objName);
+        const previousName = currentObject?.name;
+        const previousContexts = contextType && previousName
+            ? this.getObjectContexts(contextType, previousName)
+            : [];
+        const previousVariableContexts = Object.fromEntries((currentObject?.vars ?? []).map(variable => [
+            variable.name,
+            this.getVariableContexts(variable.name)
+        ]));
         // Expensive, but if the OID of the character was updated it gonna generate duplication.
         this.deleteObject(oid);
         selected.call(this,obj);
+        if(contextType && previousName && typeof obj.name === 'string' && previousContexts.length){
+            this.setObjectContexts(contextType, obj.name, previousContexts, previousName);
+        }
+        for(const variable of obj.vars ?? []){
+            if(Object.hasOwn(previousVariableContexts, variable.name)){
+                this.setVariableContexts(variable.name, previousVariableContexts[variable.name]);
+            }
+        }
     }
     getVarsRelations(varName:string){
         return this.relationVars[varName];
@@ -323,6 +558,23 @@ export class WorldEditor {
     }
     public getCategories(){
         return this.categories;
+    }
+    public getContexts(){
+        return this.editorInfo.ctxs || []
+    }
+    public setCurrentContexts(ctxs:ContextEditing[]){
+        this.currentCtxs = ctxs;
+    }
+    public getCurrentContexts(){
+        return this.currentCtxs;
+    }
+    public filterVariablesByCurrentContexts<T extends {name:string}>(variables:T[]):T[]{
+        const variableContexts = this.getContextsToApply().filter(context => contextAppliesTo(context, 'variables'));
+        if(!variableContexts.length){
+            return variables;
+        }
+        const allowedVariables = new Set(variableContexts.flatMap(context => context.varsAllowed ?? []));
+        return variables.filter(variable => allowedVariables.has(variable.name));
     }
     private extractVariablesRefInText(text:string){
 		const refs:VariableToGet[] = [];
@@ -519,6 +771,57 @@ export class WorldEditor {
             oid
         })
     }
+    private applyCtxs<T extends {name:string,vars?:VariableDeclarator[]}>(analyzeObjs:T[],objType:string):T[]{
+        if(!this.currentCtxs.length){
+            return analyzeObjs;
+        }
+        const contextsToApply = this.getContextsToApply();
+        const objectContexts = contextsToApply.filter(context => contextAppliesTo(context, 'objects'));
+        const variableContexts = contextsToApply.filter(context => contextAppliesTo(context, 'variables'));
+        const visibleObjects = objectContexts.length
+            ? analyzeObjs.filter(object => objectContexts.some(context => context.objectsInCtx[objType]?.includes(object.name)))
+            : analyzeObjs;
+        if(!variableContexts.length){
+            return visibleObjects;
+        }
+        const allowedVariables = new Set(variableContexts.flatMap(context => context.varsAllowed ?? []));
+        return visibleObjects.map(object => object.vars
+            ? { ...object, vars: object.vars.filter(variable => allowedVariables.has(variable.name)) }
+            : object
+        );
+    }
+    private getContextsToApply(){
+        if(!this.currentCtxs.length){
+            return [];
+        }
+        const selectedPaths = this.currentCtxs.map(getContextPath);
+        const contextsToApply = new Set(this.currentCtxs);
+        for(const ctx of this.editorInfo.ctxs ?? []){
+            const ctxPath = getContextPath(ctx);
+            if(selectedPaths.some((selectedPath) => ctxPath.startsWith(`${selectedPath}.`))){
+                contextsToApply.add(ctx);
+            }
+        }
+        return [...contextsToApply];
+    }
+}
+function getContextPath(ctx:ContextEditing){
+    return ctx.parent ? `${ctx.parent}.${ctx.name}` : ctx.name;
+}
+function contextAppliesTo(ctx:ContextEditing, scope:'objects'|'variables'){
+    const appliesTo = ctx.appliesTo ?? 'both';
+    return appliesTo === 'both' || appliesTo === scope;
+}
+function getContextObjectType(oidType:string):ContextObjectType | undefined{
+    const types:Record<string,ContextObjectType> = {
+        char:'character',
+        item:'item',
+        place:'place',
+        action:'action',
+        dialogue:'dialogue',
+        'text-template':'text-template'
+    };
+    return types[oidType];
 }
 function getObjName(oid:string){
     return oid.slice(0,oid.indexOf(':'));

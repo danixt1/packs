@@ -1,5 +1,7 @@
 <script lang="ts">
+    import { onMount } from 'svelte';
     import { getCurrentWorldEditor } from "$lib/shared/worldEditor";
+    import { listenForWorldEditorContextsChanged } from "$lib/shared/worldEditorContextEvents";
     import { page } from '$app/state';
 
     import ObjectTable from "$lib/components/ObjectTable.svelte";
@@ -13,16 +15,28 @@
     import ContextHost from "$lib/components/ContextHost.svelte";
     import { createContextStack } from "$lib/shared/contextStack.svelte";
     import ListVars from "$lib/components/lists/ListVars.svelte";
+    import ContextMembershipInput from "$lib/components/editor/ContextMembershipInput.svelte";
+
+    type ItemFormData = Item & {
+        oid?: string;
+        _baseOID?: string;
+        _contextPaths: string[];
+        _variableContexts: Record<string, string[]>;
+    };
 
     let editor = getCurrentWorldEditor(page.params.worldName);
     let items = $state(editor.getItems());
 
     const stack = createContextStack();
 
+    onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
+        items = editor.getItems();
+    }));
+
     async function startCreate() {
-        const newItem = await stack.push<Partial<Item>, Item>({
+        const newItem = await stack.push<ItemFormData, ItemFormData>({
             title: 'New Item',
-            data: { id: '', name: '', description: '', vars: [] },
+            data: { id: '', name: '', description: '', vars: [], _contextPaths: [], _variableContexts: {} },
             render: renderItemForm,
             meta: { mode: 'create' }
         });
@@ -39,6 +53,8 @@
                 description: newItem.description,
                 vars: newItem.vars ?? []
             });
+            editor.setObjectContexts('item', newItem.name, newItem._contextPaths);
+            editor.syncVariableContexts(newItem.vars.map((variable) => variable.name), newItem._variableContexts);
             items = editor.getItems();
             showSucess('Item created');
         }
@@ -46,10 +62,17 @@
 
     async function startEdit(item: Record<string, any>) {
         const originalOid = item.oid as string;
-        const target = $state.snapshot(item) as Item & { _baseOID?: string };
+        const original = editor.getObject(originalOid) as Item | undefined;
+        if (!original) return;
+        const target = $state.snapshot({ ...original, oid: originalOid }) as ItemFormData;
         target._baseOID = originalOid;
+        target._contextPaths = editor.getObjectContexts('item', target.name);
+        target._variableContexts = Object.fromEntries(target.vars.map((variable) => [
+            variable.name,
+            editor.getVariableContexts(variable.name)
+        ]));
 
-        const updated = await stack.push<Item & { _baseOID?: string }, Item & { _baseOID?: string }>({
+        const updated = await stack.push<ItemFormData, ItemFormData>({
             title: `Edit ${target.id}`,
             data: target,
             render: renderItemForm,
@@ -58,13 +81,21 @@
 
         if (updated) {
             const cleanId = String(updated.id ?? '').trim();
+            const previousObject = editor.getObject(originalOid) as Item | undefined;
             const baseOid = updated._baseOID ?? originalOid;
             if (baseOid !== 'item:' + cleanId && editor.getObject('item:' + cleanId)) {
                 showError('Id already used!');
                 return;
             }
-            delete updated._baseOID;
-            editor.updateObjectWithOid(baseOid, updated);
+            const { _baseOID: _ignoredBaseOID, _contextPaths, _variableContexts, oid: _ignoredOid, ...itemData } = updated;
+            itemData.id = cleanId;
+            editor.updateObjectWithOid(baseOid, itemData);
+            editor.setObjectContexts('item', itemData.name, _contextPaths, previousObject?.name ?? itemData.name);
+            editor.syncVariableContexts(
+                itemData.vars.map((variable) => variable.name),
+                _variableContexts,
+                target.vars.map((variable) => variable.name)
+            );
             items = editor.getItems();
             showSucess('Item updated');
         }
@@ -107,7 +138,8 @@
         <InputText id="item-id" label="Id" bind:value={frame.draft.id} autocomplete='off' required wrapDiv/>
         <InputText id="item-name" label="Name" bind:value={frame.draft.name} autocomplete='off' required wrapDiv/>
         <InputTextArea id="item-description" label="Description" bind:value={frame.draft.description} wrapDiv/>
-        <ListVars {stack} bind:values={frame.draft.vars} />
+        <ContextMembershipInput id="item-contexts" label="Object contexts:" contexts={editor.getContexts()} appliesTo="objects" bind:value={frame.draft._contextPaths} />
+        <ListVars {stack} bind:values={frame.draft.vars} contextEditor={editor} bind:variableContextPaths={frame.draft._variableContexts} />
     </Form>
 {/snippet}
 

@@ -6,6 +6,7 @@ import InputSelect from './InputSelect.svelte';
 import InputSwitch from './InputSwitch.svelte';
 import InputText from './InputText.svelte';
 import InputTextArea from './InputTextArea.svelte';
+import InputMultipleItems from './InputMultipleItems.svelte';
 
 test('uses the input id to generate a test id and wraps its label', async () => {
     const screen = await render(InputText, {
@@ -49,6 +50,21 @@ test('generates test ids for the other input controls', async () => {
     });
     await expect.element(toggle.getByTestId('input-enabled')).toBeVisible();
     await expect.element(toggle.getByRole('switch', { name: 'Enabled' })).toBeVisible();
+});
+
+test('renders InputMultipleItems search with an accessible label and search placeholder', async () => {
+    const screen = await render(InputMultipleItems, {
+        id: 'contexts',
+        items: [{ name: 'combat', title: 'Combat' }],
+        value: [],
+        label: 'Search contexts',
+        placeholder: 'Search contexts...'
+    });
+
+    const search = screen.getByTestId('input-contexts-search');
+    await expect.element(search).toHaveAttribute('type', 'search');
+    await expect.element(search).toHaveAttribute('placeholder', 'Search contexts...');
+    await expect.element(search).toHaveAttribute('aria-label', 'Search contexts');
 });
 
 test('generates a test id for card inputs and wraps each option label', async () => {
