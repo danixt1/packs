@@ -19,6 +19,10 @@ export interface PropsFormGetter {
     writeFormPropsTo?:Record<string,any>;
     /** Object with auxiliar hint system to the get*/
     getterCtx?:GetterCtx
+    /** Restrict the available getter scopes for a specific field. */
+    allowedGetters?: ('self'|'target'|'runtime'|'temp'|'world')[]
+    /** Restrict whether the field reads variables or metadata. */
+    allowedGets?: ('variable'|'metadata')[]
 }
 export const OBJECTS_OPTS = {
     general:[
@@ -93,7 +97,7 @@ export function createGetterFormLogic(props:PropsFormGetter){
         lastWrittenValue = valueSnapshot();
     }
     let allowedTypes = $derived.by(()=>{
-        let allowedGetters = props.getterCtx?._getter.getAllowedGetters();
+        let allowedGetters = props.allowedGetters ?? props.getterCtx?._getter.getAllowedGetters();
         const allEments = [
             {title:'Self',value:'self'},
             {title:'Target',value:'target'},
@@ -134,8 +138,9 @@ export function createGetterFormLogic(props:PropsFormGetter){
     function updateItemOps(){
         getItems =[];
         
-        _target != 'action' && getItems.push({title:'Variable',value:'variable'});
-        _in != 'temp' && getItems.push({title:'Metadata',value:'metadata'});
+        const allowedGets = props.allowedGets ?? ['variable', 'metadata'];
+        _target != 'action' && allowedGets.includes('variable') && getItems.push({title:'Variable',value:'variable'});
+        _in != 'temp' && allowedGets.includes('metadata') && getItems.push({title:'Metadata',value:'metadata'});
 
         if(getItems.length == 1){
             _get = getItems[0].value;

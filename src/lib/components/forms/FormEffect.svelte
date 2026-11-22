@@ -219,9 +219,23 @@
     }
 
     async function handleStackGetter(property: string, title: string) {
+        const isSetterVariable = property === 'var' && selectedType === 'setter';
+        const isSetterValue = property === 'value' && selectedType === 'setter';
+        const setterScopes = ['self', 'target', 'temp'] as const;
+        const valueScopes = ['self', 'target', 'runtime', 'temp', 'world'] as const;
+        const allowedScopes = ctxGetter._getter.getAllowedGetters();
+        const getterOptions = isSetterVariable
+            ? {
+                allowedGetters: setterScopes.filter((scope) => allowedScopes.includes(scope)),
+                allowedGets: ['variable']
+            }
+            : isSetterValue
+                ? { allowedGetters: valueScopes.filter((scope) => allowedScopes.includes(scope)) }
+                : undefined;
         const result = await stack.push<Record<string, any>, Record<string, any>>({
             title,
             data: data[property]?.type === 'getter' ? data[property] : {},
+            meta: getterOptions,
             render: renderGetterForm
         });
         if (result) data[property] = result;
@@ -462,6 +476,8 @@
 {#snippet renderGetterForm(frame: ContextFrame<Record<string, any>, Record<string, any>>)}
     <FormGetter
         getterCtx={ctxGetter}
+        allowedGetters={frame.meta?.allowedGetters}
+        allowedGets={frame.meta?.allowedGets}
         bind:value={frame.draft}
         onCancel={() => frame.cancel()}
         onAfterSubmit={(getter) => frame.resolve(getter)}
