@@ -25,6 +25,7 @@
         suggestions?:string[];
         contextEditor?:WorldEditor;
         variableContextPaths?:Record<string,string[]>;
+        allowPaired?: boolean;
     }
     let {
         values = $bindable([]),
@@ -36,7 +37,8 @@
         title = 'Variables',
         suggestions,
         contextEditor,
-        variableContextPaths = $bindable({})
+        variableContextPaths = $bindable({}),
+        allowPaired = false
     }: Props = $props();
     let contextRevision = $state(0);
 
@@ -106,6 +108,7 @@
     <FormVar
         nameSuggestions={suggestions}
         editor={contextEditor}
+        {allowPaired}
         bind:contextPaths={frame.meta.contextPaths}
         bind:value={frame.draft}
         existingNames={frame.meta?.existingIds}

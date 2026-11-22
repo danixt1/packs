@@ -76,6 +76,55 @@ function resolveEntityVariable<T extends RuntimeVariable[]>(
 	return { ok: false, path: `${pathPrefix}:${variable}`, reason: 'missing' };
 }
 
+function resolveCharacterVariable(
+	state: RuntimeState,
+	character: RuntimeCharacter,
+	variableName: string,
+	context: ResolveContext,
+	pathPrefix: string,
+	fallback?: string | number | boolean
+): ResolvedValue {
+	const declaration = findVar(character.vars, variableName);
+	if (!declaration) {
+		return fallback !== undefined
+			? { ok: true, value: fallback, path: `${pathPrefix}:${variableName}` }
+			: { ok: false, path: `${pathPrefix}:${variableName}`, reason: 'missing character variable' };
+	}
+	if (declaration.mode !== 'paired') {
+		return { ok: true, value: declaration.value, path: `${pathPrefix}:${variableName}`, variable: declaration };
+	}
+
+	const participants = new Set<string>();
+	const self = getSelf(state, context);
+	if (self) participants.add(self.id);
+	const target = targetEntity<RuntimeCharacter>(state, context, 'character');
+	if (target) participants.add(target.id);
+	const partnerId = [...participants].find((id) => id !== character.id);
+	const partner = partnerId && state.characters.find((candidate) => candidate.id === partnerId);
+	if (!partner || !participants.has(character.id)) {
+		return fallback !== undefined
+			? { ok: true, value: fallback, path: `${pathPrefix}:${variableName}` }
+			: { ok: false, path: `${pathPrefix}:${variableName}`, reason: 'missing paired character context' };
+	}
+
+	const pairKey = `${character.id}>${partner.id}`;
+	state.pairedVars ??= {};
+	const pairVars = state.pairedVars[pairKey] ??= {};
+	// Initialize the directed relationship from this character's declarations.
+	for (const pairedDeclaration of character.vars) {
+		if (pairedDeclaration.mode === 'paired' && !(pairedDeclaration.name in pairVars)) {
+			pairVars[pairedDeclaration.name] = pairedDeclaration.value;
+		}
+	}
+	return {
+		ok: true,
+		value: pairVars[variableName],
+		path: `paired:${pairKey}:${variableName}`,
+		variable: declaration,
+		pairedTarget: { pairKey, variableName }
+	};
+}
+
 function resolveEntityMetadata<T extends Record<string, (e: any) => string | number | boolean | undefined>>(
 	entity: any,
 	metadataMap: T,
@@ -126,6 +175,10 @@ const GETTER_HANDLERS: Record<string, GetterHandler> = {
 			if (getter.fallback !== undefined) return { ok: true, value: getter.fallback, path: `self:${getter.variable}` };
 			return { ok: false, path: `self:${getter.variable}`, reason: 'missing self' };
 		}
+		const declaration = findVar(self.vars, getter.variable);
+		if (declaration?.mode === 'paired') {
+			return resolveCharacterVariable(state, self, getter.variable, context, `self:${self.id}`, getter.fallback);
+		}
 		const result = resolveEntityVariable(self, getter.variable, `self:${self.id}`);
 		if (result.ok) return result;
 		const metaResult = resolveEntityMetadata(self, CHARACTER_METADATA, getter.variable, `self:${self.id}`);
@@ -148,7 +201,7 @@ const GETTER_HANDLERS: Record<string, GetterHandler> = {
 
 	'target:character-variable': (state, getter, context) => {
 		const character = targetEntity<RuntimeCharacter>(state, context, 'character');
-		if (character) return resolveEntityVariable(character, getter.variable, `target:character:${character.id}`);
+		if (character) return resolveCharacterVariable(state, character, getter.variable, context, `target:character:${character.id}`, getter.fallback);
 		if (getter.fallback !== undefined) return { ok: true, value: getter.fallback, path: `target:character:${getter.variable}` };
 		return { ok: false, path: `target:character:${getter.variable}`, reason: 'missing target character' };
 	},

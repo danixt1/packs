@@ -19,6 +19,12 @@ The gameplay menu supports multiple slots through `Save > Save as new file` and 
 
 The `Export JSON save` action creates a versioned `story-engine-save` JSON document. `Import JSON save` accepts that document, checks that it belongs to the active world, verifies the world-version compatibility, and creates a new local slot. Save files are local to the browser profile; exporting is the way to move a save between profiles or devices.
 
+Runtime state includes `pairedVars`, a map of directed character relationships to
+their paired variable values. A key such as `player>king` stores variables owned
+by player for the relationship from player to king; `king>player` is independent.
+The pair is initialized lazily on first access from the paired variable defaults
+declared on its owning character. Saves created before `pairedVars` existed, load with an empty map.
+
 ## World interface
 
 Encapsulate all informations of how the world should by generated in runtime.
@@ -39,3 +45,10 @@ Player actions still need a `display` declaration to appear in the player UI.
 Autonomous actions do not need a display. Action names must be unique across
 `World.actions`, because autonomy rules and action lifecycle execution resolve
 declarations by name.
+
+Character variables may set `mode: 'paired'` to store their mutable value in
+`RuntimeState.pairedVars` for the owning character and the other character in the
+current self/target context. The owner’s declaration supplies the type, default,
+and numeric limits. A context without another character uses the getter fallback
+or resolves as missing. Paired variables are not shown in a character’s
+standalone status display because their value depends on another character.

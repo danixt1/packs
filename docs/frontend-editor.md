@@ -45,7 +45,7 @@ List components accept `values` with Svelte binding when the parent owns the col
 
 Forms are reusable editors for individual data values. Under the ContextStack pattern, each form binds to the active frame's `draft` and receives explicit `onCancel` (calling `frame.cancel()`) and `onAfterSubmit` (calling `frame.resolve(result)`).
 
-- [`FormVar.svelte`](../src/lib/components/forms/FormVar.svelte) creates or edits a variable. It validates names, prevents spaces, prevents duplicate names (checking against `existingNames`), and supports primitive string, number, and boolean values.
+- [`FormVar.svelte`](../src/lib/components/forms/FormVar.svelte) creates or edits a variable. It validates names, prevents spaces, prevents duplicate names (checking against `existingNames`), and supports primitive string, number, and boolean values. Character variables can use paired storage; place, item, world, and autonomy-memory variable editors do not offer that mode.
 - [`FormCondition.svelte`](../src/lib/components/forms/FormCondition.svelte) creates relational, exists, and is-valid conditions. Relational conditions use left and right operands; other condition types use `variableToCheck`. Operands can push nested operand frames (`getter` vs `literal value`).
 - [`FormGetter.svelte`](../src/lib/components/forms/FormGetter.svelte) creates getter declarations for target objects, runtime objects, or temporary slots. It supports variable and metadata lookups and optional fallback values.
 - [`FormValue.svelte`](../src/lib/components/forms/FormValue.svelte) edits primitive string, number, and boolean values.

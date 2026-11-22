@@ -7,6 +7,7 @@ export type RuntimeVariable = {
 	name: string;
 	type: 'number' | 'string' | 'boolean';
 	value: string | number | boolean;
+	mode?: 'paired';
 	min?: number;
 	max?: number;
 	description?: string;
@@ -143,6 +144,7 @@ export type RuntimeState = {
 	world: RuntimeVariable[];
 	places: RuntimePlace[];
 	characters: RuntimeCharacter[];
+	pairedVars: Record<string, Record<string, string | number | boolean>>;
 	items: RuntimeItem[];
 	runningActions: RunningAction[];
 	eventQueue: RuntimeEvent[];
@@ -181,6 +183,7 @@ export type ResolvedValue = {
 	path?: string;
 	reason?: string;
 	variable?: RuntimeVariable;
+	pairedTarget?: { pairKey: string; variableName: string };
 };
 
 export type GameCommand =

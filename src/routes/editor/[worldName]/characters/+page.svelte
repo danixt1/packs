@@ -213,7 +213,7 @@
                 <button type="button" onclick={() => { delete frame.draft.autonomy; }}>Remove Autonomy</button>
             {/if}
         </BaseInput>
-        <ListVars {stack} bind:values={frame.draft.vars} suggestions={knowVars} contextEditor={editor} bind:variableContextPaths={frame.draft._variableContexts}/>
+        <ListVars {stack} bind:values={frame.draft.vars} suggestions={knowVars} contextEditor={editor} allowPaired bind:variableContextPaths={frame.draft._variableContexts}/>
     </Form>
 {/snippet}
 

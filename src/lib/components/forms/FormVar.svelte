@@ -25,6 +25,7 @@
         nameSuggestions?:string[];
         editor?: WorldEditor;
         contextPaths?: string[];
+        allowPaired?: boolean;
     }
     let {
         onCancel,
@@ -36,7 +37,8 @@
         writeFormPropsTo = $bindable(),
         nameSuggestions,
         editor,
-        contextPaths = $bindable([])
+        contextPaths = $bindable([]),
+        allowPaired = false
     }: Props = $props();
     let contextSelectionTouched = $state(false);
 
@@ -72,6 +74,12 @@
             showError('Variable name cannot have spaces');
             return;
         }
+
+        if (data.mode === 'paired' && !allowPaired) {
+            showError('Paired variables can only be declared on characters');
+            return;
+        }
+		if (data.mode === 'object') delete data.mode;
 
         // Direct collision check if existingNames is supplied (from ContextStack)
         if (existingNames && existingNames.includes(trimmedName)) {
@@ -114,6 +122,12 @@
             {value:'number',title:'Number'},
             {value:'boolean',title:'Boolean'},
         ]} bind:selected={data.type} />
+        {#if allowPaired}
+            <InputSelect id="varMode" label="Storage" items={[
+                {value:'object',title:'Object variable'},
+                {value:'paired',title:'Paired variable'},
+            ]} bind:selected={data.mode} />
+        {/if}
     
         {#if data.type === 'string'}
             <InputText id="varValue" label="Value" bind:value={data.value} autocomplete="off" />

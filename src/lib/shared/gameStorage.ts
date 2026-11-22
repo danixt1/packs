@@ -401,6 +401,7 @@ export function parseSavedState(serializedState: string): RuntimeState | undefin
 	try {
 		const parsed = JSON.parse(serializedState) as RuntimeState;
 		if (!isRecord(parsed) || !Array.isArray(parsed.characters) || !Array.isArray(parsed.places)) return undefined;
+		parsed.pairedVars ??= {};
 		return parsed;
 	} catch {
 		return undefined;

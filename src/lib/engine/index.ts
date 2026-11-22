@@ -71,6 +71,7 @@ export function createRuntimeState(world: World): RuntimeState {
 			charactersId: [...(place.charactersId ?? [])]
 		})),
 		characters: (world.characters ?? []).map((e)=>getCharacterRuntime(e,placeByCharacter)),
+		pairedVars: {},
 		items: (world.items ?? []).map((item: any) => ({
 			id: item.id,
 			name: item.name,
@@ -208,15 +209,22 @@ function writeVariable(state: RuntimeState, variableGetter: any, value: any, mod
 	}
 	if (isGetter(incoming)) incoming = resolveGetter(state, incoming, context).value;
 
-	const current = putInVar.value;
-	if (mode === 'set') putInVar.value = incoming;
-	if (mode === 'increment') putInVar.value = Number(current) + Number(incoming);
-	if (mode === 'decrement') putInVar.value = Number(current) - Number(incoming);
-	if (mode === 'multiply') putInVar.value = Number(current) * Number(incoming);
-	if (mode === 'divide') putInVar.value = Number(current) / Number(incoming);
+	const current = resolved.value;
+	let nextValue: string | number | boolean = current ?? putInVar.value;
+	if (mode === 'set') nextValue = incoming;
+	if (mode === 'increment') nextValue = Number(current) + Number(incoming);
+	if (mode === 'decrement') nextValue = Number(current) - Number(incoming);
+	if (mode === 'multiply') nextValue = Number(current) * Number(incoming);
+	if (mode === 'divide') nextValue = Number(current) / Number(incoming);
 	if (putInVar.type === 'number') {
-		if (putInVar.min !== undefined) putInVar.value = Math.max(putInVar.min, Number(putInVar.value));
-		if (putInVar.max !== undefined) putInVar.value = Math.min(putInVar.max, Number(putInVar.value));
+		if (putInVar.min !== undefined) nextValue = Math.max(putInVar.min, Number(nextValue));
+		if (putInVar.max !== undefined) nextValue = Math.min(putInVar.max, Number(nextValue));
+	}
+	if (resolved.pairedTarget) {
+		state.pairedVars ??= {};
+		state.pairedVars[resolved.pairedTarget.pairKey][resolved.pairedTarget.variableName] = nextValue;
+	} else {
+		putInVar.value = nextValue;
 	}
 	if(resolved.path?.startsWith('temp-variable:')){
 		if(context.temp){
@@ -817,6 +825,25 @@ export function validateWorld(world: any) {
 		if (characters.has(character.id)) errors.push(`Duplicate character id: ${character.id}`);
 		characters.add(character.id);
 	}
+	const hasPairedVariables = (world.characters ?? []).some((character: any) =>
+		(character.vars ?? []).some((variable: any) => variable.mode === 'paired')
+	);
+	for (const [ownerType, owners] of [
+		['world', [world]],
+		['place', world.places ?? []],
+		['item', world.items ?? []]
+	] as [string, any[]][]) {
+		for (const owner of owners) {
+			for (const variable of owner.vars ?? []) {
+				if (variable.mode === 'paired') errors.push(`Paired variable ${variable.name} is only supported on characters (found on ${ownerType})`);
+			}
+		}
+	}
+	if (hasPairedVariables) {
+		for (const character of world.characters ?? []) {
+			if (!/^[a-zA-Z0-9]+$/.test(character.id)) errors.push(`Character id ${character.id} must contain only letters and numbers when paired variables are used`);
+		}
+	}
 	for (const action of world.actions ?? []) {
 		if (actions.has(action.name)) errors.push(`Duplicate action name: ${action.name}`);
 		actions.add(action.name);
@@ -840,6 +867,7 @@ export function validateWorld(world: any) {
 
 export function createGameEngine(world: any, savedState?: RuntimeState): Engine {
 	let state = savedState ? clone(savedState) : createRuntimeState(world);
+	state.pairedVars ??= {};
 	if (!state.log.length) {
 		emitEvent(state, 'GAME_START', { audience: 'global' }, {});
 		renderEvents(world, state);
@@ -865,6 +893,7 @@ export function createGameEngine(world: any, savedState?: RuntimeState): Engine 
 		save: () => JSON.stringify(state),
 		load: (serialized: string) => {
 			state = JSON.parse(serialized) as RuntimeState;
+			state.pairedVars ??= {};
 			return getGameView(world, state);
 		},
 		validate: () => validateWorld(world)

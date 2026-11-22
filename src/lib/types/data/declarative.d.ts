@@ -27,6 +27,8 @@ interface BaseVariableDisplay{
 interface VariableDeclaratorBase{
     name:string;
     description?: string;
+    /** Store character variables separately for each directed character pair. */
+    mode?: 'paired';
     /**
      * Set null to cancel the default display
      */
