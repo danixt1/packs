@@ -21,10 +21,11 @@
     let importInput = $state<HTMLInputElement | null>(null);
     let stack = createContextStack();
     let ctxs = $state(untrack(()=>[...selectedWorld.getContexts()]));
-    let contextStats = $state(getContextStats());
+    let overview = $state(getOverview());
 
     $effect(()=>selectedWorld.setWorldVars($state.snapshot(worldVars)))
-    function getContextStats() {
+    function getOverview() {
+        const world = selectedWorld.toWorld();
         return {
             characters: selectedWorld.getCharacters().length,
             items: selectedWorld.getItems().length,
@@ -32,13 +33,17 @@
             actions: selectedWorld.getActions().length,
             templates: selectedWorld.getTextTemplates().length,
             dialogues: selectedWorld.getDialogues().length,
+            procedures: selectedWorld.getProcedures().length,
             events: selectedWorld.getListEvents().length,
-            labels: selectedWorld.getLabels().length
+            labels: selectedWorld.getLabels().length,
+            contexts: selectedWorld.getContexts().length,
+            categories: selectedWorld.getCategories().length,
+            version: world.version.join('.')
         };
     }
 
     onMount(() => listenForWorldEditorContextsChanged(page.params.worldName ?? '', () => {
-        contextStats = getContextStats();
+        overview = getOverview();
         ctxs = [...selectedWorld.getContexts()];
     }));
 
@@ -187,6 +192,8 @@
             saveWorld(worldId, importedEditor.toWorld());
             selectedWorld = importedEditor;
             worldVars = importedEditor.getWorldVars();
+            overview = getOverview();
+            ctxs = [...selectedWorld.getContexts()];
             notifyWorldEditorContextsChanged(worldId);
             showSucess('World imported');
         } catch (error) {
@@ -219,41 +226,67 @@
 
 <div class="world-edit">
     <div class="panels">
-        <div class="base-info">
-            <h2>World: {selectedWorld.worldName}</h2>
-            <InputTextArea label="Description: " id='world-desc' bind:value={selectedWorld.description} />
-            <ul>
-                <li>Characters: {contextStats.characters}</li>
-                <li>Items: {contextStats.items}</li>
-                <li>Places: {contextStats.places}</li>
-                <li>Actions: {contextStats.actions}</li>
-                <li>Text Templates: {contextStats.templates}</li>
-                <li>Dialogues: {contextStats.dialogues}</li>
-                <li>Events: {contextStats.events}</li>
-                <li>Labels: {contextStats.labels}</li>
-            </ul>
-        </div>
-        <div class="ctx form-group">
-            <ListVars {stack} bind:values={worldVars} contextEditor={selectedWorld} title="World Variables" />
-        </div>
-        <div class="ctx form-group">
-            <h2>Contexts</h2>
-            <p>Manage contexts to hide not required elements</p>
-            {#if ctxs.length > 0}
-                <ObjectTable ref={ctxs} items={ctxs.map(e=>({
-                    Title:e.title || e.name,
-                    Parent:e.parent ? e.parent : `<span style="color:var(--color-accent)">None</span>`,
-                    'Applies to':e.appliesTo === 'objects' ? 'Objects only' : e.appliesTo === 'variables' ? 'Variables only' : 'Objects and variables'}))}
-                    headers={['Title','Parent','Applies to']}
-                    onEdit={(context) => editContext(context as {name:string; parent:string|null})}
-                    onDelete={(ctx)=>{
-                        selectedWorld.deleteCtx(String(ctx.name), (ctx.parent as string | null) ?? null);
-                        ctxs = [...selectedWorld.getContexts()];
-                        notifyWorldEditorContextsChanged(page.params.worldName ?? '');
-                    }}
-                />
-            {/if}
-            <button onclick={createNewContext}>New Context</button>
+        <section class="overview-panel">
+            <div class="world-heading">
+                <div class="eyebrow">WORLD WORKSPACE <span>VERSION {overview.version}</span></div>
+                <h1>{selectedWorld.worldName}</h1>
+                <p>World data, shared variables, and editing contexts.</p>
+            </div>
+            <div class="description-field">
+                <InputTextArea label="World description" id='world-desc' bind:value={selectedWorld.description} />
+            </div>
+            <div class="stats-grid" aria-label="World content summary">
+                <div class="stat-card stat-highlight"><span>World variables</span><strong>{worldVars.length}</strong><small>Shared across the world</small></div>
+                <div class="stat-card"><span>Characters</span><strong>{overview.characters}</strong><small>People and entities</small></div>
+                <div class="stat-card"><span>Places</span><strong>{overview.places}</strong><small>Locations in the world</small></div>
+                <div class="stat-card"><span>Items</span><strong>{overview.items}</strong><small>Objects to discover</small></div>
+                <div class="stat-card"><span>Actions</span><strong>{overview.actions}</strong><small>Player and autonomous actions</small></div>
+                <div class="stat-card"><span>Dialogues</span><strong>{overview.dialogues}</strong><small>Conversation trees</small></div>
+                <div class="stat-card"><span>Procedures</span><strong>{overview.procedures}</strong><small>Reusable effect sequences</small></div>
+                <div class="stat-card"><span>Text templates</span><strong>{overview.templates}</strong><small>Reusable story text</small></div>
+            </div>
+            <div class="world-details" aria-label="Additional world data">
+                <span><strong>{overview.contexts}</strong> contexts</span>
+                <span><strong>{overview.labels}</strong> labels</span>
+                <span><strong>{overview.categories}</strong> action categories</span>
+                <span><strong>{overview.events}</strong> events</span>
+            </div>
+        </section>
+
+        <div class="management-grid">
+            <section class="editor-panel world-vars">
+                <div class="panel-heading">
+                    <div><span class="eyebrow">WORLD STATE</span><h2>Shared variables</h2></div>
+                    <span class="count-badge">{worldVars.length}</span>
+                </div>
+                <p class="panel-description">Values available to the whole world. Read and set markers show where each variable is used.</p>
+                <ListVars {stack} bind:values={worldVars} contextEditor={selectedWorld} title="World Variables" />
+            </section>
+            <section class="editor-panel context-panel">
+                <div class="panel-heading">
+                    <div><span class="eyebrow">ORGANIZATION</span><h2>Contexts</h2></div>
+                    <span class="count-badge">{ctxs.length}</span>
+                </div>
+                <p class="panel-description">Group objects and variables so editors can focus on the relevant parts of the world.</p>
+                {#if ctxs.length > 0}
+                    <ObjectTable ref={ctxs} items={ctxs.map(e=>({
+                        Title:e.title || e.name,
+                        Parent:e.parent ? e.parent : `<span style="color:var(--color-accent)">Root context</span>`,
+                        'Applies to':e.appliesTo === 'objects' ? 'Objects' : e.appliesTo === 'variables' ? 'Variables' : 'Objects and variables'}))}
+                        headers={['Title','Parent','Applies to']}
+                        onEdit={(context) => editContext(context as {name:string; parent:string|null})}
+                        onDelete={(ctx)=>{
+                            selectedWorld.deleteCtx(String(ctx.name), (ctx.parent as string | null) ?? null);
+                            ctxs = [...selectedWorld.getContexts()];
+                            overview = getOverview();
+                            notifyWorldEditorContextsChanged(page.params.worldName ?? '');
+                        }}
+                    />
+                {:else}
+                    <div class="empty-state"><strong>No contexts yet</strong><span>Add contexts to group parts of the world for editing.</span></div>
+                {/if}
+                <button class="new-context" onclick={createNewContext}>New Context</button>
+            </section>
         </div>
     </div>
     <div class="options">
@@ -275,6 +308,81 @@
     <ContextHost {stack}/>
 </Popup>
 <style>
+    .panels{
+        display:flex;
+        flex:1;
+        min-height:0;
+        flex-direction:column;
+        gap:1.25rem;
+        overflow:auto;
+        padding:clamp(1rem, 2.5vw, 2rem);
+    }
+    .overview-panel,
+    .editor-panel{
+        background:linear-gradient(145deg, rgba(255,255,255,0.035), rgba(255,255,255,0.012));
+        border:1px solid var(--border-subtle);
+        border-radius:14px;
+        box-shadow:0 12px 30px rgba(0,0,0,0.12);
+    }
+    .overview-panel{padding:clamp(1rem, 2vw, 1.5rem);}
+    .world-heading{margin-bottom:1.1rem;}
+    .eyebrow{
+        display:flex;
+        align-items:center;
+        gap:.65rem;
+        color:var(--color-accent);
+        font-size:.68rem;
+        font-weight:750;
+        letter-spacing:.14em;
+        text-transform:uppercase;
+    }
+    .eyebrow span{color:var(--color-accent-dim);letter-spacing:.08em;}
+    .world-heading h1{margin:.35rem 0;font-size:clamp(1.7rem, 4vw, 2.4rem);color:var(--color-text-bright);}
+    .world-heading p,.panel-description{margin:0;color:var(--color-accent-dim);line-height:1.5;}
+    .description-field{max-width:850px;margin-bottom:1.2rem;}
+    .stats-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.7rem;}
+    .stat-card{
+        display:flex;min-height:94px;flex-direction:column;justify-content:center;gap:.15rem;
+        padding:.85rem 1rem;border:1px solid var(--border-subtle);border-radius:10px;background:rgba(0,0,0,.13);
+    }
+    .stat-card span{color:var(--color-accent-dim);font-size:.78rem;}
+    .stat-card strong{font-size:1.55rem;line-height:1.15;color:var(--color-text-bright);}
+    .stat-card small{color:var(--color-accent-dim);font-size:.7rem;}
+    .stat-highlight{border-color:var(--border-strong);background:linear-gradient(135deg,rgba(215,177,115,.14),rgba(0,0,0,.12));}
+    .world-details{display:flex;flex-wrap:wrap;gap:.55rem;margin-top:1rem;}
+    .world-details span,.count-badge{padding:.35rem .65rem;border:1px solid var(--border-subtle);border-radius:999px;background:rgba(0,0,0,.13);color:var(--color-accent-dim);font-size:.76rem;}
+    .world-details strong{color:var(--color-text);}
+    .management-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(300px,1fr);align-items:start;gap:1rem;}
+    .editor-panel{min-width:0;padding:1rem;}
+    .panel-heading{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.5rem;}
+    .panel-heading h2{margin:.2rem 0 0;font-size:1.25rem;color:var(--color-text-bright);}
+    .count-badge{color:var(--color-text);font-weight:700;}
+    .panel-description{margin-bottom:1rem;font-size:.88rem;}
+    .world-vars :global(.form-group){padding:0;}
+    .world-vars :global(h3){margin:.5rem 0;color:var(--color-text-bright);font-size:1rem;}
+    .world-vars :global(table){border-collapse:separate;border-spacing:0 .35rem;}
+    .world-vars :global(thead th){padding:.65rem .75rem;border-bottom:1px solid var(--border-strong);color:var(--color-accent);font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;}
+    .world-vars :global(tbody tr){background:rgba(0,0,0,.13);}
+    .world-vars :global(tbody tr:hover){background:var(--bg-card-hover);}
+    .world-vars :global(tbody td){padding:.7rem .75rem;border-bottom:0;color:var(--color-text);vertical-align:middle;}
+    .world-vars :global(tbody td:first-child){border-radius:8px 0 0 8px;}
+    .world-vars :global(tbody td:last-child){border-radius:0 8px 8px 0;}
+    .world-vars :global(.options){display:flex;justify-content:flex-end;gap:.35rem;}
+    .world-vars :global(button),.new-context{
+        border:1px solid var(--border-subtle);border-radius:7px;background:var(--bg-button);color:var(--color-text);
+        padding:.45rem .7rem;cursor:pointer;transition:background .16s,border-color .16s;
+    }
+    .world-vars :global(button:hover),.new-context:hover{background:var(--bg-card-hover);border-color:var(--border-strong);}
+    .world-vars :global(button.btn-primary){margin-top:.75rem;color:var(--color-accent-light);}
+    .context-panel :global(table){margin:.25rem 0 .8rem;}
+    .context-panel :global(thead th){color:var(--color-accent);font-size:.75rem;}
+    .context-panel :global(tbody td){color:var(--color-text);}
+    .context-panel :global(.options){display:flex;gap:.25rem;}
+    .context-panel :global(button){border:1px solid var(--border-subtle);border-radius:6px;background:var(--bg-button);color:var(--color-text);padding:.35rem .55rem;cursor:pointer;}
+    .context-panel :global(button:hover){background:var(--bg-card-hover);border-color:var(--border-strong);}
+    .new-context{width:100%;margin-top:.35rem;color:var(--color-accent-light);}
+    .empty-state{display:flex;flex-direction:column;gap:.3rem;padding:1rem;border:1px dashed var(--border-strong);border-radius:9px;color:var(--color-accent-dim);font-size:.85rem;}
+    .empty-state strong{color:var(--color-text);}
     .options button:hover{
         background:var(--bg-card-hover);
     }
@@ -290,11 +398,6 @@
 			background 160ms ease,
 			border-color 160ms ease,
 			transform 160ms ease;
-    }
-    .panels{
-        display:flex;
-        flex-direction:column;
-        gap:1rem;
     }
     .world-edit{
         display:flex;
@@ -316,33 +419,23 @@
     .hidden-file-input{
         display:none;
     }
-    .base-info{
-        margin:15px
+    @media (max-width: 900px) {
+        .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+        .management-grid{grid-template-columns:1fr;}
     }
-    .ctx p{
-        margin-top: 0;
+    @media (max-width: 520px) {
+        .stats-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:.45rem;}
+        .stat-card{min-height:82px;padding:.7rem;}
+        .stat-card strong{font-size:1.3rem;}
+        .world-details{gap:.4rem;}
+        .options{padding:1rem;}
+        .options button{flex:1;}
     }
-    .ctx button{
-        width:100px;
-        height: 34px;
-        margin-right: 5px;
-        background-color: var(--bg-button);
-        color: var(--color-text);
-        border: var(--border-subtle) 1px solid;
-        border-radius: 4px;
-        padding: 0.25rem 0.5rem;
-        transition: background-color 0.2s, border-color 0.2s;
-    }
-    @media (max-width: 640px) {
-        .ctx button{
-            width: 100%;
-        }
-    }
-    .ctx button:focus-visible {
+    .options button:focus-visible,.new-context:focus-visible {
         outline: 2px solid var(--color-accent);
         outline-offset: 2px;
     }
-    .ctx button:hover {
+    .options button:hover {
         background-color: var(--bg-card-hover);
     }
 </style>
