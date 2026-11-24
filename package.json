@@ -12,7 +12,7 @@
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"test:unit": "vitest",
 		"test:browser": "vitest --project=client",
-		"test": "npm run test:unit -- --run"
+		"test": "vitest --run"
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-auto": "^7.0.1",

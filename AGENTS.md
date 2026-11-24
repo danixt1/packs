@@ -16,7 +16,9 @@ Case don't have any docs, check if have a skill who match the user request and r
 ```bash
 npm run dev      # Start dev server
 npm run check    # Type check
-npm test         # Run unit tests (vitest)
+npm run test:unit -- --run    # Run unit tests once
+npm run test:browser -- --run # Run browser tests once (Chromium)
+npm test                      # Run all tests once (unit and browser)
 ```
 
 ## Documents
