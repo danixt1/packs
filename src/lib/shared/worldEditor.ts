@@ -243,6 +243,25 @@ export class WorldEditor {
         }
         ctxs.splice(insertAt, 0, ctx);
     }
+    public updateContext(name:string, parent:string|null, updated:ContextEditing){
+        const contexts = this.editorInfo.ctxs ?? [];
+        const context = contexts.find(candidate => candidate.name === name && candidate.parent === parent);
+        if(!context) throw new Error(`Context "${name}" was not found`);
+
+        const previousPath = getContextPath(context);
+        const nextPath = updated.parent ? `${updated.parent}.${updated.name}` : updated.name;
+        Object.assign(context, updated);
+
+        if(previousPath !== nextPath){
+            for(const candidate of contexts){
+                if(candidate.parent === previousPath){
+                    candidate.parent = nextPath;
+                }else if(candidate.parent?.startsWith(`${previousPath}.`)){
+                    candidate.parent = `${nextPath}${candidate.parent.slice(previousPath.length)}`;
+                }
+            }
+        }
+    }
     public deleteCtx(name:string,parent:string|null = null){
         const ctxs = this.editorInfo.ctxs ?? [];
         const context = ctxs.find(candidate => candidate.name === name && candidate.parent === parent);

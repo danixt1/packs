@@ -81,6 +81,36 @@
         notifyWorldEditorContextsChanged(page.params.worldName ?? '');
     }
 
+    function getContextPath(context: {name:string; parent:string|null}) {
+        return context.parent ? `${context.parent}.${context.name}` : context.name;
+    }
+
+    async function editContext(context: {name:string; parent:string|null}) {
+        const originalPath = getContextPath(context);
+        const excludedPaths = new Set([originalPath]);
+        let foundDescendant = true;
+        while(foundDescendant){
+            foundDescendant = false;
+            for(const candidate of ctxs){
+                const candidatePath = getContextPath(candidate);
+                if(candidate.parent && excludedPaths.has(candidate.parent) && !excludedPaths.has(candidatePath)){
+                    excludedPaths.add(candidatePath);
+                    foundDescendant = true;
+                }
+            }
+        }
+        const result = await stack.push({
+            title: `Edit ${context.name}`,
+            data: context,
+            render: renderContextForm,
+            meta: { mode: 'edit', originalName: context.name, originalParent: context.parent, excludedPaths: [...excludedPaths] }
+        });
+        if(!result) return;
+        selectedWorld.updateContext(context.name, context.parent, $state.snapshot(result));
+        ctxs = [...selectedWorld.getContexts()];
+        notifyWorldEditorContextsChanged(page.params.worldName ?? '');
+    }
+
     function handleContextSubmit(frame:ContextFrame){
         const {draft} = frame;
         if(!draft.name){
@@ -93,6 +123,24 @@
         }
         if(!draft.parent){
             draft.parent = null;
+        }
+        const editMeta = frame.meta?.mode === 'edit' ? frame.meta : undefined;
+        const originalPath = editMeta
+            ? editMeta.originalParent ? `${editMeta.originalParent}.${editMeta.originalName}` : editMeta.originalName
+            : null;
+        const nextPath = draft.parent ? `${draft.parent}.${draft.name}` : draft.name;
+        if(editMeta?.excludedPaths?.includes(draft.parent ?? '') && draft.parent !== editMeta.originalParent){
+            showError('A context cannot be moved inside itself or one of its children');
+            return;
+        }
+        if(editMeta && nextPath !== originalPath && nextPath.startsWith(`${originalPath}.`)){
+            showError('A context cannot be moved inside itself or one of its children');
+            return;
+        }
+        if(ctxs.some(context => context.name === draft.name && context.parent === draft.parent
+            && !(editMeta && context.name === editMeta.originalName && context.parent === editMeta.originalParent))){
+            showError('A context with this name already exists here');
+            return;
         }
         frame.resolve(draft);
     }
@@ -157,9 +205,11 @@
             {value:'objects',title:'Objects only'},
             {value:'variables',title:'Variables only'}
         ]} />
-        {#if ctxs.length > 0}
+        {@const excludedPaths = new Set(frame.meta?.excludedPaths ?? [])}
+        {@const availableParents = ctxs.filter(context => !excludedPaths.has(getContextPath(context)))}
+        {#if availableParents.length > 0}
             <InputSelect id='ctx-parent' bind:selected={frame.draft.parent} label='Select a optional child' wrapDiv
-            items={[{value:null,title:'-- None --'},...ctxs.map(e =>({
+            items={[{value:null,title:'-- None --'},...availableParents.map(e =>({
                 value:(e.parent ? `${e.parent}.${e.name}` : e.name),
                 title: `${e.parent ? e.parent+' > ' : ''} ${e.title || e.name}`
             }))]}/>
@@ -195,6 +245,7 @@
                     Parent:e.parent ? e.parent : `<span style="color:var(--color-accent)">None</span>`,
                     'Applies to':e.appliesTo === 'objects' ? 'Objects only' : e.appliesTo === 'variables' ? 'Variables only' : 'Objects and variables'}))}
                     headers={['Title','Parent','Applies to']}
+                    onEdit={(context) => editContext(context as {name:string; parent:string|null})}
                     onDelete={(ctx)=>{
                         selectedWorld.deleteCtx(String(ctx.name), (ctx.parent as string | null) ?? null);
                         ctxs = [...selectedWorld.getContexts()];
