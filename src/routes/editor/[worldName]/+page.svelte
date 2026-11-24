@@ -13,14 +13,17 @@
     import Popup from "$lib/components/Popup.svelte";
     import ContextHost from "$lib/components/ContextHost.svelte";
     import ObjectTable from "$lib/components/ObjectTable.svelte";
+    import ListVars from "$lib/components/lists/ListVars.svelte";
     import { untrack } from "svelte";
 
     let selectedWorld = $state(getCurrentWorldEditor(page.params.worldName));
+    let worldVars = $state(untrack(()=>selectedWorld.getWorldVars()));
     let importInput = $state<HTMLInputElement | null>(null);
     let stack = createContextStack();
     let ctxs = $state(untrack(()=>[...selectedWorld.getContexts()]));
     let contextStats = $state(getContextStats());
 
+    $effect(()=>selectedWorld.setWorldVars($state.snapshot(worldVars)))
     function getContextStats() {
         return {
             characters: selectedWorld.getCharacters().length,
@@ -135,6 +138,7 @@
             const importedEditor = replaceCurrentWorldEditor(worldId, result.payload.world);
             saveWorld(worldId, importedEditor.toWorld());
             selectedWorld = importedEditor;
+            worldVars = importedEditor.getWorldVars();
             notifyWorldEditorContextsChanged(worldId);
             showSucess('World imported');
         } catch (error) {
@@ -178,6 +182,9 @@
                 <li>Events: {contextStats.events}</li>
                 <li>Labels: {contextStats.labels}</li>
             </ul>
+        </div>
+        <div class="ctx form-group">
+            <ListVars {stack} bind:values={worldVars} contextEditor={selectedWorld} title="World Variables" />
         </div>
         <div class="ctx form-group">
             <h2>Contexts</h2>

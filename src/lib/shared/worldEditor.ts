@@ -325,7 +325,8 @@ export class WorldEditor {
             ...Object.values(this.characters),
             ...Object.values(this.items),
             ...Object.values(this.places)
-        ].some(object => object.vars.some(variable => variable.name === variableName));
+        ].some(object => object.vars.some(variable => variable.name === variableName))
+            || this.worldVars.some(variable => variable.name === variableName);
         if(isStillDeclared) return;
 
         for(const context of this.editorInfo.ctxs ?? []){
@@ -466,6 +467,19 @@ export class WorldEditor {
     }
     public getObject(oid:string){
         return this.objectsByOid[oid];
+    }
+
+    public getWorldVars():VariableDeclarator[]{
+        return this.worldVars;
+    }
+
+    public setWorldVars(variables:VariableDeclarator[]):void{
+        const previousNames = this.worldVars.map(variable => variable.name);
+        this.delAllRefs('world:root');
+        this.possibleVarsToObject.world = new Set();
+        this.worldVars = variables;
+        this.worldVars.forEach(variable => this.linkVariableDeclarator(variable, 'world:root'));
+        this.syncVariableContexts(this.worldVars.map(variable => variable.name), {}, previousNames);
     }
 
     public toWorld(): World {
