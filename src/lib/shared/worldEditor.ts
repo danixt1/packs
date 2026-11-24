@@ -1,26 +1,17 @@
-import type { ActionDeclaration, Character, Collector, ConditionalList, ConditionExists, ConditionIsValid, ConditionRelational, DialogueTree, Display, EffectFomAction, EffectInterrupt, Item, Place, TextTemplate, VariableDeclarator, VariableModify, VariableToGet, World } from "$lib/types/data/declarative";
+import type { ActionDeclaration, Character, Collector, ConditionalList, ConditionExists, ConditionIsValid, ConditionRelational, DialogueTree, Display, EffectFomAction, EffectInterrupt, Item, Place, ProcedureDeclaration, TextTemplate, VariableDeclarator, VariableModify, VariableToGet, World } from "$lib/types/data/declarative";
 import { loadWorld as loadStoredWorld } from './gameStorage';
 import type { ContextEditing, Editor, LabelInfo } from "$lib/types/data/editor";
 let currentEditor:null|WorldEditor = null;
 
-export type targetsWithVar = 'character'|'temp'|'self'|'place'|'item'|'world'
-export type ContextObjectType = 'character'|'item'|'place'|'action'|'dialogue'|'text-template';
-
-//Proposed new OID system: char:marcus:variable:test | action:talk:onEffect[0]:onTrue[2]:set$target:character-variable$
-
-interface UsageRef{
-    ref:'declare'|'modify'|'use'
-    OID:string
-    parentOID:string | null
-    name:string
-}
+export type targetsWithVar = 'character'|'temp'|'self'|'place'|'item'|'world'|'parameter'
+export type ContextObjectType = 'character'|'item'|'place'|'action'|'dialogue'|'text-template'|'procedure';
 
 type VarRelation = ({
     relation:'use'
-    relationWith:'text-template'|'display'|'action'|'dialogue',
+    relationWith:'text-template'|'display'|'action'|'dialogue'|'procedure',
     subLocation:string
 } | {relation:'declare', relationWith:'item'|'char'|'place'|'world', data:VariableDeclarator } 
-| {relation:'modify',relationWith:'action',subLocation:string}) & {oid:string};
+| {relation:'modify',relationWith:'action'|'dialogue'|'procedure',subLocation:string}) & {oid:string};
 
 export interface LabelMapper{
     name:string
@@ -43,6 +34,7 @@ export interface TextTemplateEditor extends TextTemplate, itemWithOid{}
 export interface ItemEditor extends Item, itemWithOid{}
 export interface DisplayEditor extends Display, itemWithOid{}
 export interface ActionEditor extends ActionDeclaration, itemWithOid{}
+export interface ProcedureEditor extends ProcedureDeclaration, itemWithOid{}
 export class WorldEditor {
     private listEvents:Set<string> =new Set();
 
@@ -59,6 +51,7 @@ export class WorldEditor {
     private characters:Record<string,CharacterEditor> = {};
     private places:Record<string,PlaceEditor> = {};
     private actions:Record<string,ActionEditor> = {};
+    private procedures:Record<string,ProcedureEditor> = {};
     private dialogues:Record<string,DialogueEditor> = {};
     private textTemplates:Record<string,TextTemplateEditor> = {};
     private items:Record<string,ItemEditor> = {};
@@ -88,6 +81,7 @@ export class WorldEditor {
         world.characters        .forEach( e => this.addCharacter(e));
         world.places            .forEach( e => this.addPlace(e));
         world.actions          .forEach( e => this.addAction(e));
+        world.procedures       ?.forEach(e => this.addProcedure(e));
         world.textTemplates     .forEach( e => this.addTextTemplate(e));
         world.items             .forEach( e => this.addItem(e));
         world.dialogues         ?.forEach(e => this.addDialogue(e));
@@ -138,6 +132,13 @@ export class WorldEditor {
             }
         }
         this.analyzeConditionalLists(action.activationConditions,oid,'activate');
+    }
+    public addProcedure(procedure:ProcedureDeclaration){
+        const oid = `procedure:${procedure.name}`;
+        if (this.procedures[procedure.name] || this.objectsByOid[oid]) throw new Error(`Procedure "${procedure.name}" already exists`);
+        this.procedures[procedure.name] = {...procedure, oid};
+        this.objectsByOid[oid] = procedure;
+        (procedure.effects ?? []).forEach(effect => this.analyzeEffect(effect, oid, 'effects'));
     }
     public addCharacter(char:Character){
         const oid = 'char:'+char.id;
@@ -338,7 +339,8 @@ export class WorldEditor {
             place: Object.values(this.places),
             action: Object.values(this.actions),
             dialogue: Object.values(this.dialogues),
-            'text-template': Object.values(this.textTemplates)
+            'text-template': Object.values(this.textTemplates),
+            procedure: Object.values(this.procedures)
         };
         return objects[objectType].some(object => object.name === objectName);
     }
@@ -349,7 +351,8 @@ export class WorldEditor {
             place: new Set(Object.values(this.places).map(object => object.name)),
             action: new Set(Object.values(this.actions).map(object => object.name)),
             dialogue: new Set(Object.values(this.dialogues).map(object => object.name)),
-            'text-template': new Set(Object.values(this.textTemplates).map(object => object.name))
+            'text-template': new Set(Object.values(this.textTemplates).map(object => object.name)),
+            procedure: new Set(Object.values(this.procedures).map(object => object.name))
         };
         const variableNames = new Set([
             ...Object.values(this.characters).flatMap(object => object.vars.map(variable => variable.name)),
@@ -388,6 +391,7 @@ export class WorldEditor {
             'action':this.actions,
             'dialogue':this.dialogues,
             'text-template':this.textTemplates,
+            'procedure':this.procedures,
             'display':this.displays
         }
         let selected = opts[objName];
@@ -438,6 +442,10 @@ export class WorldEditor {
         }
         return Object.values(this.actions);
     }
+    public getProcedures(ignoreCtx = false):ProcedureEditor[]{
+        if(!ignoreCtx) return this.applyCtxs(Object.values(this.procedures),'procedure');
+        return Object.values(this.procedures);
+    }
     public getPlaces(ignoreCtx = false):PlaceEditor[]{
         if(!ignoreCtx){
             return this.applyCtxs(Object.values(this.places),'place');
@@ -476,6 +484,7 @@ export class WorldEditor {
             places: this.getPlaces(true).map(({ oid: _oid, ...place }) => place),
             items: this.getItems(true).map(({ oid: _oid, ...item }) => item),
             actions: this.getActions(true).map(({ oid: _oid, ...action }) => action),
+            procedures: this.getProcedures(true).map(({ oid: _oid, ...procedure }) => procedure),
             textTemplates: Object.values(this.textTemplates).map(({ oid: _oid, ...template }) => template),
             dialogues: this.getDialogues(true).map(({ oid: _oid, ...dialogue }) => dialogue),
             displays: Object.values(this.displays).map(({ oid: _oid, ...display }) => display),
@@ -494,6 +503,7 @@ export class WorldEditor {
         const objName = oid.substring(0,oid.indexOf(':'));
         const options:Record<string,(data:any)=>void> = {
             'action':this.addAction,
+            'procedure':this.addProcedure,
             'char':this.addCharacter,
             'place':this.addPlace,
             'dialogue':this.addDialogue,
@@ -506,6 +516,9 @@ export class WorldEditor {
             throw new Error('Invalid oid, type "'+objName + '" not found');
         }
         const currentObject = this.objectsByOid[oid] as {name?:string;vars?:VariableDeclarator[]} | undefined;
+        if (objName === 'procedure' && currentObject?.name && typeof obj.name === 'string' && currentObject.name !== obj.name) {
+            this.renameProcedureCalls(currentObject.name, obj.name);
+        }
         const contextType = getContextObjectType(objName);
         const previousName = currentObject?.name;
         const previousContexts = contextType && previousName
@@ -524,6 +537,29 @@ export class WorldEditor {
         for(const variable of obj.vars ?? []){
             if(Object.hasOwn(previousVariableContexts, variable.name)){
                 this.setVariableContexts(variable.name, previousVariableContexts[variable.name]);
+            }
+        }
+    }
+    private renameProcedureCalls(previousName:string, nextName:string){
+        const visit = (effects:EffectFomAction[] = []) => {
+            for(const effect of effects){
+                if(effect.type === 'call-procedure' && effect.procedure === previousName) effect.procedure = nextName;
+                if(effect.type === 'conditional'){
+                    visit(effect.onTrue);
+                    visit(effect.onFalse);
+                }
+            }
+        };
+        for(const action of Object.values(this.actions)){
+            visit(action.onActivate);
+            visit(action.onComplete);
+            visit(action.onInterrupt as EffectFomAction[] | undefined);
+        }
+        for(const procedure of Object.values(this.procedures)) visit(procedure.effects);
+        for(const dialogue of Object.values(this.dialogues)){
+            for(const node of dialogue.nodes){
+                visit(node.onEnter);
+                for(const choice of node.choices) visit(choice.effects);
             }
         }
     }
@@ -634,13 +670,18 @@ export class WorldEditor {
             case 'setter':
                 this.analyzeSetter(effect,originOid,sublocation+'-action:setter');
                 break;
+            case 'call-procedure':
+                Object.values(effect.arguments ?? {}).forEach(value => {
+                    if(typeof value === 'object') this.analyzeGetter(value as VariableToGet, originOid, sublocation + '-procedure-argument');
+                });
+                break;
         }
     }
     private analyzeSetter(setter:VariableModify,originOid:string,subLocation:string){
         this.linkVariableSetter(setter.var.variable,originOid,subLocation);
     }
     private analyzeGetter(getter:VariableToGet,originOid:string,subLocation:string){
-        if(!getter.in.endsWith('variable')){
+        if(!getter.in.endsWith('variable') || getter.in === 'parameter-variable'){
             return;
         }
         this.linkVariableUsage(getter.variable,originOid,subLocation);
@@ -711,7 +752,7 @@ export class WorldEditor {
         })
     }
     private linkVariableSetter(varName:string,originOid:string,subLocation:string){
-        if(!['action','dialogue'].includes(getObjName(originOid))){
+        if(!['action','dialogue','procedure'].includes(getObjName(originOid))){
             throw new Error('Invalid object type');
         }
         if(!this.relationVars[varName]){
@@ -723,14 +764,14 @@ export class WorldEditor {
         this.refsByOID[originOid].push({is:'var',prop:varName});
         this.relationVars[varName].push({
             relation:'modify',
-            relationWith:'action',
+            relationWith:getObjName(originOid) as 'action'|'dialogue'|'procedure',
             oid:originOid,
             subLocation
         })
     }
     private linkVariableUsage(varName:string,oid:string,subLocation:string){
-        let referedType = getObjName(oid) as 'text-template'|'display'|'action'|'dialogue';
-        if(!['text-template','display','action','dialogue'].includes(referedType)){
+        let referedType = getObjName(oid) as 'text-template'|'display'|'action'|'dialogue'|'procedure';
+        if(!['text-template','display','action','dialogue','procedure'].includes(referedType)){
             throw new Error('Invalid object type');
         }
         if(!this.refsByOID[oid]){
@@ -819,7 +860,8 @@ function getContextObjectType(oidType:string):ContextObjectType | undefined{
         place:'place',
         action:'action',
         dialogue:'dialogue',
-        'text-template':'text-template'
+        'text-template':'text-template',
+        'procedure':'procedure'
     };
     return types[oidType];
 }

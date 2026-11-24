@@ -56,7 +56,8 @@
             allowedObjects:ctx.allowedObjects,
             actionCategories:ctx.actionCategories,
             selfMetadata:ctx.selfMetadata,
-            selfVars:ctx.selfVars
+            selfVars:ctx.selfVars,
+            parameterVars:ctx.parameterVars
         }
     }
 
@@ -181,6 +182,8 @@
                 return varToSet + effect.value;
             case 'start-dialogue':
                 return `${accent('Start Dialogue')} ${effect.dialogueId ?? effect.intent ?? '(unspecified)'}`;
+            case 'call-procedure':
+                return `${accent('Call Procedure')} ${effect.procedure}${effect.swapSelfTarget ? ' (swap self/target)' : ''}`;
         }
     }
 </script>

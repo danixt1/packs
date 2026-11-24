@@ -1,7 +1,7 @@
 import type { GettersType } from "$lib/types/data/getters";
 import type { targetsWithVar, WorldEditor } from "./worldEditor";
 
-export type ObjectsWithVarFromGetter = targetsWithVar | 'character/place'|'self'
+export type ObjectsWithVarFromGetter = targetsWithVar | 'character/place'|'self'|'parameter'
 export type ObjectsWithMetadata = 'place'|'item'|'character'|'action'|'world'|'autonomy'
 export type allowedObjectsStructures = 'character' | 'character/place' | 'place' | 'item' | 'event' | 'action' | 'autonomy'
 export interface CtxBuilder{
@@ -9,6 +9,7 @@ export interface CtxBuilder{
     allowedObjects:allowedObjectsStructures[]
     tempVars?:string[]
     selfVars?:string[]
+    parameterVars?:string[]
     selfMetadata?:ObjectsWithMetadata
     actionCategories?:string[]
     editor:WorldEditor

@@ -66,6 +66,7 @@
                 if(e === 'temp' && ctx.tempVars){
                     return ctx.tempVars;
                 }
+                if(e === 'parameter') return ctx.parameterVars ?? [];
                 if(e === 'self'){
                     return ctx.selfVars ?? (ctx.selfMetadata
                      && ctx.selfMetadata != 'action' 
@@ -78,6 +79,7 @@
             if(e === 'temp' && ctx.tempVars){
                 return ctx.tempVars;
             }
+            if(e === 'parameter') return ctx.parameterVars ?? [];
         })
     })()
     let lastValue: EffectFomAction | undefined;
@@ -88,7 +90,8 @@
         { title: 'Event', value: 'event' },
         { title: 'Conditional', value: 'conditional' },
         { title: 'Set variable', value: 'setter' },
-        { title: 'Start dialogue', value: 'start-dialogue' }
+        { title: 'Start dialogue', value: 'start-dialogue' },
+        { title: 'Call procedure', value: 'call-procedure' }
     ];
 
     $effect(() => {
@@ -108,6 +111,10 @@
         propLiteralValue = typeof data.value === 'object' ? '' : (data.value ?? '');
         randomValue = valueIsRandom ? $state.snapshot(configuredValue) : { type: 'random-value', values: [] };
         data._valueKind = valueIsGetter ? 'getter' : valueIsRandom ? 'random' : 'literal';
+        if (selectedType === 'call-procedure') {
+            data.arguments ??= {};
+            data._argumentKinds = Object.fromEntries(Object.entries(data.arguments).map(([key, argument]) => [key, typeof argument === 'object' ? 'getter' : 'literal']));
+        }
 
         eventContextFields = Object.entries(data.context ?? {})
             .filter(([key]) => ['actorId', 'targetId', 'subjectId', 'placeId'].includes(key))
@@ -132,6 +139,7 @@
             case 'conditional': return { type, conditions: [], onTrue: [], onFalse: [] };
             case 'setter': return { type, var: {}, mode: 'set', value: '' };
             case 'start-dialogue': return { type, intent: '' };
+            case 'call-procedure': return { type, procedure: '', arguments: {}, _argumentKinds: {}, swapSelfTarget: false };
         }
     }
 
@@ -167,6 +175,20 @@
         if (data.type === 'start-dialogue' && !data.dialogueId?.trim() && !data.intent?.trim()) {
             showError('Add a dialogue id or intent');
             return;
+        }
+        if (data.type === 'call-procedure') {
+            const procedure = selectedProcedure();
+            if (!procedure) {
+                showError('Choose an existing procedure');
+                return;
+            }
+            for (const parameter of procedure.parameters) {
+                const argument = data.arguments?.[parameter.name];
+                if (argument === undefined || (typeof argument === 'object' && argument?.type !== 'getter') || (typeof argument !== 'object' && typeof argument !== parameter.type)) {
+                    showError(`Configure a ${parameter.type} value for ${parameter.name}`);
+                    return;
+                }
+            }
         }
         if (data.type === 'conditional') {
             data.conditions ??= [];
@@ -214,6 +236,7 @@
         }
         const result = $state.snapshot(data) as Record<string, any>;
         delete result._valueKind;
+        delete result._argumentKinds;
         value = result as EffectFomAction;
         onAfterSubmit?.(result as EffectFomAction);
     }
@@ -222,7 +245,7 @@
         const isSetterVariable = property === 'var' && selectedType === 'setter';
         const isSetterValue = property === 'value' && selectedType === 'setter';
         const setterScopes = ['self', 'target', 'temp'] as const;
-        const valueScopes = ['self', 'target', 'runtime', 'temp', 'world'] as const;
+        const valueScopes = ['self', 'target', 'runtime', 'temp', 'world', 'parameter'] as const;
         const allowedScopes = ctxGetter._getter.getAllowedGetters();
         const getterOptions = isSetterVariable
             ? {
@@ -284,6 +307,42 @@
 
     function addEventDataField() {
         eventDataFields = [...eventDataFields, { name: '', kind: 'literal', valueType: 'string', value: '' }];
+    }
+
+    function selectedProcedure() {
+        return ctx?.editor.getProcedures(true).find(procedure => procedure.name === data.procedure);
+    }
+
+    function changeProcedure(name: string) {
+        const previous = data.arguments ?? {};
+        const procedure = ctx?.editor.getProcedures(true).find(candidate => candidate.name === name);
+        data.procedure = name;
+        data.arguments = Object.fromEntries((procedure?.parameters ?? []).map(parameter => [
+            parameter.name,
+            Object.hasOwn(previous, parameter.name) ? previous[parameter.name] : parameter.type === 'number' ? 0 : parameter.type === 'boolean' ? false : ''
+        ]));
+        data._argumentKinds = Object.fromEntries(Object.entries(data.arguments).map(([key, argument]) => [key, typeof argument === 'object' ? 'getter' : 'literal']));
+    }
+
+    function changeArgumentKind(parameterName: string, kind: 'literal' | 'getter') {
+        const parameter = selectedProcedure()?.parameters.find(candidate => candidate.name === parameterName);
+        if (!parameter) return;
+        data._argumentKinds[parameterName] = kind;
+        const value = data.arguments[parameterName];
+        if (kind === 'getter' && (typeof value !== 'object' || value?.type !== 'getter')) data.arguments[parameterName] = {};
+        if (kind === 'literal' && typeof value === 'object') data.arguments[parameterName] = parameter.type === 'number' ? 0 : parameter.type === 'boolean' ? false : '';
+    }
+
+    async function handleProcedureArgumentGetter(parameterName: string) {
+        const result = await stack.push<Record<string, any>, Record<string, any>>({
+            title: `Configure ${parameterName}`,
+            data: data.arguments?.[parameterName]?.type === 'getter' ? data.arguments[parameterName] : {},
+            render: renderGetterForm
+        });
+        if (result) {
+            data.arguments[parameterName] = result;
+            data._argumentKinds[parameterName] = 'getter';
+        }
     }
 
     $effect(() => {
@@ -456,6 +515,41 @@
             <div class="form-group">
                 <button type="button" class="nested-button" onclick={() => handleStackGetter('targetId', 'Configure Target Getter')}>Edit target getter</button>
             </div>
+        {:else if selectedType === 'call-procedure'}
+            <InputSelect
+                id="effect-procedure"
+                label="Procedure:"
+                selected={data.procedure ?? ''}
+                onchange={(event) => changeProcedure((event.currentTarget as HTMLSelectElement).value)}
+                items={[
+                    { title: 'Choose a procedure', value: '' },
+                    ...(ctx?.editor.getProcedures(true) ?? []).map(procedure => ({ title: procedure.name, value: procedure.name }))
+                ]}
+            />
+            {#if selectedProcedure()}
+                {#each selectedProcedure()?.parameters ?? [] as parameter (parameter.name)}
+                    <div class="procedure-argument">
+                        <h4>{parameter.name} ({parameter.type})</h4>
+                        <InputSelect
+                            id={`procedure-argument-source-${parameter.name}`}
+                            label="Value source:"
+                            selected={data._argumentKinds?.[parameter.name] ?? 'literal'}
+                            onchange={(event) => changeArgumentKind(parameter.name, (event.currentTarget as HTMLSelectElement).value as 'literal' | 'getter')}
+                            items={[{ title: 'Literal', value: 'literal' }, { title: 'Getter', value: 'getter' }]}
+                        />
+                        {#if data._argumentKinds?.[parameter.name] === 'getter'}
+                            <button type="button" class="nested-button" onclick={() => handleProcedureArgumentGetter(parameter.name)}>Edit getter</button>
+                        {:else if parameter.type === 'number'}
+                            <InputNumber id={`procedure-argument-${parameter.name}`} label="Value:" bind:value={data.arguments[parameter.name]} />
+                        {:else if parameter.type === 'boolean'}
+                            <InputSwitch id={`procedure-argument-${parameter.name}`} label="Value:" bind:value={data.arguments[parameter.name]} />
+                        {:else}
+                            <InputText id={`procedure-argument-${parameter.name}`} label="Value:" bind:value={data.arguments[parameter.name]} />
+                        {/if}
+                    </div>
+                {/each}
+                <InputSwitch id="procedure-swap-self-target" label="Swap self and target" bind:value={data.swapSelfTarget} />
+            {/if}
         {:else if selectedType === 'conditional'}
             <section class="conditional-list" aria-label="Conditions">
                 <h3>Conditions</h3>

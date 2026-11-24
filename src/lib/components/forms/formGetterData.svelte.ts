@@ -20,7 +20,7 @@ export interface PropsFormGetter {
     /** Object with auxiliar hint system to the get*/
     getterCtx?:GetterCtx
     /** Restrict the available getter scopes for a specific field. */
-    allowedGetters?: ('self'|'target'|'runtime'|'temp'|'world')[]
+    allowedGetters?: ('self'|'target'|'runtime'|'temp'|'world'|'parameter')[]
     /** Restrict whether the field reads variables or metadata. */
     allowedGets?: ('variable'|'metadata')[]
 }
@@ -37,7 +37,7 @@ export const OBJECTS_OPTS = {
         {title:'Autonomy',value:'autonomy'}
     ]
 };
-export const NO_TARGET_STRUCTURES = ['world','temp','self']
+export const NO_TARGET_STRUCTURES = ['world','temp','self','parameter']
 export const METADATA_OPTS = {
     character:[
         {title:'Id Place',value:'idPlace'},
@@ -103,9 +103,12 @@ export function createGetterFormLogic(props:PropsFormGetter){
             {title:'Target',value:'target'},
             {title:'Runtime',value:'runtime'},
             {title:'Temporary Slot',value:'temp'},
-            {title:'World',value:'world'}
+            {title:'World',value:'world'},
+            {title:'Procedure parameter',value:'parameter'}
         ];
-        const result = allowedGetters ? allowedGetters.map((getter) => allEments.find((a) => a.value === getter)!) : allEments;
+        const result = allowedGetters
+            ? allowedGetters.map((getter) => allEments.find((a) => a.value === getter)!)
+            : allEments.filter((element) => element.value !== 'parameter');
         return result;
     })
     let _in = $state(untrack(()=> allowedTypes[0]?.value ?? 'self'));
@@ -132,6 +135,7 @@ export function createGetterFormLogic(props:PropsFormGetter){
         const source = _in === 'self' ? 'self'
             : _in === 'temp' ? 'temp'
             : _in === 'world' ? 'world'
+            : _in === 'parameter' ? 'parameter'
             : _target;
         return [...new Set(getter.getVars(source as any) ?? [])];
     }
@@ -140,7 +144,7 @@ export function createGetterFormLogic(props:PropsFormGetter){
         
         const allowedGets = props.allowedGets ?? ['variable', 'metadata'];
         _target != 'action' && allowedGets.includes('variable') && getItems.push({title:'Variable',value:'variable'});
-        _in != 'temp' && allowedGets.includes('metadata') && getItems.push({title:'Metadata',value:'metadata'});
+        !['temp','parameter'].includes(_in) && allowedGets.includes('metadata') && getItems.push({title:'Metadata',value:'metadata'});
 
         if(getItems.length == 1){
             _get = getItems[0].value;
@@ -179,6 +183,13 @@ export function createGetterFormLogic(props:PropsFormGetter){
             if(value.in){
                 const fullIn = value.in;
                 const [scope, source] = fullIn.split(':', 2);
+                if (fullIn === 'parameter-variable') {
+                    _in = 'parameter';
+                    _get = 'variable';
+                    updateItemOps();
+                    updateMetadataOpts();
+                    return;
+                }
                 const isSelfGetter = scope === 'self-variable' || scope === 'self-metadata';
                 const sourceParts = isSelfGetter ? [scope.slice('self-'.length)] : (source?.split('-') ?? []);
                 _in = isSelfGetter ? 'self' : scope;
@@ -326,7 +337,9 @@ export function createGetterFormLogic(props:PropsFormGetter){
                 showError('Variable name cannot contain: spaces,commans, or special characters');
                 return;
             }
-            if(NO_TARGET_STRUCTURES.includes(_in)){
+            if(_in === 'parameter'){
+                inProperty = 'parameter-variable';
+            }else if(NO_TARGET_STRUCTURES.includes(_in)){
                 inProperty += ['self','world'].includes(_in) ?  `-${_get}` : '-variable';
             }else{
                 inProperty += `:${_target}-${_get}`

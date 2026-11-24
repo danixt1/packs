@@ -5,6 +5,8 @@ import FormEffectStackHarness from './__tests__/FormEffectStackHarness.svelte';
 import type { EffectFomAction } from '$lib/types/data/declarative';
 import { createContextStack } from '$lib/shared/contextStack.svelte';
 import { fillGetter } from './__tests__/testUtils';
+import { WorldEditor } from '$lib/shared/worldEditor';
+import type { World } from '$lib/types/data/declarative';
 
 const setterEffect: EffectFomAction = {
     type: 'setter',
@@ -58,6 +60,74 @@ test('adds an event effect from the standalone form', async () => {
         type: 'event',
         event: 'DOOR_OPENED'
     });
+});
+
+test('configures a procedure call from its declared parameters', async () => {
+    const world: World = {
+        name: 'Editor Test', description: '', version: [1, 0, 0],
+        places: [], characters: [], items: [], actions: [], vars: [], textTemplates: [],
+        procedures: [{
+            name: 'applyDamage',
+            parameters: [{ name: 'amount', type: 'number' }],
+            effects: []
+        }]
+    };
+    const editor = new WorldEditor(world);
+    const onAfterSubmit = vi.fn();
+    const screen = await render(FormEffect, {
+        stack: createContextStack(),
+        onAfterSubmit,
+        ctx: {
+            editor,
+            allowedGetters: ['self', 'target', 'runtime', 'temp', 'world'],
+            allowedObjects: ['character', 'character/place', 'place', 'item', 'action'],
+            selfMetadata: 'character'
+        }
+    });
+
+    await screen.getByTestId('input-effect-type').selectOptions('Call procedure');
+    await screen.getByTestId('input-effect-procedure').selectOptions('applyDamage');
+    await expect.element(screen.getByTestId('input-procedure-argument-amount')).toBeVisible();
+    await screen.getByTestId('input-procedure-argument-amount').fill('12');
+    await screen.getByTestId('input-procedure-swap-self-target').click();
+    await screen.getByRole('button', { name: 'Confirm' }).click();
+
+    await expect.poll(() => onAfterSubmit.mock.calls.length).toBe(1);
+    expect(onAfterSubmit).toHaveBeenCalledWith({
+        type: 'call-procedure',
+        procedure: 'applyDamage',
+        arguments: { amount: 12 },
+        swapSelfTarget: true
+    });
+});
+
+test('offers procedure parameters as setter value getters inside a conditional effect', async () => {
+    const world: World = {
+        name: 'Editor Test', description: '', version: [1, 0, 0],
+        places: [], characters: [], items: [], actions: [], vars: [], textTemplates: [],
+        procedures: [{ name: 'applyDamage', parameters: [{ name: 'amount', type: 'number' }], effects: [] }]
+    };
+    const editor = new WorldEditor(world);
+    const screen = await render(FormEffectStackHarness, {
+        initialValue: { type: 'conditional', conditions: [], onTrue: [], onFalse: [] },
+        ctx: {
+            editor,
+            allowedGetters: ['self', 'target', 'runtime', 'temp', 'world', 'parameter'],
+            allowedObjects: ['character', 'character/place', 'place', 'item', 'action'],
+            selfMetadata: 'character',
+            parameterVars: ['amount']
+        }
+    });
+
+    await screen.getByRole('button', { name: 'Open effect' }).click();
+    await screen.getByRole('button', { name: 'Add Effect' }).first().click();
+    await screen.getByTestId('input-effect-type').last().selectOptions('Set variable');
+    await screen.getByTestId('input-effect-value-kind').last().selectOptions('Getter');
+    await screen.getByRole('button', { name: 'Edit value getter' }).click();
+    await screen.getByTestId('input-getter-location').last().selectOptions('parameter');
+
+    await expect.element(screen.getByTestId('input-getter-location').last()).toHaveValue('parameter');
+    await expect.element(screen.getByTestId('input-getter-variable').last()).toBeVisible();
 });
 
 test('edits structured event context and payload fields', async () => {
@@ -183,7 +253,7 @@ test('renders conditional lists together in the main effect form', async () => {
     await expect.element(screen.getByRole('button', { name: 'Add Effect' }).last()).toBeVisible();
     expect(stack.depth).toBe(0);
 });
-for(const effectName of ['Move','Event','Conditional','Set variable','Start dialogue']){
+for(const effectName of ['Move','Event','Conditional','Set variable','Start dialogue','Call procedure']){
     test(`fail on not passed data on ${effectName}`,async ()=>{
         const onAfterSubmit = vi.fn();
         const screen = await render(FormEffect, {stack: createContextStack(), onAfterSubmit});

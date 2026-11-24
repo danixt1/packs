@@ -41,6 +41,10 @@
         {
             display:'Actions',
             name:'actions'
+        },
+        {
+            display:'Procedures',
+            name:'procedures'
         }
     ];
     function runInDevMode(){

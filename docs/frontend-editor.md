@@ -36,7 +36,8 @@ List components manage collections of editor data and provide the list-level act
 - [`ListVars.svelte`](../src/lib/components/lists/ListVars.svelte) displays variables in an [`ObjectTable.svelte`](../src/lib/components/ObjectTable.svelte), supports editing and deleting variables, and pushes `FormVar.svelte` frames onto `stack` for creating and editing variables.
 - [`ListConditions.svelte`](../src/lib/components/lists/ListConditions.svelte) manages conditional-expression tokens, supports adding, reordering, and deleting tokens in any order, and pushes `FormCondition.svelte` frames onto `stack`. The enclosing object form validates the completed expression when it is submitted.
 - [`ListCollectors.svelte`](../src/lib/components/lists/ListCollectors.svelte) manages target collectors, displays items via `OrderedList.svelte`, and pushes `FormCollector.svelte` frames onto `stack`.
-- [`ListEffects.svelte`](../src/lib/components/lists/ListEffects.svelte) manages action and node effects, supports reordering, and pushes `FormEffect.svelte` frames onto `stack`.
+- [`ListEffects.svelte`](../src/lib/components/lists/ListEffects.svelte) manages action, dialogue-node, and procedure effects, supports reordering, and pushes `FormEffect.svelte` frames onto `stack`.
+- The Procedures editor route manages reusable procedure declarations. Each procedure contains typed parameters and a `ListEffects` sequence; effect call forms load the selected procedure signature to edit its arguments.
 - [`OrderedList.svelte`](../src/lib/components/lists/OrderedList.svelte) is a generic ordered list. It accepts a label function and optional edit/delete callbacks. `validateChange` can reject a removal or reorder, and `onInvalidChange` reports the rejected change.
 
 List components accept `values` with Svelte binding when the parent owns the collection, and accept `stack` (`ContextStack`) to handle child form opening without coupling to parent routes.

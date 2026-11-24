@@ -52,3 +52,17 @@ test('keeps effects in their new order after dragging', async () => {
     await expect.element(screen.getByTestId('orderedlist-item-0')).toHaveTextContent('Move character');
     await expect.element(screen.getByTestId('orderedlist-item-1')).toHaveTextContent('Event FIRST');
 });
+
+test('shows procedure calls and role swapping in the effect list', async () => {
+    const screen = await render(ListEffects, {
+        stack: createContextStack(),
+        values: [{
+            type: 'call-procedure',
+            procedure: 'applyDamage',
+            arguments: { amount: 7 },
+            swapSelfTarget: true
+        }]
+    });
+
+    await expect.element(screen.getByTestId('orderedlist-item-0')).toHaveTextContent('Call Procedure applyDamage (swap self/target)');
+});

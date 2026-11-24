@@ -15,7 +15,7 @@ const BUILD_MODES = new Set(['oneActionPerTarget', 'oneActionForAllTargets', 'on
 const SHOW_AS = new Set(['optionOfObject', 'optionOfActionList']);
 const ATTRIBUTES = new Set(['passiveAction', 'showAsLockedInUI', 'interruptible']);
 const AUDIENCES = new Set(['player', 'autonomous']);
-const EFFECT_TYPES = new Set(['move', 'event', 'conditional', 'setter', 'start-dialogue']);
+const EFFECT_TYPES = new Set(['move', 'event', 'conditional', 'setter', 'start-dialogue', 'call-procedure']);
 const INTERRUPT_EFFECT_TYPES = new Set(['move', 'event', 'conditional']);
 const COLLECTOR_TARGETS = new Set(['character', 'place', 'item', 'self', 'connectedPlaces']);
 const OPERATORS = new Set(['>', '<', '==', '!=']);
@@ -135,6 +135,12 @@ function validateEffect(value: unknown, location: string, interruptOnly = false)
                 return invalid(`${location} needs a dialogue id or intent`);
             }
             if (value.targetId !== undefined && !isPrimitiveOrGetter(value.targetId)) return invalid(`${location} has an invalid target`);
+            return valid();
+        case 'call-procedure':
+            if (typeof value.procedure !== 'string' || !value.procedure.trim()) return invalid(`${location} needs a procedure`);
+            if (value.arguments !== undefined && (!isRecord(value.arguments) || !Object.values(value.arguments).every(isPrimitiveOrGetter))) {
+                return invalid(`${location} has invalid procedure arguments`);
+            }
             return valid();
         case 'conditional': {
             const conditionsResult = validateConditions(value.conditions, `${location} conditions`);
