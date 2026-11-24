@@ -9,7 +9,7 @@ export type ActionRuntimeMetadata = `hasCategory:${string}`|'actionName'|'execut
 export type AutonomyRuntimeMetadata = 'currentGoal'|'lastActionName'|'cycle';
 export type WorldMetadata = 'time';
 
-export type GettersType = 'self'|'target'|'runtime'|'temp'|'world';
+export type GettersType = 'self'|'target'|'runtime'|'temp'|'world'|'parameter';
 interface BaseGetter{
     type:'getter';
     /** Value used when the resolved variable/metadata is missing. */
@@ -62,6 +62,7 @@ export type RuntimeAction = GetActionRuntimeMetadata;
  */
 type PrefixTemp = 'temp';
 export type TempVariable = VariableGetter<PrefixTemp>;
+export type ProcedureParameter = VariableGetter<'parameter'>;
 type GetWorldVariable = VariableGetter<'world'>;
 export type World = GetWorldVariable | VariableMetadataGetter<'world',WorldMetadata>;
 export type Self<T = CharacterMetadata> = VariableGetter<'self'> | VariableMetadataGetter<'self', T>;

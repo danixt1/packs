@@ -46,6 +46,18 @@ Autonomous actions do not need a display. Action names must be unique across
 `World.actions`, because autonomy rules and action lifecycle execution resolve
 declarations by name.
 
+### Procedures
+
+`World.procedures` stores reusable, serializable effect sequences. A procedure
+has a unique name, typed parameters, and an ordered `effects` list. The
+`call-procedure` effect supplies each parameter with a literal or getter. Within
+the procedure, parameters are read through the `parameter-variable` getter
+scope. `swapSelfTarget` runs the body with the current character `self` and
+`target` roles exchanged; call arguments are resolved before that swap.
+
+Each procedure call gets its own temporary-variable scope. Procedure calls may
+nest, but recursive call cycles are invalid.
+
 Character variables may set `mode: 'paired'` to store their mutable value in
 `RuntimeState.pairedVars` for the owning character and the other character in the
 current self/target context. The owner’s declaration supplies the type, default,

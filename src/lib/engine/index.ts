@@ -444,7 +444,7 @@ function startDialogue(world: any, state: RuntimeState, effect: any, context: Re
 	if (node?.onEnter?.length) executeEffects(world, state, node.onEnter, { self: self.id, target: { type: 'character', id: targetId }, temp: {} });
 }
 
-function executeEffects(world: any, state: RuntimeState, effects: any[] = [], context: ResolveContext, actionInstanceId?: string) {
+function executeEffects(world: any, state: RuntimeState, effects: any[] = [], context: ResolveContext, actionInstanceId?: string, procedureStack: string[] = []) {
 	for (const effect of effects) {
 		if (effect.type === 'setter') writeVariable(state, effect.var, effect.value, effect.mode, context);
 		if (effect.type === 'move') {
@@ -453,8 +453,48 @@ function executeEffects(world: any, state: RuntimeState, effects: any[] = [], co
 			if (characterId && placeId) moveCharacter(state, String(characterId), String(placeId));
 		}
 		if (effect.type === 'event') emitEventFromEffect(state, effect, context, actionInstanceId);
-		if (effect.type === 'conditional') executeEffects(world, state, evaluateConditions(state, effect.conditions ?? [], context) ? effect.onTrue ?? [] : effect.onFalse ?? [], context, actionInstanceId);
+		if (effect.type === 'conditional') executeEffects(world, state, evaluateConditions(state, effect.conditions ?? [], context) ? effect.onTrue ?? [] : effect.onFalse ?? [], context, actionInstanceId, procedureStack);
 		if (effect.type === 'start-dialogue') startDialogue(world, state, effect, context);
+		if (effect.type === 'call-procedure') {
+			const procedure = (world.procedures ?? []).find((candidate: any) => candidate.name === effect.procedure);
+			if (!procedure) {
+				state.debug.push(`Cannot call missing procedure: ${effect.procedure}`);
+				continue;
+			}
+			if (procedureStack.includes(procedure.name)) {
+				state.debug.push(`Recursive procedure call prevented: ${[...procedureStack, procedure.name].join(' -> ')}`);
+				continue;
+			}
+			const parameters: Record<string, string | number | boolean> = {};
+			let invalidArguments = false;
+			for (const parameter of procedure.parameters ?? []) {
+				const resolved = resolveGetter(state, effect.arguments?.[parameter.name], context);
+				if (!resolved.ok || resolved.value === undefined) {
+					state.debug.push(`Cannot resolve argument ${parameter.name} for procedure ${procedure.name}`);
+					invalidArguments = true;
+					break;
+				}
+				if (typeof resolved.value !== parameter.type) {
+					state.debug.push(`Argument ${parameter.name} for procedure ${procedure.name} must be ${parameter.type}`);
+					invalidArguments = true;
+					break;
+				}
+				parameters[parameter.name] = resolved.value;
+			}
+			if (invalidArguments) continue;
+			let procedureContext: ResolveContext = { ...context, temp: {}, parameters };
+			if (effect.swapSelfTarget) {
+				const currentSelf = typeof context.self === 'string' ? context.self : context.self?.id;
+				const currentTarget = context.target;
+				if (currentSelf && currentTarget && (currentTarget.type === 'character' || currentTarget.type === 'self')) {
+					procedureContext = { ...procedureContext, self: currentTarget.id, target: { type: 'character', id: currentSelf } };
+				} else {
+					state.debug.push(`Cannot swap self and target for procedure ${procedure.name}: target is not a character`);
+					continue;
+				}
+			}
+			executeEffects(world, state, procedure.effects ?? [], procedureContext, actionInstanceId, [...procedureStack, procedure.name]);
+		}
 	}
 }
 
@@ -817,6 +857,8 @@ export function validateWorld(world: any) {
 	const places = new Set<string>();
 	const characters = new Set<string>();
 	const actions = new Set<string>();
+	const procedures = new Set<string>();
+	
 	for (const place of world.places ?? []) {
 		if (places.has(place.id)) errors.push(`Duplicate place id: ${place.id}`);
 		places.add(place.id);
@@ -848,6 +890,81 @@ export function validateWorld(world: any) {
 		if (actions.has(action.name)) errors.push(`Duplicate action name: ${action.name}`);
 		actions.add(action.name);
 	}
+	for (const procedure of world.procedures ?? []) {
+		if (procedures.has(procedure.name)) errors.push(`Duplicate procedure name: ${procedure.name}`);
+		procedures.add(procedure.name);
+		const parameters = new Set<string>();
+		for (const parameter of procedure.parameters ?? []) {
+			if (!/^[a-zA-Z0-9]+$/.test(parameter.name)) errors.push(`Invalid parameter name ${parameter.name} in procedure ${procedure.name}`);
+			if (!['number', 'string', 'boolean'].includes(parameter.type)) errors.push(`Invalid parameter type for ${parameter.name} in procedure ${procedure.name}`);
+			if (parameters.has(parameter.name)) errors.push(`Duplicate parameter ${parameter.name} in procedure ${procedure.name}`);
+			parameters.add(parameter.name);
+		}
+		const checkParameterGetters = (value: any) => {
+			if (!value || typeof value !== 'object') return;
+			if (value.type === 'getter' && value.in === 'parameter-variable' && !parameters.has(value.variable)) {
+				errors.push(`Procedure ${procedure.name} reads undeclared parameter: ${value.variable}`);
+			}
+			Object.values(value).forEach(checkParameterGetters);
+		};
+		checkParameterGetters(procedure.effects);
+	}
+	const procedureByName = new Map((world.procedures ?? []).map((procedure: any) => [procedure.name, procedure]));
+	const findProcedureCalls = (effects: any[]): any[] => {
+		return (effects ?? []).flatMap((effect: any) => effect.type === 'conditional'
+			? [...findProcedureCalls(effect.onTrue), ...findProcedureCalls(effect.onFalse)]
+			: effect.type === 'call-procedure' ? [effect] : []);
+	};
+	const checkProcedureCalls = (effects: any[], origin: string) => {
+		for (const effect of effects ?? []) {
+			if (effect.type === 'conditional') {
+				checkProcedureCalls(effect.onTrue ?? [], origin);
+				checkProcedureCalls(effect.onFalse ?? [], origin);
+				continue;
+			}
+			if (effect.type !== 'call-procedure') continue;
+			const declaration = procedureByName.get(effect.procedure) as any;
+			if (!declaration) {
+				errors.push(`${origin} calls missing procedure: ${effect.procedure}`);
+				continue;
+			}
+			const expected = new Set((declaration.parameters ?? []).map((parameter: any) => parameter.name));
+			const actual = Object.keys(effect.arguments ?? {});
+			if (actual.length !== expected.size || actual.some(name => !expected.has(name))) {
+				errors.push(`${origin} has invalid arguments for procedure ${effect.procedure}`);
+			}
+			for (const parameter of declaration.parameters ?? []) {
+				const argument = effect.arguments?.[parameter.name];
+				if (argument === undefined || (!isGetter(argument) && typeof argument !== parameter.type)) {
+					errors.push(`${origin} argument ${parameter.name} for procedure ${effect.procedure} must be ${parameter.type}`);
+				}
+			}
+		}
+	};
+	for (const action of world.actions ?? []) {
+		checkProcedureCalls([...(action.onActivate ?? []), ...(action.onComplete ?? []), ...(action.onInterrupt ?? [])], `Action ${action.name}`);
+	}
+	for (const dialogue of world.dialogues ?? []) {
+		for (const node of dialogue.nodes ?? []) {
+			checkProcedureCalls([...(node.onEnter ?? []), ...(node.choices ?? []).flatMap((choice: any) => choice.effects ?? [])], `Dialogue ${dialogue.id}`);
+		}
+	}
+	for (const procedure of world.procedures ?? []) {
+		checkProcedureCalls(procedure.effects ?? [], `Procedure ${procedure.name}`);
+	}
+	const visitProcedure = (name: string, path: string[], visited: Set<string>) => {
+		if (path.includes(name)) {
+			errors.push(`Recursive procedure call: ${[...path, name].join(' -> ')}`);
+			return;
+		}
+		if (visited.has(name)) return;
+		visited.add(name);
+		const declaration = procedureByName.get(name) as any;
+		if (!declaration) return;
+		for (const call of findProcedureCalls(declaration.effects)) visitProcedure(call.procedure, [...path, name], visited);
+	};
+	const visitedProcedures = new Set<string>();
+	for (const procedure of world.procedures ?? []) visitProcedure(procedure.name, [], visitedProcedures);
 	for (const place of world.places ?? []) {
 		for (const id of place.charactersId ?? []) if (!characters.has(id)) errors.push(`Place ${place.id} references missing character ${id}`);
 		for (const id of place.connectedPlaces ?? []) if (!places.has(id)) errors.push(`Place ${place.id} references missing connected place ${id}`);

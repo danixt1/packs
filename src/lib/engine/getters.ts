@@ -146,6 +146,12 @@ function ok(value: string | number | boolean | undefined, path: string, variable
 type GetterHandler = (state: RuntimeState, getter: RuntimeGetter, context: ResolveContext) => ResolvedValue;
 
 const GETTER_HANDLERS: Record<string, GetterHandler> = {
+	'parameter-variable': (_state, getter, context) => {
+		const value = context.parameters?.[getter.variable];
+		if (value !== undefined) return ok(value, `parameter-variable:${getter.variable}`);
+		if (getter.fallback !== undefined) return { ok: true, value: getter.fallback, path: `parameter-variable:${getter.variable}` };
+		return { ok: false, path: `parameter-variable:${getter.variable}`, reason: 'missing procedure parameter' };
+	},
 	'world-variable': (state, getter) => {
 		const variable = findVar(state.world, getter.variable);
 		if (variable) return ok(variable.value, `world-variable:${getter.variable}`, variable);

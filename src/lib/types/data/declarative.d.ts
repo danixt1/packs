@@ -91,7 +91,7 @@ interface GenericVariableToGet{
     variable: string;
     fallback?: string | number | boolean;
 }
-type VariableToGet = Getters.TargetCharacter | Getters.TargetPlace | Getters.TargetItem | Getters.World | Getters.Self | Getters.TempVariable | Getters.RuntimeAutonomy;
+type VariableToGet = Getters.TargetCharacter | Getters.TargetPlace | Getters.TargetItem | Getters.World | Getters.Self | Getters.TempVariable | Getters.RuntimeAutonomy | Getters.ProcedureParameter;
 
 interface BaseModificator{
     /** Name used to expose the generated value as `temp-variable`. */
@@ -109,12 +109,13 @@ interface ModificatorRandomValue extends BaseModificator{
 }
 
 
-interface VariableModify<T extends VariableToGet = VariableToGet>{
+type WritableVariableToGet = Exclude<VariableToGet, Getters.ProcedureParameter>;
+interface VariableModify<T extends WritableVariableToGet = WritableVariableToGet>{
     type:'setter';
     var :T;
     /** Arithmetic modes expect number-compatible current and incoming values. */
     mode: 'set' | 'increment' | 'decrement'| 'multiply' | 'divide';
-    value: string | number | ModificatorRandomInterval | ModificatorRandomValue | T;
+    value: string | number | ModificatorRandomInterval | ModificatorRandomValue | VariableToGet;
 }
 /**
  * Compares two literal values, getter results, or a mix of both.
@@ -229,7 +230,25 @@ interface StartDialogueEffect{
     targetId?: string | VariableToGet;
 }
 
-type EffectFomAction = MoveEffect | EventEffect | ConditionalEffect | VariableModify | StartDialogueEffect;
+type ProcedureParameterType = 'number' | 'string' | 'boolean';
+interface ProcedureParameterDeclaration {
+    name: string;
+    type: ProcedureParameterType;
+}
+interface ProcedureDeclaration {
+    name: string;
+    parameters: ProcedureParameterDeclaration[];
+    effects: EffectFomAction[];
+}
+interface CallProcedureEffect {
+    type: 'call-procedure';
+    procedure: string;
+    arguments: Record<string, string | number | boolean | VariableToGet>;
+    /** Execute the procedure with its self and target character roles exchanged. */
+    swapSelfTarget?: boolean;
+}
+
+type EffectFomAction = MoveEffect | EventEffect | ConditionalEffect | VariableModify | StartDialogueEffect | CallProcedureEffect;
 /** Effects allowed while another action is being interrupted. */
 type EffectInterrupt = MoveEffect | EventEffect | ConditionalEffect<EffectInterrupt, ConditionalList<VariableToGet | Getters.RuntimeAction>>;
 
@@ -546,4 +565,5 @@ export interface World{
     vars: VariableDeclarator[];
     textTemplates: TextTemplate[];
     dialogues?: DialogueTree[];
+    procedures?: ProcedureDeclaration[];
 }

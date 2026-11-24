@@ -170,6 +170,7 @@ export type ResolveContext = {
 	self?: RuntimeCharacter | string;
 	target?: RuntimeTarget;
 	temp?: Record<string, string | number | boolean>;
+	parameters?: Record<string, string | number | boolean>;
 	event?: RuntimeEvent;
 	actionRuntime?: Partial<RunningAction> & { actionName?: string; executionTime?: number; isFromPlayer?: boolean };
 	autonomyRuntime?: Record<string, string | number | boolean>;

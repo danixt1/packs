@@ -728,4 +728,119 @@ describe('actions, events, dialogue, autonomy, and persistence', () => {
 		expect(engine.getState().debug).toStrictEqual([]);
 		expect(runtimeArthur.vars.find(e =>e.name === 'health')?.value).equal(80);
 	})
+
+	it('calls a procedure with a typed parameter and applies its effects to the target', () => {
+		const testWorld = engineTestWorld();
+		testWorld.procedures = [{
+			name: 'applyDamage',
+			parameters: [{ name: 'amount', type: 'number' }],
+			effects: [{
+				type: 'setter',
+				var: { type: 'getter', in: 'target:character-variable', variable: 'health' },
+				mode: 'decrement',
+				value: { type: 'getter', in: 'parameter-variable', variable: 'amount' }
+			}]
+		}];
+		testWorld.actions.find(action => action.name === 'attack')!.onComplete = [{
+			type: 'call-procedure', procedure: 'applyDamage', arguments: { amount: 9 }
+		}];
+		const engine = createGameEngine(testWorld);
+		const attack = engine.getView().availableActions.find(option => option.actionName === 'attack' && option.targets[0]?.id === 'troll');
+
+		engine.dispatch({ type: 'start-action', actionOptionId: attack!.id });
+
+		expect(numberVar(engine.getState().characters.find(character => character.id === 'troll')!.vars, 'health')).toBe(71);
+		expect(engine.getState().debug).toEqual([]);
+	});
+
+	it('resolves procedure arguments before swapping self and target', () => {
+		const testWorld = engineTestWorld();
+		testWorld.procedures = [{
+			name: 'applyDamage',
+			parameters: [{ name: 'amount', type: 'number' }],
+			effects: [{
+				type: 'setter',
+				var: { type: 'getter', in: 'target:character-variable', variable: 'health' },
+				mode: 'decrement',
+				value: { type: 'getter', in: 'parameter-variable', variable: 'amount' }
+			}]
+		}];
+		testWorld.actions.find(action => action.name === 'attack')!.onComplete = [{
+			type: 'call-procedure',
+			procedure: 'applyDamage',
+			arguments: { amount: { type: 'getter', in: 'self-variable', variable: 'energy' } },
+			swapSelfTarget: true
+		}];
+		const engine = createGameEngine(testWorld);
+		const attack = engine.getView().availableActions.find(option => option.actionName === 'attack' && option.targets[0]?.id === 'troll');
+
+		engine.dispatch({ type: 'start-action', actionOptionId: attack!.id });
+
+		expect(numberVar(engine.getState().characters.find(character => character.id === 'arthur')!.vars, 'health')).toBe(90);
+		expect(numberVar(engine.getState().characters.find(character => character.id === 'troll')!.vars, 'health')).toBe(80);
+		expect(engine.getState().debug).toEqual([]);
+	});
+
+	it('swaps both self and target character roles inside a procedure', () => {
+		const testWorld = engineTestWorld();
+		testWorld.procedures = [{
+			name: 'reverseExchange',
+			parameters: [],
+			effects: [
+				{ type: 'setter', var: { type: 'getter', in: 'self-variable', variable: 'health' }, mode: 'increment', value: 1 },
+				{ type: 'setter', var: { type: 'getter', in: 'target:character-variable', variable: 'health' }, mode: 'decrement', value: 2 }
+			]
+		}];
+		testWorld.actions.find(action => action.name === 'attack')!.onComplete = [{
+			type: 'call-procedure',
+			procedure: 'reverseExchange',
+			arguments: {},
+			swapSelfTarget: true
+		}];
+		const engine = createGameEngine(testWorld);
+		const attack = engine.getView().availableActions.find(option => option.actionName === 'attack' && option.targets[0]?.id === 'troll');
+
+		engine.dispatch({ type: 'start-action', actionOptionId: attack!.id });
+
+		expect(numberVar(engine.getState().characters.find(character => character.id === 'troll')!.vars, 'health')).toBe(81);
+		expect(numberVar(engine.getState().characters.find(character => character.id === 'arthur')!.vars, 'health')).toBe(98);
+		expect(engine.getState().debug).toEqual([]);
+	});
+
+	it('isolates procedure temporary variables and prevents recursive calls', () => {
+		const testWorld = engineTestWorld({
+			probe: {
+				onActivate: [
+					{ type: 'setter', var: { type: 'getter', in: 'temp-variable', variable: 'damage' }, mode: 'set', value: 5 },
+					{ type: 'call-procedure', procedure: 'localDamage', arguments: {} },
+					{ type: 'setter', var: { type: 'getter', in: 'self-variable', variable: 'health' }, mode: 'decrement', value: { type: 'getter', in: 'temp-variable', variable: 'damage' } }
+				]
+			}
+		});
+		testWorld.procedures = [{
+			name: 'localDamage',
+			parameters: [],
+			effects: [
+				{ type: 'setter', var: { type: 'getter', in: 'temp-variable', variable: 'damage' }, mode: 'set', value: 10 },
+				{ type: 'setter', var: { type: 'getter', in: 'self-variable', variable: 'health' }, mode: 'decrement', value: { type: 'getter', in: 'temp-variable', variable: 'damage' } }
+			]
+		}];
+		const engine = createGameEngine(testWorld);
+		const probe = engine.getView().availableActions.find(option => option.actionName === 'probe');
+
+		engine.dispatch({ type: 'start-action', actionOptionId: probe!.id });
+
+		expect(numberVar(engine.getState().characters.find(character => character.id === 'arthur')!.vars, 'health')).toBe(85);
+		expect(engine.getState().debug).toEqual([]);
+
+		const recursiveWorld = engineTestWorld({
+			probe: { onActivate: [{ type: 'call-procedure', procedure: 'loop', arguments: {} }] }
+		});
+		recursiveWorld.procedures = [{ name: 'loop', parameters: [], effects: [{ type: 'call-procedure', procedure: 'loop', arguments: {} }] }];
+		expect(validateWorld(recursiveWorld)).toContain('Recursive procedure call: loop -> loop');
+		const recursiveEngine = createGameEngine(recursiveWorld);
+		const recursiveProbe = recursiveEngine.getView().availableActions.find(option => option.actionName === 'probe');
+		recursiveEngine.dispatch({ type: 'start-action', actionOptionId: recursiveProbe!.id });
+		expect(recursiveEngine.getState().debug).toContain('Recursive procedure call prevented: loop -> loop');
+	});
 });
