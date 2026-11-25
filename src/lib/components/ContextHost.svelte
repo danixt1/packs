@@ -97,7 +97,9 @@
 <style>
     .context-host {
         display: flex;
+        flex: 1;
         flex-direction: column;
+        min-height: 0;
         width: 100%;
         gap: 0.75rem;
     }
@@ -108,7 +110,9 @@
 
     .context-frame-layer.layer-active {
         display: flex;
+        flex: 1;
         flex-direction: column;
+        min-height: 0;
         width: 100%;
     }
 
@@ -162,7 +166,9 @@
 
     .context-frame-viewport {
         display: flex;
+        flex: 1;
         flex-direction: column;
+        min-height: 0;
         width: 100%;
     }
 </style>

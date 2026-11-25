@@ -357,13 +357,41 @@
     <section class="effect-type-selector" aria-labelledby="effect-type-heading">
         <h2 id="effect-type-heading">Choose an effect</h2>
         <p>This choice determines which effect you are adding</p>
-        <InputSelect
-            id="effect-type"
-            label="Effect type:"
-            selected={selectedType}
-            onchange={(event) => changeType((event.currentTarget as HTMLSelectElement).value as EffectType)}
-            items={effectOptions}
-        />
+        <div class="effect-type-options" role="group" aria-label="Effect type">
+            {#each effectOptions as option (option.value)}
+                <button
+                    type="button"
+                    class="effect-type-button"
+                    class:selected={selectedType === option.value}
+                    aria-pressed={selectedType === option.value}
+                    aria-label={option.title}
+                    data-testid={`effect-type-${option.value}`}
+                    onclick={() => changeType(option.value as EffectType)}
+                >
+                    <svg class="effect-type-icon" viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        {#if option.value === 'move'}
+                            <path d="M5 24 24 5M15 5h9v9" />
+                            <circle cx="9" cy="9" r="3" />
+                            <path d="M5 18v-2a4 4 0 0 1 8 0v2M19 27l2-2 2 2 2-2 2 2" />
+                        {:else if option.value === 'event'}
+                            <path d="m18 3-12 16h9l-1 10 12-17h-9l1-9Z" />
+                        {:else if option.value === 'conditional'}
+                            <path d="M7 6v7a5 5 0 0 0 5 5h8M7 13a5 5 0 0 1 5-5h8M20 5l5 5-5 5M20 18l5 5-5 5" />
+                            <circle cx="7" cy="5" r="2" />
+                        {:else if option.value === 'setter'}
+                            <rect x="3" y="5" width="26" height="22" rx="3" />
+                            <text x="16" y="20" text-anchor="middle" fill="currentColor" stroke="none" font-size="10" font-weight="700">VAR</text>
+                        {:else if option.value === 'start-dialogue'}
+                            <path d="M5 6h22v16H15l-7 5v-5H5z" />
+                            <path d="m14 10 6 4-6 4z" fill="currentColor" stroke="none" />
+                        {:else if option.value === 'call-procedure'}
+                            <text x="16" y="20" text-anchor="middle" fill="currentColor" stroke="none" font-size="13" font-weight="700">ƒ()</text>
+                        {/if}
+                    </svg>
+                    <span>{option.title}</span>
+                </button>
+            {/each}
+        </div>
     </section>
 
     <section class="effect-settings" aria-label="Effect settings">
@@ -619,20 +647,46 @@
         font-size: 0.9rem;
         line-height: 1.45;
     }
-    .effect-type-selector :global(.def-label) {
-        font-size: 0.95rem;
+    .effect-type-options {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+        gap: 0.5rem;
+        margin-top: 0.75rem;
     }
-    .effect-type-selector :global(.def-select) {
-        min-height: 2.8rem;
-        padding: 0.65rem 2.5rem 0.65rem 0.8rem;
-        border: 1px solid var(--color-accent);
+    .effect-type-button {
+        display: flex;
+        min-height: 5.5rem;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        padding: 0.65rem 0.5rem;
+        border: 1px solid var(--border-strong);
         border-radius: 6px;
-        background-color: var(--bg-panel-solid);
-        box-shadow: 0 0 0 2px rgba(215, 177, 115, 0.12);
-        font-size: 1rem;
+        color: var(--color-text);
+        background: var(--bg-panel-solid);
+        font: inherit;
+        font-size: 0.9rem;
         font-weight: 600;
+        cursor: pointer;
+        transition: border-color 120ms ease, background-color 120ms ease, color 120ms ease;
     }
-    .effect-type-selector :global(.def-select:focus-visible) {
+    .effect-type-button:hover,
+    .effect-type-button.selected {
+        border-color: var(--color-accent);
+        color: var(--color-text-bright);
+        background: rgba(215, 177, 115, 0.12);
+    }
+    .effect-type-button.selected {
+        box-shadow: inset 0 0 0 1px var(--color-accent);
+    }
+    .effect-type-icon {
+        width: 2rem;
+        height: 2rem;
+        color: var(--color-accent-light);
+        flex: 0 0 auto;
+    }
+    .effect-type-button:focus-visible {
         outline: 2px solid var(--color-accent-light);
         outline-offset: 2px;
     }

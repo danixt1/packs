@@ -26,7 +26,9 @@
     <div class="popup-backdrop" role="presentation" onclick={(event) => {if(isSmarthphone)return; if (event.target === event.currentTarget) dismiss(); }}>
         <dialog open class="popup" aria-labelledby="object-editor-title" bind:this={popupPage}>
             <h2 id="object-editor-title">{title ?? 'Create Object'}</h2>
-            {@render children()}
+            <div class="popup-content">
+                {@render children()}
+            </div>
         </dialog>
     </div>
 {/if}
@@ -43,6 +45,7 @@
     .popup {
         z-index: 100;
         padding: 0;
+        box-sizing: border-box;
         border: 1px solid var(--border-subtle);
         border-radius: 8px;
         background: var(--bg-panel-solid);
@@ -50,13 +53,38 @@
         box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.55);
         overflow: auto;
     }
+    .popup-content {
+        min-height: 0;
+    }
     @media screen and (max-width:732px){
         .popup{
             width: calc(99% - 2px);
-            height: 100dvh;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .popup-content {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
         }
     }
-    @media screen and (min-width:732px){
+    @media screen and (min-width:733px) and (max-height:560px){
+        .popup{
+            width: min(45rem, calc(100% - 2px));
+            height: 90%;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .popup-content {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+        }
+    }
+    @media screen and (min-width:733px) and (min-height:561px){
         .popup{
             width: 45rem;
             max-height: 90dvh;

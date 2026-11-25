@@ -23,15 +23,25 @@
     </div>
 </form>
 <style>
+    form {
+        min-height: 0;
+    }
     .capsule{
         position: relative;
         overflow: auto;
     }
-    @media screen and (max-width:732px){
+    @media screen and (max-width:732px), screen and (min-width:733px) and (max-height:560px){
+        form {
+            display: flex;
+            flex: 1;
+            flex-direction: column;
+        }
         .capsule{
-            max-height: 83dvh;
+            flex: 1;
+            min-height: 0;
         }
         .form-actions{
+            flex: none;
             padding: 0.7rem !important;
         }
     }
