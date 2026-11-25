@@ -15,6 +15,7 @@ type VarRelation = ({
 
 export interface LabelMapper{
     name:string
+    _id:number
     title?:string
     description?:string
     usedBy:{type:'char'|'item'|'dialogue',oid:string,usedAs:string}[]
@@ -60,6 +61,9 @@ export class WorldEditor {
     private eventsInfo:Record<string,EventEditor> = {};
 
     private worldVersion:number[] = [1,0,0];
+    private lastId = 0;
+    private initializing = true;
+    private preserveIdsForNextAdd = new Set<number>();
     private editorInfo:Editor;
     public readonly worldId?:string;
 
@@ -68,39 +72,53 @@ export class WorldEditor {
 
     constructor(world:World, worldId?:string){
         this.worldId = worldId;
-        this.worldName = world.name;
-        this.description = world.description;
-        this.worldVars = structuredClone(world.vars ?? []);
-        this.worldVersion = [...(world.version ?? [1,0,0])];
-        this.editorInfo = structuredClone(world.editor) || {};
-        const editorInfo = world.editor || {};
+        const normalizedWorld = normalizeWorldIds(structuredClone(world));
+        this.lastId = normalizedWorld.lastId ?? 0;
+        this.worldName = normalizedWorld.name;
+        this.description = normalizedWorld.description;
+        this.worldVars = normalizedWorld.vars ?? [];
+        this.worldVersion = [...(normalizedWorld.version ?? [1,0,0])];
+        this.editorInfo = normalizedWorld.editor || {};
 
         Object.entries(this.editorInfo.labelsDescription ?? []).forEach(([k,v])=>this.addLabel(k,v));
 
-        world.vars              .forEach( e => this.linkVariableDeclarator(e,'world:root'));
-        world.characters        .forEach( e => this.addCharacter(e));
-        world.places            .forEach( e => this.addPlace(e));
-        world.actions          .forEach( e => this.addAction(e));
-        world.procedures       ?.forEach(e => this.addProcedure(e));
-        world.textTemplates     .forEach( e => this.addTextTemplate(e));
-        world.items             .forEach( e => this.addItem(e));
-        world.dialogues         ?.forEach(e => this.addDialogue(e));
-        world.displays          ?.forEach(e => this.addDisplay(e));
+        normalizedWorld.vars.forEach( e => this.linkVariableDeclarator(e,'world:root'));
+        normalizedWorld.characters.forEach( e => this.addCharacter(e));
+        normalizedWorld.places.forEach( e => this.addPlace(e));
+        normalizedWorld.actions.forEach( e => this.addAction(e));
+        normalizedWorld.procedures?.forEach(e => this.addProcedure(e));
+        normalizedWorld.textTemplates.forEach( e => this.addTextTemplate(e));
+        normalizedWorld.items.forEach( e => this.addItem(e));
+        normalizedWorld.dialogues?.forEach(e => this.addDialogue(e));
+        normalizedWorld.displays?.forEach(e => this.addDisplay(e));
+        this.initializing = false;
         this.cleanupInvalidContextMembers();
 
     }
     public addLabel(name:string,info:LabelInfo){
+        const currentInfo = this.editorInfo.labelsDescription?.[name];
+        if(currentInfo && info._id === undefined){
+            info._id = currentInfo._id;
+        }
+        if(!this.initializing){
+            this.ensureAddedRecordIds(info, new Set(currentInfo?._id === undefined ? [] : [currentInfo._id]));
+        }
+        this.editorInfo.labelsDescription ??= {};
+        this.editorInfo.labelsDescription[name] = info;
         if(!this.labelslinks[name]){
             this.labelslinks[name] = {
                 name,
+                _id:info._id!,
                 usedBy:[]
             }
         }
+        this.labelslinks[name]._id = info._id!;
         this.labelslinks[name].description = info.description;
         this.labelslinks[name].title = info.title;
         this.objectsByOid['label:'+name] = info;
     }
     public addAction(action:ActionDeclaration){
+        this.ensureAddedRecordIds(action);
         const oid = `action:${action.name}`;
         if (this.actions[action.name] || this.objectsByOid[oid]) {
             throw new Error(`Action "${action.name}" already exists`);
@@ -134,6 +152,7 @@ export class WorldEditor {
         this.analyzeConditionalLists(action.activationConditions,oid,'activate');
     }
     public addProcedure(procedure:ProcedureDeclaration){
+        this.ensureAddedRecordIds(procedure);
         const oid = `procedure:${procedure.name}`;
         if (this.procedures[procedure.name] || this.objectsByOid[oid]) throw new Error(`Procedure "${procedure.name}" already exists`);
         this.procedures[procedure.name] = {...procedure, oid};
@@ -141,6 +160,7 @@ export class WorldEditor {
         (procedure.effects ?? []).forEach(effect => this.analyzeEffect(effect, oid, 'effects'));
     }
     public addCharacter(char:Character){
+        this.ensureAddedRecordIds(char);
         const oid = 'char:'+char.id;
         this.objectsByOid[oid] = char;
         this.characters[char.id] = {...char, oid};
@@ -148,12 +168,14 @@ export class WorldEditor {
         char.labels?.forEach(e =>this.linkLabel(e,oid,'label'));
     }
     public addPlace(place:Place){
+        this.ensureAddedRecordIds(place);
         const oid = 'place:' + place.id;
         this.objectsByOid[oid] = place;
         this.places[place.id] = {...place, oid};
         place.vars.forEach(e =>this.linkVariableDeclarator(e,oid));
     }
     public addDialogue(dialogue:DialogueTree){
+        this.ensureAddedRecordIds(dialogue);
         const oid = 'dialogue:'+dialogue.id;
         this.objectsByOid[oid] = dialogue;
         this.dialogues[dialogue.id] = {...dialogue, oid};
@@ -195,24 +217,28 @@ export class WorldEditor {
         }
     }
     public addTextTemplate(textTemplate:TextTemplate){
+        this.ensureAddedRecordIds(textTemplate);
         textTemplate.name = textTemplate.name.replaceAll(' ','_');
         const oid = 'text-template:'+textTemplate.name;
         this.objectsByOid[oid] = textTemplate;
         this.textTemplates[textTemplate.name] = {...textTemplate, oid};
     }
     public addItem(item:Item){
+        this.ensureAddedRecordIds(item);
         const oid = 'item:'+item.id;
         this.objectsByOid[oid] = item;
         this.items[item.id] = {...item, oid};
         item.vars.forEach(e => this.linkVariableDeclarator(e,oid));
     }
     public addDisplay(display:Display){
+        this.ensureAddedRecordIds(display);
         const oid = 'display:'+display.varName;
         this.objectsByOid[oid] = display;
         this.displays[display.varName] = {...display, oid};
         this.linkVariableUsage(display.varName,oid,'display');
     }
     public addContext(ctx:ContextEditing){
+        this.ensureAddedRecordIds(ctx);
         if(!this.editorInfo.ctxs){
             this.editorInfo.ctxs = [];
         }
@@ -248,6 +274,10 @@ export class WorldEditor {
         const context = contexts.find(candidate => candidate.name === name && candidate.parent === parent);
         if(!context) throw new Error(`Context "${name}" was not found`);
 
+        if(updated._id === undefined){
+            updated._id = context._id;
+        }
+        this.ensureAddedRecordIds(updated, new Set(context._id === undefined ? [] : [context._id]));
         const previousPath = getContextPath(context);
         const nextPath = updated.parent ? `${updated.parent}.${updated.name}` : updated.name;
         Object.assign(context, updated);
@@ -494,6 +524,11 @@ export class WorldEditor {
 
     public setWorldVars(variables:VariableDeclarator[]):void{
         const previousNames = this.worldVars.map(variable => variable.name);
+        preserveMissingRecordIds(this.worldVars, variables);
+        const reusableIds = new Set(collectRecordIds(this.worldVars)
+            .map(record => record._id)
+            .filter((id): id is number => isValidRecordId(id)));
+        this.ensureAddedRecordIds(variables, reusableIds);
         this.delAllRefs('world:root');
         this.possibleVarsToObject.world = new Set();
         this.worldVars = variables;
@@ -504,6 +539,7 @@ export class WorldEditor {
     public toWorld(): World {
         const labelsDescription = Object.fromEntries(
             Object.values(this.labelslinks).map((label) => [label.name, {
+                _id: label._id,
                 title: label.title,
                 description: label.description
             }])
@@ -512,6 +548,7 @@ export class WorldEditor {
             name: this.worldName,
             description: this.description,
             version: [...this.worldVersion],
+            lastId: this.lastId,
             vars: structuredClone(this.worldVars),
             characters: this.getCharacters(true).map(({ oid: _oid, ...character }) => character),
             places: this.getPlaces(true).map(({ oid: _oid, ...place }) => place),
@@ -548,7 +585,7 @@ export class WorldEditor {
         if(!selected){
             throw new Error('Invalid oid, type "'+objName + '" not found');
         }
-        const currentObject = this.objectsByOid[oid] as {name?:string;vars?:VariableDeclarator[]} | undefined;
+        const currentObject = this.objectsByOid[oid] as {name?:string;vars?:VariableDeclarator[];_id?:number} | undefined;
         if (objName === 'procedure' && currentObject?.name && typeof obj.name === 'string' && currentObject.name !== obj.name) {
             this.renameProcedureCalls(currentObject.name, obj.name);
         }
@@ -561,9 +598,19 @@ export class WorldEditor {
             variable.name,
             this.getVariableContexts(variable.name)
         ]));
+        if(currentObject){
+            preserveMissingRecordIds(currentObject, obj);
+        }
         // Expensive, but if the OID of the character was updated it gonna generate duplication.
         this.deleteObject(oid);
-        selected.call(this,obj);
+        this.preserveIdsForNextAdd = new Set(currentObject ? collectRecordIds(currentObject)
+            .map(record => record._id)
+            .filter((id): id is number => isValidRecordId(id)) : []);
+        try{
+            selected.call(this,obj);
+        }finally{
+            this.preserveIdsForNextAdd.clear();
+        }
         if(contextType && previousName && typeof obj.name === 'string' && previousContexts.length){
             this.setObjectContexts(contextType, obj.name, previousContexts, previousName);
         }
@@ -687,7 +734,7 @@ export class WorldEditor {
                         if(!this.eventsInfo[effect.event].sharedProperties.includes(key)){
                             this.eventsInfo[effect.event].sharedProperties.push(key);
                         }
-                        if(typeof value === 'object'){
+                        if(typeof value === 'object' && value !== null && 'type' in value && value.type === 'getter'){
                             this.analyzeGetter(value,originOid,sublocation + '-action:event(data)');
                         }
                     }
@@ -705,7 +752,7 @@ export class WorldEditor {
                 break;
             case 'call-procedure':
                 Object.values(effect.arguments ?? {}).forEach(value => {
-                    if(typeof value === 'object') this.analyzeGetter(value as VariableToGet, originOid, sublocation + '-procedure-argument');
+                    if(typeof value === 'object' && value !== null && 'type' in value && value.type === 'getter') this.analyzeGetter(value as VariableToGet, originOid, sublocation + '-procedure-argument');
                 });
                 break;
         }
@@ -765,10 +812,7 @@ export class WorldEditor {
     }
     private linkLabel(label:string,oidLinkedObj:string,usedAs:string){
         if(!this.labelslinks[label]){
-            this.labelslinks[label] = {
-                name:label,
-                usedBy:[]
-            };
+            this.addLabel(label, {});
         }
         if(!this.refsByOID[oidLinkedObj]){
             this.refsByOID[oidLinkedObj] = [];
@@ -878,7 +922,201 @@ export class WorldEditor {
         }
         return [...contextsToApply];
     }
+
+    private ensureAddedRecordIds(value:unknown,reusableIds:Set<number> = this.preserveIdsForNextAdd){
+        if(this.initializing) return;
+        const occupiedIds = collectRecordIds(this.toWorld())
+            .map(record => record._id)
+            .filter((id): id is number => isValidRecordId(id) && !reusableIds.has(id));
+        const normalized = normalizeRecordIds(value, this.lastId, new Set(occupiedIds));
+        this.lastId = normalized.lastId;
+    }
 }
+
+const RECORD_ARRAY_KEYS = new Set([
+    'vars', 'memory', 'effects', 'onActivate', 'onComplete', 'onInterrupt', 'onEnter',
+    'onTrue', 'onFalse', 'conditions', 'collectIf', 'activationConditions',
+    'interruptSelfConditions', 'interruptTargetConditions', 'targets', 'parameters',
+    'goals', 'rules', 'nodes', 'choices', 'ctxs', 'when', 'stayActiveIf'
+]);
+
+const IDENTIFIED_RECORD_TYPES = new Set([
+    'getter', 'condition-relational', 'condition-exists', 'condition-is-valid',
+    'collector', 'move', 'event', 'setter', 'conditional', 'start-dialogue',
+    'call-procedure', 'random-interval', 'random-value', 'dialogue-tree',
+    'text-template', 'char-var-display'
+]);
+
+function isValidRecordId(id:unknown):id is number{
+    return typeof id === 'number' && Number.isSafeInteger(id) && id > 0;
+}
+
+function ensureLabelDefinitions(world:World){
+    const usedLabels = new Set<string>();
+    for(const character of world.characters ?? []){
+        character.labels?.forEach(label => usedLabels.add(label));
+    }
+    for(const dialogue of world.dialogues ?? []){
+        for(const key of ['targetLabelsAny','targetLabelsAll','targetLabelsNone','selfLabelsAny','selfLabelsAll','selfLabelsNone'] as const){
+            dialogue.match?.[key]?.forEach(label => usedLabels.add(label));
+        }
+    }
+    const hasDefinitions = Object.keys(world.editor?.labelsDescription ?? {}).length > 0;
+    if(!usedLabels.size && !hasDefinitions) return;
+    const editor = world.editor ??= {};
+    const labels = editor.labelsDescription ??= {};
+    for(const label of usedLabels){
+        labels[label] ??= {};
+    }
+}
+
+function collectRecordIds(root:unknown):Array<Record<string,unknown>>{
+    const records:Array<Record<string,unknown>> = [];
+    const seen = new Set<object>();
+    const visit = (value:unknown, forceRecord = false, key?:string):void => {
+        if(!value || typeof value !== 'object') return;
+        if(seen.has(value)) return;
+        seen.add(value);
+        if(Array.isArray(value)){
+            for(const item of value) visit(item, forceRecord || (key !== undefined && RECORD_ARRAY_KEYS.has(key)));
+            return;
+        }
+
+        const record = value as Record<string,unknown>;
+        if(key === 'labelsDescription'){
+            for(const labelInfo of Object.values(record)) visit(labelInfo, true);
+            return;
+        }
+        const isTypedRecord = typeof record.type === 'string' && IDENTIFIED_RECORD_TYPES.has(record.type);
+        if(forceRecord || isTypedRecord){
+            records.push(record);
+        }
+
+        for(const [childKey,child] of Object.entries(record)){
+            if(childKey === '_id') continue;
+            if(childKey === 'labelsDescription' || childKey === 'roles'){
+                if(child && typeof child === 'object' && !Array.isArray(child)){
+                    const shouldIdentifyEntries = childKey === 'labelsDescription'
+                        || (childKey === 'roles' && typeof record.primaryRole === 'string');
+                    for(const childRecord of Object.values(child)) visit(childRecord, shouldIdentifyEntries);
+                }
+                continue;
+            }
+            if(childKey === 'event' && record.type === 'event') continue;
+            if(childKey === 'data' && record.type === 'event'){
+                if(child && typeof child === 'object' && !Array.isArray(child)){
+                    for(const payloadValue of Object.values(child)){
+                        if(payloadValue && typeof payloadValue === 'object' && 'type' in payloadValue && payloadValue.type === 'getter') visit(payloadValue);
+                    }
+                }
+                continue;
+            }
+            if(childKey === 'ctxs' && Array.isArray(child)){
+                visit(child, false, childKey);
+                continue;
+            }
+            if(childKey === 'editor' && child && typeof child === 'object'){
+                const editor = child as Record<string,unknown>;
+                if(editor.labelsDescription) visit(editor.labelsDescription, false, 'labelsDescription');
+                if(editor.ctxs) visit(editor.ctxs, false, 'ctxs');
+                continue;
+            }
+            if(childKey === 'display' || childKey === 'autonomy' || childKey === 'interruption'
+                || childKey === 'match' || childKey === 'context' || childKey === 'speaker'){
+                visit(child, true, childKey);
+                continue;
+            }
+            if(Array.isArray(child)){
+                visit(child, false, childKey);
+            }else{
+                visit(child);
+            }
+        }
+    };
+
+    if(root && typeof root === 'object' && !Array.isArray(root) && 'characters' in root){
+        const world = root as Record<string,unknown>;
+        for(const key of ['vars','characters','places','items','actions','procedures','dialogues','textTemplates','displays'] as const){
+            const collection = world[key];
+            if(Array.isArray(collection)){
+                for(const item of collection) visit(item, true);
+            }
+        }
+        if(world.editor && typeof world.editor === 'object'){
+            const editor = world.editor as Record<string,unknown>;
+            if(editor.labelsDescription) visit(editor.labelsDescription, false, 'labelsDescription');
+            if(editor.ctxs) visit(editor.ctxs, false, 'ctxs');
+        }
+    }else{
+        visit(root, true);
+    }
+    return records;
+}
+
+function preserveMissingRecordIds(previous:unknown,next:unknown){
+    const previousByPath = new Map<string,number>();
+    const buildPaths = (value:unknown,path:string,output:Map<string,number>,seen = new Set<object>()) => {
+        if(!value || typeof value !== 'object' || seen.has(value)) return;
+        seen.add(value);
+        if(Array.isArray(value)){
+            value.forEach((item,index)=>buildPaths(item,`${path}[${index}]`,output,seen));
+            return;
+        }
+        const record = value as Record<string,unknown>;
+        if(isValidRecordId(record._id)) output.set(path,record._id);
+        for(const [key,child] of Object.entries(record)){
+            if(key === '_id') continue;
+            if(child && typeof child === 'object') buildPaths(child,`${path}.${key}`,output,seen);
+        }
+    };
+    buildPaths(previous,'root',previousByPath);
+    const transferMissing = (value:unknown,path:string,seen = new Set<object>()) => {
+        if(!value || typeof value !== 'object' || seen.has(value)) return;
+        seen.add(value);
+        if(Array.isArray(value)){
+            value.forEach((item,index)=>transferMissing(item,`${path}[${index}]`,seen));
+            return;
+        }
+        const record = value as Record<string,unknown>;
+        const previousId = previousByPath.get(path);
+        if(record._id === undefined && previousId !== undefined) record._id = previousId;
+        for(const [key,child] of Object.entries(record)){
+            if(key === '_id') continue;
+            if(child && typeof child === 'object') transferMissing(child,`${path}.${key}`,seen);
+        }
+    };
+    transferMissing(next,'root');
+}
+
+function normalizeRecordIds(root:unknown,lastId:number,occupiedIds:Set<number> = new Set()):{lastId:number}{
+    const records = collectRecordIds(root);
+    const validIds = records.map(record => record._id).filter(isValidRecordId);
+    let nextId = Math.max(Number.isSafeInteger(lastId) && lastId >= 0 ? lastId : 0, ...validIds, 0);
+    const seenIds = new Set(occupiedIds);
+    for(const record of records){
+        if(isValidRecordId(record._id) && !seenIds.has(record._id)){
+            seenIds.add(record._id);
+            continue;
+        }
+        do{
+            if(nextId >= Number.MAX_SAFE_INTEGER){
+                throw new Error('World has exhausted its numeric ID range');
+            }
+            nextId++;
+        }while(seenIds.has(nextId));
+        record._id = nextId;
+        seenIds.add(nextId);
+    }
+    return {lastId:nextId};
+}
+
+function normalizeWorldIds(world:World):World{
+    ensureLabelDefinitions(world);
+    const result = normalizeRecordIds(world, world.lastId ?? 0);
+    world.lastId = result.lastId;
+    return world;
+}
+
 function getContextPath(ctx:ContextEditing){
     return ctx.parent ? `${ctx.parent}.${ctx.name}` : ctx.name;
 }

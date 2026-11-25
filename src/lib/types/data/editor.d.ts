@@ -1,9 +1,13 @@
 export interface LabelInfo{
+    /** Stable, world-wide numeric identity for this label definition. */
+    _id?: number;
     title?:string;
     description?:string;
 
 }
 export interface ContextEditing{
+    /** Stable, world-wide numeric identity for this editor context. */
+    _id?:number
     name:string
     title?:string
     description:string

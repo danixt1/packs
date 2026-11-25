@@ -11,6 +11,8 @@ export type WorldMetadata = 'time';
 
 export type GettersType = 'self'|'target'|'runtime'|'temp'|'world'|'parameter';
 interface BaseGetter{
+    /** Stable, world-wide numeric identity assigned by the editor. */
+    _id?: number;
     type:'getter';
     /** Value used when the resolved variable/metadata is missing. */
     fallback?: string | number | boolean;

@@ -15,6 +15,34 @@ function buildBlankWorld():World{
         version:[1,0,0]
     }
 }
+function collectSerializedIds(world:World):number[]{
+    const ids:number[] = [];
+    const seen = new Set<object>();
+    const visit = (value:unknown) => {
+        if(!value || typeof value !== 'object' || seen.has(value)) return;
+        seen.add(value);
+        if(Array.isArray(value)){
+            value.forEach(visit);
+            return;
+        }
+        const record = value as Record<string,unknown>;
+        if(typeof record._id === 'number') ids.push(record._id);
+        for(const [key,child] of Object.entries(record)){
+            if(key === 'lastId') continue;
+            if(key === 'data' && record.type === 'event'){
+                if(child && typeof child === 'object' && !Array.isArray(child)){
+                    for(const payloadValue of Object.values(child)){
+                        if(payloadValue && typeof payloadValue === 'object' && 'type' in payloadValue && payloadValue.type === 'getter') visit(payloadValue);
+                    }
+                }
+                continue;
+            }
+            visit(child);
+        }
+    };
+    visit(world);
+    return ids;
+}
 it('Add A character and build the links',()=>{
     let editor = new WorldEditor(buildBlankWorld());
     editor.addCharacter({controlledByPlayer:false,id:'test',labels:['NPC'],name:'a',vars:[
@@ -25,7 +53,11 @@ it('Add A character and build the links',()=>{
     let refs = (editor as any)['refsByOID'];
     let labelslinks = (editor as any)['labelslinks'] as Record<string,LabelMapper>;
 
-    expect(labelslinks['NPC']).toStrictEqual<LabelMapper>({name:'NPC',usedBy:[{type:'char',oid:'char:test',usedAs:'label'}]})
+    expect(labelslinks['NPC']).toEqual<LabelMapper>(expect.objectContaining({
+        name:'NPC',
+        _id:expect.any(Number),
+        usedBy:[{type:'char',oid:'char:test',usedAs:'label'}]
+    }) as LabelMapper)
     expect(characters['test']).toBeDefined();
     expect(relationVars['var1']).toBeDefined();
     expect(refs['char:test']).toStrictEqual([{is:'var',prop:'var1'},{is:'label',prop:'NPC'}]);
@@ -133,6 +165,101 @@ it('loads, updates, deletes, and serializes text templates', () => {
     editor.deleteObject('text-template:updated');
     expect(editor.getTextTemplates()).toHaveLength(0);
     expect(editor.toWorld().textTemplates).toEqual([]);
+});
+
+it('assigns unique IDs to legacy authored records and repairs invalid or duplicate IDs', () => {
+    const world = buildBlankWorld();
+    world.lastId = 2;
+    world.characters.push({
+        _id: 4,
+        id: 'alice',
+        name: 'Alice',
+        controlledByPlayer: false,
+        labels: ['NPC'],
+        vars: [{ _id: 4, name: 'health', type: 'number', value: 10 }]
+    });
+    world.actions.push({
+        _id: 8,
+        name: 'attack',
+        executionTime: 1,
+        activationConditions: [],
+        targets: [{ type: 'collector', target: 'character', collectIf: [] }],
+        onActivate: [{
+            type: 'conditional',
+            conditions: [{ type: 'condition-relational', left: { type: 'getter', in: 'self-variable', variable: 'health', _id: 8 }, right: 0, operator: '>' }],
+            onTrue: [{ type: 'event', event: 'ATTACK', data: { arbitrary: { nested: true } as any } }]
+        }],
+        onComplete: []
+    });
+    world.editor = { labelsDescription: { NPC: { _id: -1, title: 'Non player' } } };
+
+    const editor = new WorldEditor(world);
+    const savedWorld = editor.toWorld();
+    const ids = collectSerializedIds(savedWorld);
+
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids.every((id) => Number.isSafeInteger(id) && id > 0)).toBe(true);
+    expect(savedWorld.characters[0]._id).toBe(4);
+    expect(savedWorld.actions[0]._id).toBe(8);
+    expect(savedWorld.lastId).toBe(Math.max(...ids));
+    expect(savedWorld.editor?.labelsDescription?.NPC._id).toBeDefined();
+    expect(savedWorld.actions[0].onActivate[0]._id).toBeDefined();
+    expect(savedWorld.actions[0].onActivate[0].type).toBe('conditional');
+    if(savedWorld.actions[0].onActivate[0].type === 'conditional'){
+        expect(savedWorld.actions[0].onActivate[0].conditions[0]).toHaveProperty('_id');
+        expect(savedWorld.actions[0].onActivate[0].conditions[0]).toHaveProperty('left._id');
+        expect(savedWorld.actions[0].onActivate[0].onTrue[0]).toHaveProperty('_id');
+        expect(savedWorld.actions[0].onActivate[0].onTrue[0]).not.toHaveProperty('data._id');
+        expect(savedWorld.actions[0].onActivate[0].onTrue[0]).not.toHaveProperty('data.arbitrary._id');
+    }
+});
+
+it('keeps IDs stable across serialization and allocates the next ID on additions', () => {
+    const initialWorld = buildBlankWorld();
+    initialWorld.characters.push({
+        id: 'alice', name: 'Alice', controlledByPlayer: false,
+        vars: [{ name: 'health', type: 'number', value: 10 }]
+    });
+    const firstEditor = new WorldEditor(initialWorld);
+    const firstSaved = firstEditor.toWorld();
+    const secondEditor = new WorldEditor(firstSaved);
+    const previousIds = collectSerializedIds(firstSaved);
+
+    secondEditor.addItem({ id: 'potion', name: 'Potion', description: '', vars: [] });
+    const saved = secondEditor.toWorld();
+    const allIds = collectSerializedIds(saved);
+    const itemId = saved.items[0]._id;
+
+    expect(collectSerializedIds(new WorldEditor(saved).toWorld())).toEqual(allIds);
+    expect(itemId).toBe(Math.max(...previousIds) + 1);
+    expect(saved.lastId).toBe(Math.max(...allIds));
+});
+
+it('preserves top-level and nested IDs when updated drafts omit IDs', () => {
+    const world = buildBlankWorld();
+    world.actions.push({
+        name: 'inspect',
+        executionTime: 1,
+        activationConditions: [],
+        targets: [],
+        onActivate: [{ type: 'event', event: 'INSPECT', context: { actorId: 'player' } }],
+        onComplete: []
+    });
+    const editor = new WorldEditor(world);
+    const before = editor.toWorld().actions[0];
+    const eventBefore = before.onActivate[0];
+    const eventContextBefore = eventBefore.type === 'event' ? eventBefore.context?._id : undefined;
+
+    editor.updateObjectWithOid('action:inspect', {
+        name: 'inspect', executionTime: 1, activationConditions: [], targets: [],
+        onActivate: [{ type: 'event', event: 'INSPECT', context: { actorId: 'player' } }], onComplete: []
+    });
+    const after = editor.toWorld().actions[0];
+    const eventAfter = after.onActivate[0];
+
+    expect(after._id).toBe(before._id);
+    expect(eventAfter._id).toBe(eventBefore._id);
+    expect(eventAfter.type === 'event' ? eventAfter.context?._id : undefined).toBe(eventContextBefore);
 });
 
 it('correct update action with temp vars',()=>{
@@ -361,6 +488,31 @@ it('keeps variable context membership global for same-named variables', () => {
     expect(editor.getVariableContexts('health')).toEqual(['combat']);
     expect(editor.getCharacters()[0].vars.map(({ name }) => name)).toEqual(['health']);
     expect(editor.getItems()[0].vars.map(({ name }) => name)).toEqual(['health']);
+});
+
+it('keeps label IDs stable when label metadata is edited', () => {
+    const world = buildBlankWorld();
+    world.characters.push({ id: 'alice', name: 'Alice', controlledByPlayer: false, labels: ['NPC'], vars: [] });
+    world.editor = { labelsDescription: { NPC: { title: 'Person' } } };
+    const editor = new WorldEditor(world);
+    const initialLabelId = editor.toWorld().editor?.labelsDescription?.NPC._id;
+
+    editor.addLabel('NPC', { title: 'Non-player character', description: 'An edited label' });
+
+    expect(editor.toWorld().editor?.labelsDescription?.NPC._id).toBe(initialLabelId);
+    expect(editor.toWorld().editor?.labelsDescription?.NPC.title).toBe('Non-player character');
+});
+
+it('assigns unique IDs when incoming records contain IDs that collide with existing records', () => {
+    const editor = new WorldEditor(buildBlankWorld());
+    editor.addItem({ _id: 12, id: 'potion', name: 'Potion', description: '', vars: [] });
+    editor.addItem({ _id: 12, id: 'ether', name: 'Ether', description: '', vars: [] });
+
+    const world = editor.toWorld();
+    expect(world.items[0]._id).toBe(12);
+    expect(world.items[1]._id).not.toBe(12);
+    expect(new Set(collectSerializedIds(world)).size).toBe(collectSerializedIds(world).length);
+    expect(world.lastId).toBe(Math.max(...collectSerializedIds(world)));
 });
 
 it('renames variable memberships and removes them after the last declaration is deleted', () => {

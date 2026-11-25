@@ -2,7 +2,12 @@ import type { Editor } from './editor';
 import * as Getters from './getters';
 export type PlaceToShowInUI = 'statusCard'|'statusBar'|'attribute';
 
-interface BaseVariableDisplay{
+interface IdentifiedRecord{
+    /** Stable, world-wide numeric identity assigned by the editor. */
+    _id?: number;
+}
+
+interface BaseVariableDisplay extends IdentifiedRecord{
     /**
      * case no title is passed and `showIn` is equal attribute only show what is inside the variable
      */
@@ -24,7 +29,7 @@ interface BaseVariableDisplay{
     showIn:PlaceToShowInUI
 
 }
-interface VariableDeclaratorBase{
+interface VariableDeclaratorBase extends IdentifiedRecord{
     name:string;
     description?: string;
     /** Store character variables separately for each directed character pair. */
@@ -51,14 +56,14 @@ interface VariableBoolean extends VariableDeclaratorBase{
 
 type VariableDeclarator = VariableNumber | VariableString | VariableBoolean;
 
-interface Item{
+interface Item extends IdentifiedRecord{
     id: string;
     name: string;
     description: string;
     vars: VariableDeclarator[];
 }
 
-interface Place{
+interface Place extends IdentifiedRecord{
     id: string;
     name: string;
     description: string;
@@ -67,7 +72,7 @@ interface Place{
     charactersId: string[];
 }
 
-export interface Character{
+export interface Character extends IdentifiedRecord{
     id: string;
     name: string;
     /**
@@ -93,7 +98,7 @@ interface GenericVariableToGet{
 }
 type VariableToGet = Getters.TargetCharacter | Getters.TargetPlace | Getters.TargetItem | Getters.World | Getters.Self | Getters.TempVariable | Getters.RuntimeAutonomy | Getters.ProcedureParameter;
 
-interface BaseModificator{
+interface BaseModificator extends IdentifiedRecord{
     /** Name used to expose the generated value as `temp-variable`. */
     tempVarName?: string;
 }
@@ -110,7 +115,7 @@ interface ModificatorRandomValue extends BaseModificator{
 
 
 type WritableVariableToGet = Exclude<VariableToGet, Getters.ProcedureParameter>;
-interface VariableModify<T extends WritableVariableToGet = WritableVariableToGet>{
+interface VariableModify<T extends WritableVariableToGet = WritableVariableToGet> extends IdentifiedRecord{
     type:'setter';
     var :T;
     /** Arithmetic modes expect number-compatible current and incoming values. */
@@ -120,20 +125,20 @@ interface VariableModify<T extends WritableVariableToGet = WritableVariableToGet
 /**
  * Compares two literal values, getter results, or a mix of both.
  */
-interface ConditionRelational<L = VariableToGet,R = VariableToGet>{
+interface ConditionRelational<L = VariableToGet,R = VariableToGet> extends IdentifiedRecord{
     type: 'condition-relational';
     operator: '>' | '<' | '==' | '!=';
     left: L | string | number | boolean;
     right: R | string | number| boolean;
     description?: string;
 }
-interface ConditionIsValid<T = VariableToGet>{
+interface ConditionIsValid<T = VariableToGet> extends IdentifiedRecord{
     type: 'condition-is-valid';
     /** Truthiness check after resolving the getter. */
     variableToCheck: T;
     description?: string;
 }
-interface ConditionExists<T = VariableToGet>{
+interface ConditionExists<T = VariableToGet> extends IdentifiedRecord{
     type: 'condition-exists';
     /** Checks that the getter can be resolved, regardless of the value truthiness. */
     variableToCheck: T;
@@ -145,7 +150,7 @@ interface ConditionExists<T = VariableToGet>{
  */
 type ConditionalList<T = VariableToGet> = 'OR' | 'AND' | 'NOT' |'('|')'| ConditionRelational<T, T> | ConditionExists<T> | ConditionIsValid<T>;
 
-interface Collector{
+interface Collector extends IdentifiedRecord{
     type:'collector';
     /** Entity kind iterated by this collector before `collectIf` is applied. */
     target: 'character' | 'place' | 'item';
@@ -153,11 +158,11 @@ interface Collector{
     collectIf: ConditionalList[];
 }
 
-interface CollectorSelf{
+interface CollectorSelf extends IdentifiedRecord{
     type:'collector';
     target: 'self';
 }
-interface CollectorConnectedPlaces{
+interface CollectorConnectedPlaces extends IdentifiedRecord{
     type:'collector';
     target: 'connectedPlaces';
     /** Source place id or getter; each connected place becomes `target:place`. */
@@ -165,14 +170,14 @@ interface CollectorConnectedPlaces{
 }
 type CollectorToGet = Collector | CollectorSelf | CollectorConnectedPlaces;
 
-interface MoveEffect{
+interface MoveEffect extends IdentifiedRecord{
     type: 'move';
     /** Character id to move. Usually `self-metadata:id`. */
     moveId: Getters.Self<Getters.CharacterMetadata>;
     /** Destination id. Character targets resolve to their current place. */
     toId:Getters.TargetCharacter | Getters.TargetPlace | string;
 }
-interface EventContext{
+interface EventContext extends IdentifiedRecord{
     /**
      * The entity that originated the event.
      * Used by filters like FROM_THE_PLAYER.
@@ -199,7 +204,7 @@ interface EventContext{
     audience?: 'actor' | 'target' | 'place' | 'global';
     tags?: string[];
 }
-interface EventEffect{
+interface EventEffect extends IdentifiedRecord{
     type: 'event';
     event: string;
     context?: EventContext;
@@ -208,14 +213,14 @@ interface EventEffect{
     /** Payload fields available to text templates as `$roleName/fieldName$`. */
     data?: Record<string, string | number | boolean | VariableToGet>;
 }
-interface ConditionalEffect<E = EffectFomAction,C = ConditionalList> {
+interface ConditionalEffect<E = EffectFomAction,C = ConditionalList> extends IdentifiedRecord {
     type: 'conditional';
     /** Infix condition expression; see `ConditionalList`. */
     conditions: C[];
     onTrue: E[];
     onFalse?: E[];
 }
-interface StartDialogueEffect{
+interface StartDialogueEffect extends IdentifiedRecord{
     type:'start-dialogue';
     /**
      * Starts a specific dialogue tree. Prefer intent for generic actions like
@@ -231,16 +236,16 @@ interface StartDialogueEffect{
 }
 
 type ProcedureParameterType = 'number' | 'string' | 'boolean';
-interface ProcedureParameterDeclaration {
+interface ProcedureParameterDeclaration extends IdentifiedRecord {
     name: string;
     type: ProcedureParameterType;
 }
-interface ProcedureDeclaration {
+interface ProcedureDeclaration extends IdentifiedRecord {
     name: string;
     parameters: ProcedureParameterDeclaration[];
     effects: EffectFomAction[];
 }
-interface CallProcedureEffect {
+interface CallProcedureEffect extends IdentifiedRecord {
     type: 'call-procedure';
     procedure: string;
     arguments: Record<string, string | number | boolean | VariableToGet>;
@@ -252,7 +257,7 @@ type EffectFomAction = MoveEffect | EventEffect | ConditionalEffect | VariableMo
 /** Effects allowed while another action is being interrupted. */
 type EffectInterrupt = MoveEffect | EventEffect | ConditionalEffect<EffectInterrupt, ConditionalList<VariableToGet | Getters.RuntimeAction>>;
 
-interface ActionDisplayInfo{
+interface ActionDisplayInfo extends IdentifiedRecord{
     name: string;
     description: string;
     /**
@@ -283,7 +288,7 @@ type ActionBuildMode = 'oneActionPerTarget' | 'oneActionForAllTargets' | 'oneAct
  */ 
 type ActionAttributes = 'passiveAction'|'showAsLockedInUI'|'interruptible';
 type ActionAudience = 'player' | 'autonomous';
-interface ActionInterruptionDeclaration {
+interface ActionInterruptionDeclaration extends IdentifiedRecord {
     /**
      * Phase 1: checked on the newly started action before it can interrupt an
      * existing action. `runtime:action` describes the existing running action.
@@ -298,7 +303,7 @@ interface ActionInterruptionDeclaration {
      */
     interruptTargetConditions?: ConditionalList<Getters.RuntimeAction>[];
 }
-interface ActionDeclaration {
+interface ActionDeclaration extends IdentifiedRecord {
     name: string;
     /** If no display is passed the action automatically can't by used by the player */
     display?: ActionDisplayInfo | null;
@@ -342,7 +347,7 @@ interface ActionDeclaration {
 type AutonomyCondition = ConditionalList<VariableToGet | Getters.RuntimeAutonomy>;
 type AutonomyRuleTargeting = 'firstValid' | 'randomValid' | 'allValid';
 
-interface CharacterAutonomyGoal{
+interface CharacterAutonomyGoal extends IdentifiedRecord{
     name: string;
     description?: string;
     /**
@@ -353,7 +358,7 @@ interface CharacterAutonomyGoal{
     stayActiveIf?: AutonomyCondition[];
 }
 
-interface CharacterAutonomyActionRule{
+interface CharacterAutonomyActionRule extends IdentifiedRecord{
     type:'action-rule';
     name: string;
     description?: string;
@@ -373,7 +378,7 @@ interface CharacterAutonomyActionRule{
     targeting?: AutonomyRuleTargeting;
 }
 
-interface CharacterAutonomyIdleRule{
+interface CharacterAutonomyIdleRule extends IdentifiedRecord{
     type:'idle-rule';
     name: string;
     description?: string;
@@ -386,7 +391,7 @@ interface CharacterAutonomyIdleRule{
 
 type CharacterAutonomyRule = CharacterAutonomyActionRule | CharacterAutonomyIdleRule;
 
-interface CharacterAutonomy{
+interface CharacterAutonomy extends IdentifiedRecord{
     /**
      * Rule-based autonomy keeps characters deterministic to author and easy to debug.
      */
@@ -403,7 +408,7 @@ interface CharacterAutonomy{
     goals?: CharacterAutonomyGoal[];
     rules: CharacterAutonomyRule[];
 }
-interface DialogueMatch{
+interface DialogueMatch extends IdentifiedRecord{
     /**
      * Exact character ids that this dialogue can target.
      */
@@ -429,12 +434,12 @@ type DialogueSpeaker =
     | 'self'
     | 'target'
     | 'narrator'
-    | {
+    | ({
         type:'character';
         /** Explicit speaker id, or a getter that resolves to one. */
         id: string | VariableToGet;
-    };
-interface DialogueChoice{
+    } & IdentifiedRecord);
+interface DialogueChoice extends IdentifiedRecord{
     id: string;
     text: string;
     /**
@@ -451,7 +456,7 @@ interface DialogueChoice{
     /** Ends the conversation after applying effects. */
     endDialogue?: boolean;
 }
-interface DialogueNode{
+interface DialogueNode extends IdentifiedRecord{
     id: string;
     speaker: DialogueSpeaker;
     text: string;
@@ -459,7 +464,7 @@ interface DialogueNode{
     onEnter?: EffectFomAction[];
     choices: DialogueChoice[];
 }
-interface DialogueTree{
+interface DialogueTree extends IdentifiedRecord{
     type:'dialogue-tree';
     id: string;
     name: string;
@@ -479,7 +484,7 @@ interface DialogueTree{
     nodes: DialogueNode[];
 }
 type EventConditions = 'FROM_THE_PLAYER'|'TARGETS_PLAYER'|'FROM_NON_PLAYER'|'TARGETS_NON_PLAYER'| 'IN_PLAYER_PLACE';
-interface TextTemplateEventRoleMatch{
+interface TextTemplateEventRoleMatch extends IdentifiedRecord{
     /**
      * Event assigned to this role.
      */
@@ -500,7 +505,7 @@ interface TextTemplateEventRoleMatch{
     sameSubjectAs?: string;
     samePlaceAs?: string;
 }
-interface TextTemplateMatch{
+interface TextTemplateMatch extends IdentifiedRecord{
     /**
      * Role used as the anchor event for choosing the template.
      */
@@ -511,7 +516,7 @@ interface TextTemplateMatch{
      */
     roles: Record<string, TextTemplateEventRoleMatch>;
 }
-interface TextTemplate{
+interface TextTemplate extends IdentifiedRecord{
     type:'text-template';
     name: string;
     /** The text template, use: $roleName/variable$ in the text to get a variable value from the matched event role.
@@ -548,6 +553,8 @@ export interface World{
      * pos 3: small additions(new texts, typo fix, small adjusts)
      */
     version:number[];
+    /** Highest numeric `_id` ever allocated in this world. */
+    lastId?: number;
     editor?: Editor;
     places: Place[];
     displays?:DisplayVariable[]
