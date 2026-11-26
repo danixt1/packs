@@ -440,7 +440,72 @@ describe('runtime kernel', () => {
 		const world = engineTestWorld();
 		world.actions.push({ ...world.actions[0], name: world.actions[1].name });
 
-		expect(validateWorld(world)).toContain(`Duplicate action name: ${world.actions[1].name}`);
+		const report = validateWorld(world);
+		expect(report.issues).toContainEqual(expect.objectContaining({
+			code: 'ACTION_DUPLICATE_NAME',
+			level: 'average',
+			message: `Duplicate action name: ${world.actions[1].name}`
+		}));
+		expect(report.concernLevel).toBe('average');
+		expect(report.canStart).toBe(true);
+	});
+
+	it.each([
+		['WORLD_NO_PLACES', (world: World) => { world.places = []; }],
+		['WORLD_NO_CHARACTERS', (world: World) => { world.characters = []; }],
+		['WORLD_NO_CONTROLLED_PLAYER', (world: World) => { world.characters.forEach((character) => { character.controlledByPlayer = false; }); }],
+		['PLAYER_NO_PLACE', (world: World) => { world.places.forEach((place) => { place.charactersId = place.charactersId.filter((id) => id !== 'arthur'); }); }]
+	])('marks critical world structure issue %s as non-startable', (code, mutateWorld) => {
+		const world = engineTestWorld();
+		mutateWorld(world);
+
+		const report = validateWorld(world);
+
+		expect(report.concernLevel).toBe('critical');
+		expect(report.canStart).toBe(false);
+		expect(report.issues).toContainEqual(expect.objectContaining({ code, level: 'critical' }));
+	});
+
+	it('reports an empty issue list as no concern', () => {
+		const report = validateWorld(engineTestWorld());
+
+		expect(report).toMatchObject({
+			concernLevel: 'none',
+			canStart: true,
+			counts: { critical: 0, average: 0, low: 0, none: 0 },
+			issues: []
+		});
+	});
+
+	it('classifies dangling references as low concern and still startable', () => {
+		const world = engineTestWorld();
+		world.places[0].connectedPlaces.push('missing-place');
+		world.places[0].charactersId.push('missing-character');
+
+		const report = validateWorld(world);
+
+		expect(report.concernLevel).toBe('low');
+		expect(report.canStart).toBe(true);
+		expect(report.issues.map((issue) => issue.code)).toEqual(expect.arrayContaining([
+			'PLACE_CONNECTION_MISSING',
+			'PLACE_CHARACTER_MISSING'
+		]));
+	});
+
+	it('classifies calls to missing procedures as average concern and still startable', () => {
+		const world = engineTestWorld({
+			probe: { onActivate: [{ type: 'call-procedure', procedure: 'missingProcedure', arguments: {} }] }
+		});
+
+		const report = validateWorld(world);
+
+		expect(report.concernLevel).toBe('average');
+		expect(report.canStart).toBe(true);
+		expect(report.issues).toContainEqual(expect.objectContaining({
+			code: 'PROCEDURE_MISSING',
+			level: 'average',
+			message: 'Action probe calls missing procedure: missingProcedure'
+		}));
 	});
 
 	it('evaluates activation conditions and parenthesized OR target conditions', () => {
@@ -544,7 +609,7 @@ describe('actions, events, dialogue, autonomy, and persistence', () => {
 		expect(numberVar(runtimeArthur.vars, 'energy')).toBe(9);
 		expect(engine.getState().eventQueue.find((event) => event.event === 'CHARACTER_ATTACKED')?.data.damage).toBeTypeOf('number');
 		expect(view.log.some((line) => line.startsWith('You attacked Troll'))).toBe(true);
-		expect(validateWorld(world)).toEqual([]);
+		expect(validateWorld(world).issues).toEqual([]);
 	});
 
 	it('starts dialogue by intent and applies visible choice effects', () => {
@@ -837,7 +902,11 @@ describe('actions, events, dialogue, autonomy, and persistence', () => {
 			probe: { onActivate: [{ type: 'call-procedure', procedure: 'loop', arguments: {} }] }
 		});
 		recursiveWorld.procedures = [{ name: 'loop', parameters: [], effects: [{ type: 'call-procedure', procedure: 'loop', arguments: {} }] }];
-		expect(validateWorld(recursiveWorld)).toContain('Recursive procedure call: loop -> loop');
+		expect(validateWorld(recursiveWorld).issues).toContainEqual(expect.objectContaining({
+			code: 'PROCEDURE_RECURSIVE_CALL',
+			level: 'average',
+			message: 'Recursive procedure call: loop -> loop'
+		}));
 		const recursiveEngine = createGameEngine(recursiveWorld);
 		const recursiveProbe = recursiveEngine.getView().availableActions.find(option => option.actionName === 'probe');
 		recursiveEngine.dispatch({ type: 'start-action', actionOptionId: recursiveProbe!.id });

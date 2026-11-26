@@ -202,11 +202,27 @@ export type GameView = {
 	log: string[];
 };
 
+export type ValidationConcernLevel = 'critical' | 'average' | 'low' | 'none';
+
+export type ValidationIssue = {
+	code: string;
+	level: Exclude<ValidationConcernLevel, 'none'>;
+	message: string;
+	path?: string;
+};
+
+export type WorldValidationResult = {
+	concernLevel: ValidationConcernLevel;
+	canStart: boolean;
+	issues: ValidationIssue[];
+	counts: Record<ValidationConcernLevel, number>;
+};
+
 export type Engine = {
 	getState: () => RuntimeState;
 	getView: () => GameView;
 	dispatch: (command: GameCommand) => GameView;
 	save: () => string;
 	load: (serialized: string) => GameView;
-	validate: () => string[];
+	validate: () => WorldValidationResult;
 };

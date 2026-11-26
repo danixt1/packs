@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import MainGame from '$lib/components/MainGame.svelte';
-	import { createGameEngine, createRuntimeState, type Engine, type GameView } from '$lib/engine';
+	import { createGameEngine, createRuntimeState, type Engine, type GameView, type WorldValidationResult } from '$lib/engine';
 	import type { RuntimeState } from '$lib/engine/types';
 	import {
 		compareWorldVersions,
@@ -32,6 +32,7 @@
 	let save = $state<StoredSave | null>(null);
 	let engine = $state<Engine | null>(null);
 	let view = $state<GameView | null>(null);
+	let validationReport = $state<WorldValidationResult | null>(null);
 	let showMobileActions = $state(false);
 	let showGameMenu = $state(false);
 	let showSaveMenu = $state(false);
@@ -96,8 +97,19 @@
 		}
 
 		engine = createGameEngine(world, restoredState);
-		view = engine.getView();
+		if (!prepareGameView(engine)) return;
 		status = 'ready';
+	}
+
+	function prepareGameView(candidate: Engine) {
+		const report = candidate.validate();
+		validationReport = report;
+		if (!report.canStart) {
+			fail('This world has critical validation issues and cannot be played.');
+			return false;
+		}
+		view = candidate.getView();
+		return true;
 	}
 
 	function fail(message: string) {
@@ -166,8 +178,9 @@
 			showError('Save data could not be decoded.');
 			return;
 		}
-		engine = createGameEngine(world, restoredState);
-		view = engine.getView();
+		const nextEngine = createGameEngine(world, restoredState);
+		if (!prepareGameView(nextEngine)) return;
+		engine = nextEngine;
 		save = result.save;
 		saveSlotsVersion += 1;
 		warningMessage = result.warning ?? '';
@@ -232,10 +245,11 @@
 				showError(compatibility.reason);
 				return;
 			}
+			const nextEngine = createGameEngine(world, result.payload.state);
+			if (!prepareGameView(nextEngine)) return;
 			const imported = createSave(save.worldId, result.payload.saveName, result.payload.state, world.version);
 			save = imported;
-			engine = createGameEngine(world, result.payload.state);
-			view = engine.getView();
+			engine = nextEngine;
 			warningMessage = compatibility.warning ?? '';
 			saveSlotsVersion += 1;
 			showInfo(`Imported ${imported.name}`);
@@ -269,6 +283,13 @@
 			<p class="eyebrow">Unable to open game</p>
 			<h1 id="game-error-title">This adventure is unavailable</h1>
 			<p>{errorMessage}</p>
+			{#if validationReport && !validationReport.canStart}
+				<ul class="validation-issues" aria-label="Critical validation issues">
+					{#each validationReport.issues.filter((issue) => issue.level === 'critical') as issue, index (index)}
+						<li><strong>{issue.code}</strong>: {issue.message}</li>
+					{/each}
+				</ul>
+			{/if}
 			<button type="button" onclick={() => goto('#/')}>Back to main menu</button>
 		</section>
 	</main>
@@ -333,6 +354,16 @@
 		/>
 		{#if warningMessage}
 			<p class="compatibility-warning" role="status">{warningMessage}</p>
+		{/if}
+		{#if validationReport && validationReport.issues.length > 0}
+			<details class="validation-warning">
+				<summary>World validation: {validationReport.concernLevel} concern ({validationReport.issues.length} {validationReport.issues.length === 1 ? 'issue' : 'issues'})</summary>
+				<ul class="validation-issues">
+					{#each validationReport.issues as issue, index (index)}
+						<li><strong>{issue.level.toUpperCase()} · {issue.code}</strong>: {issue.message}{#if issue.path} <code>{issue.path}</code>{/if}</li>
+					{/each}
+				</ul>
+			</details>
 		{/if}
 		<MainGame {callEngine} bind:view bind:showMobileActions />
 	</main>
@@ -610,6 +641,33 @@
 		color: var(--color-text-bright);
 		padding: 0.65rem 0.8rem;
 		font-size: 0.9rem;
+	}
+
+	.validation-warning {
+		margin: 0.75rem clamp(1rem, 3vw, 2rem) 0;
+		border: 1px solid var(--border-subtle);
+		border-radius: 0.45rem;
+		background: var(--bg-panel);
+		padding: 0.65rem 0.8rem;
+		font-size: 0.9rem;
+	}
+
+	.validation-warning summary {
+		color: var(--color-text-bright);
+		cursor: pointer;
+		font-weight: 700;
+	}
+
+	.validation-issues {
+		display: grid;
+		gap: 0.4rem;
+		margin: 0.75rem 0;
+		padding-left: 1.25rem;
+		line-height: 1.5;
+	}
+
+	.validation-issues code {
+		color: var(--color-accent-dim);
 	}
 
 	@media (max-width: 780px) {

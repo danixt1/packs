@@ -15,7 +15,10 @@ import type {
 	VarDisplayView,
 	WorldIndexes,
 	RuntimeCharacter,
-	BaseDisplay
+	BaseDisplay,
+	ValidationConcernLevel,
+	ValidationIssue,
+	WorldValidationResult
 } from './types';
 import { runAutonomy } from './autonomy';
 import { resolveGetter } from './getters';
@@ -852,64 +855,95 @@ export function getGameView(world: any, state: RuntimeState): GameView {
 	};
 }
 
-export function validateWorld(world: any) {
-	const errors: string[] = [];
+export function validateWorld(world: any): WorldValidationResult {
+	const issues: ValidationIssue[] = [];
+	const addIssue = (code: string, level: ValidationIssue['level'], message: string, path?: string) => {
+		issues.push({ code, level, message, ...(path ? { path } : {}) });
+	};
+	if (!world || typeof world !== 'object' || Array.isArray(world)) {
+		const counts: WorldValidationResult['counts'] = { critical: 1, average: 0, low: 0, none: 0 };
+		return {
+			concernLevel: 'critical',
+			canStart: false,
+			issues: [{ code: 'WORLD_INVALID_DATA', level: 'critical', message: 'World data must be an object', path: 'world' }],
+			counts
+		};
+	}
+	const placesList = Array.isArray(world.places) ? world.places : [];
+	const charactersList = Array.isArray(world.characters) ? world.characters : [];
+	const actionsList = Array.isArray(world.actions) ? world.actions : [];
+	const proceduresList = Array.isArray(world.procedures) ? world.procedures : [];
+	const itemsList = Array.isArray(world.items) ? world.items : [];
 	const places = new Set<string>();
 	const characters = new Set<string>();
 	const actions = new Set<string>();
 	const procedures = new Set<string>();
-	
-	for (const place of world.places ?? []) {
-		if (places.has(place.id)) errors.push(`Duplicate place id: ${place.id}`);
+	const controlledCharacters = charactersList.filter((character: any) => character.controlledByPlayer);
+	if (!placesList.length) addIssue('WORLD_NO_PLACES', 'critical', 'World has no places', 'places');
+	if (!charactersList.length) addIssue('WORLD_NO_CHARACTERS', 'critical', 'World has no characters', 'characters');
+	if (!controlledCharacters.length) addIssue('WORLD_NO_CONTROLLED_PLAYER', 'critical', 'World has no controlled player character', 'characters');
+	const placeCharacterIds = new Set(placesList.flatMap((place: any) => place?.charactersId ?? []));
+	const playerCharacter = controlledCharacters[0];
+	if (playerCharacter && !placeCharacterIds.has(playerCharacter.id)) {
+		addIssue('PLAYER_NO_PLACE', 'critical', `Player character ${playerCharacter.id} is not assigned to a place`, `characters[${charactersList.indexOf(playerCharacter)}]`);
+	}
+	if (controlledCharacters.length > 1) {
+		addIssue('MULTIPLE_CONTROLLED_PLAYERS', 'average', `World has ${controlledCharacters.length} controlled player characters; runtime uses the first one`, 'characters');
+	}
+
+	for (const [index, place] of placesList.entries()) {
+		if (!place || typeof place !== 'object') continue;
+		if (places.has(place.id)) addIssue('PLACE_DUPLICATE_ID', 'average', `Duplicate place id: ${place.id}`, `places[${index}].id`);
 		places.add(place.id);
 	}
-	for (const character of world.characters ?? []) {
-		if (characters.has(character.id)) errors.push(`Duplicate character id: ${character.id}`);
+	for (const [index, character] of charactersList.entries()) {
+		if (!character || typeof character !== 'object') continue;
+		if (characters.has(character.id)) addIssue('CHARACTER_DUPLICATE_ID', 'average', `Duplicate character id: ${character.id}`, `characters[${index}].id`);
 		characters.add(character.id);
 	}
-	const hasPairedVariables = (world.characters ?? []).some((character: any) =>
+	const hasPairedVariables = charactersList.some((character: any) =>
 		(character.vars ?? []).some((variable: any) => variable.mode === 'paired')
 	);
 	for (const [ownerType, owners] of [
 		['world', [world]],
-		['place', world.places ?? []],
-		['item', world.items ?? []]
+		['place', placesList],
+		['item', itemsList]
 	] as [string, any[]][]) {
 		for (const owner of owners) {
 			for (const variable of owner.vars ?? []) {
-				if (variable.mode === 'paired') errors.push(`Paired variable ${variable.name} is only supported on characters (found on ${ownerType})`);
+				if (variable.mode === 'paired') addIssue('PAIRED_VARIABLE_UNSUPPORTED_OWNER', 'average', `Paired variable ${variable.name} is only supported on characters (found on ${ownerType})`);
 			}
 		}
 	}
 	if (hasPairedVariables) {
-		for (const character of world.characters ?? []) {
-			if (!/^[a-zA-Z0-9]+$/.test(character.id)) errors.push(`Character id ${character.id} must contain only letters and numbers when paired variables are used`);
+		for (const [index, character] of charactersList.entries()) {
+			if (!/^[a-zA-Z0-9]+$/.test(character.id)) addIssue('PAIRED_VARIABLE_INVALID_CHARACTER_ID', 'average', `Character id ${character.id} must contain only letters and numbers when paired variables are used`, `characters[${index}].id`);
 		}
 	}
-	for (const action of world.actions ?? []) {
-		if (actions.has(action.name)) errors.push(`Duplicate action name: ${action.name}`);
+	for (const [index, action] of actionsList.entries()) {
+		if (actions.has(action.name)) addIssue('ACTION_DUPLICATE_NAME', 'average', `Duplicate action name: ${action.name}`, `actions[${index}].name`);
 		actions.add(action.name);
 	}
-	for (const procedure of world.procedures ?? []) {
-		if (procedures.has(procedure.name)) errors.push(`Duplicate procedure name: ${procedure.name}`);
+	for (const [index, procedure] of proceduresList.entries()) {
+		if (procedures.has(procedure.name)) addIssue('PROCEDURE_DUPLICATE_NAME', 'average', `Duplicate procedure name: ${procedure.name}`, `procedures[${index}].name`);
 		procedures.add(procedure.name);
 		const parameters = new Set<string>();
-		for (const parameter of procedure.parameters ?? []) {
-			if (!/^[a-zA-Z0-9]+$/.test(parameter.name)) errors.push(`Invalid parameter name ${parameter.name} in procedure ${procedure.name}`);
-			if (!['number', 'string', 'boolean'].includes(parameter.type)) errors.push(`Invalid parameter type for ${parameter.name} in procedure ${procedure.name}`);
-			if (parameters.has(parameter.name)) errors.push(`Duplicate parameter ${parameter.name} in procedure ${procedure.name}`);
+		for (const [parameterIndex, parameter] of (procedure.parameters ?? []).entries()) {
+			if (!/^[a-zA-Z0-9]+$/.test(parameter.name)) addIssue('PROCEDURE_PARAMETER_INVALID_NAME', 'average', `Invalid parameter name ${parameter.name} in procedure ${procedure.name}`, `procedures[${index}].parameters[${parameterIndex}].name`);
+			if (!['number', 'string', 'boolean'].includes(parameter.type)) addIssue('PROCEDURE_PARAMETER_INVALID_TYPE', 'average', `Invalid parameter type for ${parameter.name} in procedure ${procedure.name}`, `procedures[${index}].parameters[${parameterIndex}].type`);
+			if (parameters.has(parameter.name)) addIssue('PROCEDURE_PARAMETER_DUPLICATE_NAME', 'average', `Duplicate parameter ${parameter.name} in procedure ${procedure.name}`, `procedures[${index}].parameters[${parameterIndex}].name`);
 			parameters.add(parameter.name);
 		}
 		const checkParameterGetters = (value: any) => {
 			if (!value || typeof value !== 'object') return;
 			if (value.type === 'getter' && value.in === 'parameter-variable' && !parameters.has(value.variable)) {
-				errors.push(`Procedure ${procedure.name} reads undeclared parameter: ${value.variable}`);
+				addIssue('PROCEDURE_PARAMETER_UNDECLARED_READ', 'average', `Procedure ${procedure.name} reads undeclared parameter: ${value.variable}`, `procedures[${index}].effects`);
 			}
 			Object.values(value).forEach(checkParameterGetters);
 		};
 		checkParameterGetters(procedure.effects);
 	}
-	const procedureByName = new Map((world.procedures ?? []).map((procedure: any) => [procedure.name, procedure]));
+	const procedureByName = new Map(proceduresList.map((procedure: any) => [procedure.name, procedure]));
 	const findProcedureCalls = (effects: any[]): any[] => {
 		return (effects ?? []).flatMap((effect: any) => effect.type === 'conditional'
 			? [...findProcedureCalls(effect.onTrue), ...findProcedureCalls(effect.onFalse)]
@@ -925,23 +959,23 @@ export function validateWorld(world: any) {
 			if (effect.type !== 'call-procedure') continue;
 			const declaration = procedureByName.get(effect.procedure) as any;
 			if (!declaration) {
-				errors.push(`${origin} calls missing procedure: ${effect.procedure}`);
+				addIssue('PROCEDURE_MISSING', 'average', `${origin} calls missing procedure: ${effect.procedure}`);
 				continue;
 			}
 			const expected = new Set((declaration.parameters ?? []).map((parameter: any) => parameter.name));
 			const actual = Object.keys(effect.arguments ?? {});
 			if (actual.length !== expected.size || actual.some(name => !expected.has(name))) {
-				errors.push(`${origin} has invalid arguments for procedure ${effect.procedure}`);
+				addIssue('PROCEDURE_ARGUMENTS_INVALID', 'average', `${origin} has invalid arguments for procedure ${effect.procedure}`);
 			}
 			for (const parameter of declaration.parameters ?? []) {
 				const argument = effect.arguments?.[parameter.name];
 				if (argument === undefined || (!isGetter(argument) && typeof argument !== parameter.type)) {
-					errors.push(`${origin} argument ${parameter.name} for procedure ${effect.procedure} must be ${parameter.type}`);
+					addIssue('PROCEDURE_ARGUMENT_TYPE_INVALID', 'average', `${origin} argument ${parameter.name} for procedure ${effect.procedure} must be ${parameter.type}`);
 				}
 			}
 		}
 	};
-	for (const action of world.actions ?? []) {
+	for (const action of actionsList) {
 		checkProcedureCalls([...(action.onActivate ?? []), ...(action.onComplete ?? []), ...(action.onInterrupt ?? [])], `Action ${action.name}`);
 	}
 	for (const dialogue of world.dialogues ?? []) {
@@ -949,12 +983,12 @@ export function validateWorld(world: any) {
 			checkProcedureCalls([...(node.onEnter ?? []), ...(node.choices ?? []).flatMap((choice: any) => choice.effects ?? [])], `Dialogue ${dialogue.id}`);
 		}
 	}
-	for (const procedure of world.procedures ?? []) {
+	for (const procedure of proceduresList) {
 		checkProcedureCalls(procedure.effects ?? [], `Procedure ${procedure.name}`);
 	}
 	const visitProcedure = (name: string, path: string[], visited: Set<string>) => {
 		if (path.includes(name)) {
-			errors.push(`Recursive procedure call: ${[...path, name].join(' -> ')}`);
+			addIssue('PROCEDURE_RECURSIVE_CALL', 'average', `Recursive procedure call: ${[...path, name].join(' -> ')}`);
 			return;
 		}
 		if (visited.has(name)) return;
@@ -964,22 +998,30 @@ export function validateWorld(world: any) {
 		for (const call of findProcedureCalls(declaration.effects)) visitProcedure(call.procedure, [...path, name], visited);
 	};
 	const visitedProcedures = new Set<string>();
-	for (const procedure of world.procedures ?? []) visitProcedure(procedure.name, [], visitedProcedures);
-	for (const place of world.places ?? []) {
-		for (const id of place.charactersId ?? []) if (!characters.has(id)) errors.push(`Place ${place.id} references missing character ${id}`);
-		for (const id of place.connectedPlaces ?? []) if (!places.has(id)) errors.push(`Place ${place.id} references missing connected place ${id}`);
+	for (const procedure of proceduresList) visitProcedure(procedure.name, [], visitedProcedures);
+	for (const [placeIndex, place] of placesList.entries()) {
+		for (const id of place.charactersId ?? []) if (!characters.has(id)) addIssue('PLACE_CHARACTER_MISSING', 'low', `Place ${place.id} references missing character ${id}`, `places[${placeIndex}].charactersId`);
+		for (const id of place.connectedPlaces ?? []) if (!places.has(id)) addIssue('PLACE_CONNECTION_MISSING', 'low', `Place ${place.id} references missing connected place ${id}`, `places[${placeIndex}].connectedPlaces`);
 	}
 	for (const dialogue of world.dialogues ?? []) {
 		const nodes = new Set((dialogue.nodes ?? []).map((node: any) => node.id));
-		if (!nodes.has(dialogue.startsAt)) errors.push(`Dialogue ${dialogue.id} starts at missing node ${dialogue.startsAt}`);
+		if (!nodes.has(dialogue.startsAt)) addIssue('DIALOGUE_START_NODE_MISSING', 'low', `Dialogue ${dialogue.id} starts at missing node ${dialogue.startsAt}`);
 		for (const node of dialogue.nodes ?? []) {
-			for (const choice of node.choices ?? []) if (choice.nextNodeId && !nodes.has(choice.nextNodeId)) errors.push(`Dialogue ${dialogue.id} choice ${choice.id} links missing node ${choice.nextNodeId}`);
+			for (const choice of node.choices ?? []) if (choice.nextNodeId && !nodes.has(choice.nextNodeId)) addIssue('DIALOGUE_NEXT_NODE_MISSING', 'low', `Dialogue ${dialogue.id} choice ${choice.id} links missing node ${choice.nextNodeId}`);
 		}
 	}
 	for (const textTemplate of world.textTemplates ?? []) {
-		if (textTemplate.match?.primaryRole && !textTemplate.match.roles?.[textTemplate.match.primaryRole]) errors.push(`Text template ${textTemplate.name} primary role ${textTemplate.match.primaryRole} is not defined in roles`);
+		if (textTemplate.match?.primaryRole && !textTemplate.match.roles?.[textTemplate.match.primaryRole]) addIssue('TEXT_TEMPLATE_PRIMARY_ROLE_MISSING', 'low', `Text template ${textTemplate.name} primary role ${textTemplate.match.primaryRole} is not defined in roles`);
 	}
-	return errors;
+	const counts: WorldValidationResult['counts'] = {
+		critical: issues.filter((issue) => issue.level === 'critical').length,
+		average: issues.filter((issue) => issue.level === 'average').length,
+		low: issues.filter((issue) => issue.level === 'low').length,
+		none: 0
+	};
+	const concernOrder: ValidationConcernLevel[] = ['critical', 'average', 'low', 'none'];
+	const concernLevel = concernOrder.find((level) => level !== 'none' && counts[level] > 0) ?? 'none';
+	return { concernLevel, canStart: counts.critical === 0, issues, counts };
 }
 
 export function createGameEngine(world: any, savedState?: RuntimeState): Engine {
