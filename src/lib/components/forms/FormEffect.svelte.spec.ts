@@ -25,7 +25,7 @@ test('add move event using literal toId',async ()=>{
     const screen = await render(FormEffectStackHarness, { onAfterSubmit });
 
     await screen.getByRole('button', { name: 'Open effect' }).click();
-    await screen.getByTestId('input-effect-type').selectOptions('Move');
+    await screen.getByTestId('effect-type-move').click();
     await screen.getByTestId('button-move-moveId').click();
     //Getter page
     await fillGetter(screen,'Target','Character','Variable','test');
@@ -62,6 +62,21 @@ test('adds an event effect from the standalone form', async () => {
     });
 });
 
+test('renders effect choices as buttons and updates the selected effect', async () => {
+    const screen = await render(FormEffect, { stack: createContextStack() });
+    const effectTypes = ['move', 'event', 'conditional', 'setter', 'start-dialogue', 'call-procedure'];
+
+    for (const type of effectTypes) {
+        await expect.element(screen.getByTestId(`effect-type-${type}`)).toBeVisible();
+        await expect.element(screen.getByTestId(`effect-type-${type}`)).toHaveAttribute('type', 'button');
+    }
+
+    await expect.element(screen.getByTestId('effect-type-event')).toHaveAttribute('aria-pressed', 'true');
+    await screen.getByTestId('effect-type-setter').click();
+    await expect.element(screen.getByTestId('effect-type-setter')).toHaveAttribute('aria-pressed', 'true');
+    await expect.element(screen.getByTestId('effect-type-event')).toHaveAttribute('aria-pressed', 'false');
+});
+
 test('configures a procedure call from its declared parameters', async () => {
     const world: World = {
         name: 'Editor Test', description: '', version: [1, 0, 0],
@@ -85,7 +100,7 @@ test('configures a procedure call from its declared parameters', async () => {
         }
     });
 
-    await screen.getByTestId('input-effect-type').selectOptions('Call procedure');
+    await screen.getByTestId('effect-type-call-procedure').click();
     await screen.getByTestId('input-effect-procedure').selectOptions('applyDamage');
     await expect.element(screen.getByTestId('input-procedure-argument-amount')).toBeVisible();
     await screen.getByTestId('input-procedure-argument-amount').fill('12');
@@ -121,7 +136,7 @@ test('offers procedure parameters as setter value getters inside a conditional e
 
     await screen.getByRole('button', { name: 'Open effect' }).click();
     await screen.getByRole('button', { name: 'Add Effect' }).first().click();
-    await screen.getByTestId('input-effect-type').last().selectOptions('Set variable');
+    await screen.getByTestId('effect-type-setter').last().click();
     await screen.getByTestId('input-effect-value-kind').last().selectOptions('Getter');
     await screen.getByRole('button', { name: 'Edit value getter' }).click();
     await screen.getByTestId('input-getter-location').last().selectOptions('parameter');
@@ -185,7 +200,7 @@ test('edits a setter effect and loads its getter fields', async () => {
     const stack = createContextStack();
     const screen = await render(FormEffect, { stack, value: setterEffect });
 
-    await expect.element(screen.getByTestId('input-effect-type')).toHaveValue('setter');
+    await expect.element(screen.getByTestId('effect-type-setter')).toHaveAttribute('aria-pressed', 'true');
 
     await screen.getByRole('button', { name: 'Edit variable getter' }).click();
 
@@ -257,7 +272,8 @@ for(const effectName of ['Move','Event','Conditional','Set variable','Start dial
     test(`fail on not passed data on ${effectName}`,async ()=>{
         const onAfterSubmit = vi.fn();
         const screen = await render(FormEffect, {stack: createContextStack(), onAfterSubmit});
-        await screen.getByTestId('input-effect-type').selectOptions(effectName);
+        const effectType = effectName === 'Set variable' ? 'setter' : effectName.toLowerCase().replaceAll(' ', '-');
+        await screen.getByTestId(`effect-type-${effectType}`).click();
         await screen.getByRole('button', { name: 'Confirm' }).click();
         await expect.poll(() => onAfterSubmit.mock.calls.length).toBe(0);
     })
